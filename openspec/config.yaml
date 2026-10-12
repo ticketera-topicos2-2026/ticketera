@@ -1,0 +1,154 @@
+# =============================================================================
+# openspec/config.yaml  -  Ticketera virtual para eventos (microservicios)
+# Versión del archivo: 0.2.1  (propuesta pendiente de aprobación del equipo)
+#
+# Notas para el equipo (en español):
+# - La extensión DEBE ser .yaml (OpenSpec no lee config.yml).
+# - El contenido está en inglés porque se inyecta en los prompts de la IA
+#   (decisión propuesta D-09; si el equipo elige español, se traduce).
+# - Este archivo guía a la IA; no obliga. La verificación real es la CI
+#   y la revisión humana de cada Pull Request.
+# - Las decisiones marcadas "proposed" figuran en docs/PLAN.md (sección 5).
+# =============================================================================
+
+# Esquema de trabajo: proposal -> specs -> design -> tasks
+schema: spec-driven
+
+# Contexto del proyecto: se inyecta en TODAS las instrucciones de artefactos.
+context: |
+  ## Product
+  Virtual ticketing platform for events, built as microservices.
+  Academic project (Topics in Software Engineering II, 2026), team of three.
+  Design quality is evaluated, not real-world scale: the architecture must
+  allow scaling, and every decision must be justified.
+
+  ## Actors (ubiquitous language: use these exact role names)
+  - ADMIN: full platform management, maintenance, operations; approves or
+    rejects refund requests.
+  - EVENT_OWNER: designs, configures and publishes events.
+  - CLIENT: browses published events and buys tickets.
+
+  ## Method: DDD -> SDD -> TDD
+  1. Strategic DDD defines the boundaries. Bounded contexts and the
+     ubiquitous language live in docs/domain/ (glossary.md, context-map.md).
+     Always use glossary terms in specs and code; never invent synonyms.
+  2. SDD with OpenSpec defines the contract before any code.
+  3. TDD implements it: tests first (red -> green -> refactor).
+     No feature is merged unless its tests pass in CI.
+  If implementation reveals a gap in the model, open a new change that
+  updates the spec; never silently diverge from it.
+
+  ## Change granularity (proposed, pending confirmation with the professor)
+  One OpenSpec change per feature, grouped by stage with a prefix:
+  project-bootstrap, e1-*, e2-*, e3-*.
+  - Stage I (core): backend, APIs, authentication, ticket purchase, mockups.
+  - Stage II: recommendation system integration and caching.
+  - Stage III: sales queues, refunds, advanced search, stress test.
+
+  ## Candidate bounded contexts (hypothesis until Event Storming)
+  - identity (generic): users, roles, authentication via Keycloak.
+  - catalog (supporting): events, venues, zones, seat maps, participants
+    (performers), event types, publication lifecycle.
+  - sales (core): availability, temporary reservations with expiration,
+    orders, tickets, idempotency; refunds in Stage III.
+  - payments (generic): simulated, idempotent payments.
+  - Later: recommendation (II), search (III), sales-queue (III).
+
+  ## Domain rules that must never be violated
+  - A ticket is never sold twice (seat or zone capacity), under concurrency.
+  - Two ticket modalities: numbered (specific seat) and unnumbered (zone
+    capacity), each with its own business rules.
+  - Every state-changing request that may be retried uses an idempotency key.
+  - Refunds: CLIENT requests, ADMIN approves or rejects; approval releases
+    the seat or zone capacity.
+
+  ## Architecture
+  - One microservice per bounded context, each in its own container.
+  - Hexagonal architecture inside each service: domain/ (pure Python, no
+    framework or database imports), application/ (use cases),
+    infrastructure/ (database, messaging), api/ (FastAPI routers).
+  - Database per service: one PostgreSQL container, one logical database
+    and credentials per service. No service reads another service's data.
+  - API gateway (NGINX) is the only entry point to the API.
+  - Stage I: synchronous REST with idempotency keys; integration events are
+    already documented in designs. Asynchronous messaging (RabbitMQ) and
+    eventual consistency start in Stage II.
+  - HTTP request log (all services): start a timer on arrival, process
+    authentication, record method, path, user, status and duration, then
+    return the response. Authentication failures are logged too.
+
+  ## Stack (proposed)
+  - Frontend: React + TypeScript + Vite; tests with Vitest and React Testing Library.
+  - Backend: Python + FastAPI + Pydantic; SQLAlchemy 2 + Alembic; uv for
+    dependencies; Ruff (lint and format); mypy (type check).
+  - Tests: pytest, pytest-cov; integration tests against real PostgreSQL.
+  - Identity: Keycloak (OAuth 2.0 / OpenID Connect, JWT, RBAC).
+  - Infrastructure: Docker, Docker Compose, GitHub Actions.
+
+  ## Development environment (Docker-only)
+  - A single `docker compose up` from the repository root starts the whole
+    system. Every container defines a healthcheck, and services wait for
+    their dependencies to be healthy.
+  - The walking skeleton (all services with a /health endpoint, gateway
+    routes, Keycloak realm with roles) exists from the bootstrap; every
+    feature is added on top of a system that already runs.
+  - Never install project dependencies on the host machine.
+  - Run every command (install, lint, type check, tests, migrations)
+    inside containers via docker compose.
+  - Source folders are bind-mounted into their containers for live reload.
+
+  ## Conventions
+  - OpenSpec artifacts, code, identifiers and commit messages in English.
+  - PLAN.md, CONTRIBUTE.md and the team log (bitácora) in Spanish.
+  - Conventional Commits; branches named feature/<change-or-topic>.
+  - Clean Code (R. C. Martin): descriptive names, small single-purpose
+    functions, no duplication, explicit error handling.
+  - Security aligned with OWASP ASVS and OWASP API Security Top 10.
+    No secrets in the repository (public repository).
+  - AI usage must be declared in every pull request; a human teammate
+    reviews and approves every change.
+
+# Reglas por artefacto: se inyectan solo en el artefacto correspondiente.
+rules:
+  proposal:
+    - State Why, What Changes and Impact.
+    - List explicit non-goals (what this change will not do).
+    - Name the bounded contexts affected and the team member responsible.
+    - Identify technical risks and a rollback plan.
+  specs:
+    - One spec folder per bounded context; do not mix contexts in one file.
+    - Use only terms defined in docs/domain/glossary.md.
+    - Every requirement uses SHALL or MUST and has at least one scenario.
+    - Write scenarios as WHEN/THEN; include error, validation, concurrency
+      and role-authorization scenarios (ADMIN, EVENT_OWNER, CLIENT).
+    - Express non-functional requirements with measurable metrics.
+  design:
+    - Include sections Goals, Non-Goals, Decisions and Alternatives Considered
+      (with the reason each alternative was rejected).
+    - Model the domain with tactical DDD (aggregates and their invariants,
+      entities, value objects and domain events).
+    - Define API contracts (OpenAPI) and, when applicable, integration events.
+    - Explain the concurrency and idempotency strategy whenever stock,
+      orders or payments are involved.
+    - Include Mermaid sequence diagrams for multi-service flows.
+    - Analyze security threats of the change (for example with STRIDE).
+  tasks:
+    - Small, verifiable tasks (less than one day), grouped by bounded context.
+    - For every behavior, the test task comes before its implementation task.
+    - Each task references the requirement and scenario it satisfies.
+    - Include documentation and team-log tasks.
+
+# Indicaciones para las operaciones de implementación y archivo.
+operations:
+  apply:
+    guidance:
+      - Follow TDD strictly - write a failing test first, then the minimum code to pass, then refactor.
+      - Name or document each test with the requirement and scenario it verifies.
+      - Run tests, lint and type check inside Docker Compose, never on the host.
+      - Mark a task complete only when its tests pass.
+      - Do not modify bounded contexts or specs outside the current task.
+  archive:
+    guidance:
+      - Run openspec validate --all --strict before archiving.
+      - Keep the completion summary brief and state which team member completed each part.
+

@@ -22,6 +22,22 @@ Clients outside the system SHALL reach the backend services and the identity ser
 - **WHEN** a client on the local machine sends a request to the internal address of the `sales` service
 - **THEN** the request does not reach the `sales` service
 
+### Requirement: The gateway serves only the expected host names
+
+The gateway SHALL forward a request only when the host name in its `Host` header, regardless of the port, is one
+of the host names used on the local machine (`localhost` or `127.0.0.1`), and SHALL answer
+`421 Misdirected Request` to any other host name without forwarding the request.
+
+#### Scenario: Request with an unexpected host name
+
+- **WHEN** a client sends `GET /api/catalog/health` to the gateway with `Host: evil.example`
+- **THEN** the gateway answers `421 Misdirected Request` and the `catalog` service does not receive the request
+
+#### Scenario: Request with an expected host name
+
+- **WHEN** a client sends `GET /api/catalog/health` to the gateway with `Host: localhost`
+- **THEN** the request is forwarded to the `catalog` service
+
 ### Requirement: Each backend service has one route
 
 The gateway SHALL forward every request under `/api/<service>/` to that backend service, with the
@@ -89,13 +105,26 @@ service, replacing any `X-Forwarded-For`, `X-Forwarded-Host` or `X-Forwarded-Pro
 ### Requirement: The frontend can call the API from the browser
 
 The frontend, loaded in a browser from its own address, SHALL be able to call the API routes and receive their
-responses without cross-origin errors.
+responses without cross-origin errors; no other origin SHALL be granted cross-origin access.
 
 #### Scenario: Status page loads the health of every service
 
 - **WHEN** a team member opens the frontend status page in a browser on the local machine
 - **THEN** the page receives the health response of every backend service with no cross-origin error in the
   browser
+
+#### Scenario: CORS preflight from the frontend's address
+
+- **WHEN** a browser sends a CORS preflight `OPTIONS /api/catalog/health` from the frontend's address
+- **THEN** the preflight is answered successfully, the response allows the frontend's address as origin, and
+  the `catalog` service does not receive the request
+
+#### Scenario: CORS preflight from another origin
+
+- **WHEN** a browser sends a CORS preflight `OPTIONS /api/catalog/health` from any address other than the
+  frontend's
+- **THEN** the response grants no permission to that origin: it neither allows every origin nor echoes the
+  requested origin
 
 ### Requirement: The identity service is served under /auth
 

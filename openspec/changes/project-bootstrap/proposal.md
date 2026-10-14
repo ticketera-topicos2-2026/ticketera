@@ -10,7 +10,8 @@ works end to end (PLAN.md sections 6, 7.1 and 7.1.1).
 ## What Changes
 
 - Contribution rules and conventions: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTE.md`, pull request template,
-  `CODEOWNERS`, `.gitignore`, `.env.example`; update of the existing `.gitattributes` (initial commit).
+  `CODEOWNERS`, `.gitignore`, `.env.example`, MIT `LICENSE` (D-11); update of the existing `.gitattributes`
+  (initial commit).
 - Protection of `main` enforced through the GitHub ruleset, including the required status checks
   `openspec-validate`, `quality` and `smoke-test`.
 - A single `docker compose up` from the repository root starts the whole system; every container has a
@@ -69,7 +70,7 @@ context folder. The candidate contexts affected remain a hypothesis until the Ev
 skeletons).
 
 | Group | Scope | Owner | Branch |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | 1 | Conventions and rules files | A | `feature/bootstrap-conventions` |
 | 2 | Platform: database, identity service, gateway, smoke test, CI workflow | A | `feature/bootstrap-platform` |
 | 3 | `catalog` skeleton | B | `feature/bootstrap-catalog` |
@@ -99,7 +100,7 @@ these decisions are proposed, and this change implements nothing.
 ## Risks and Rollback
 
 | Risk | Mitigation |
-|---|---|
+| --- | --- |
 | A gated decision changes at the team meeting | `/opsx:update` the artifacts before implementation starts. |
 | Groups 3 to 6 edit shared files in parallel | Each pull request adds only its own entries and rebases on `main`. |
 | Groups 1 and 2 merge before the checks are required | Group 7 runs right after group 2 is merged; until then, reviewers do not approve a red pull request. |
@@ -112,8 +113,8 @@ settings. Until archived, the change adds no specs to `openspec/specs/`.
 
 ## Impact
 
-- Files: new `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTE.md`, `.gitignore`, `.env.example`, `.github/` (CI workflow,
-  pull request template, `CODEOWNERS`), `docker-compose.yml`, `infra/`, `services/`, `frontend/`,
+- Files: new `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTE.md`, `LICENSE`, `.gitignore`, `.env.example`, `.github/`
+  (CI workflow, pull request template, `CODEOWNERS`), `docker-compose.yml`, `infra/`, `services/`, `frontend/`,
   `docs/bitacora/`; modified `.gitattributes`.
 - APIs, through the gateway: `GET /api/<service>/health`, the gateway's `/healthz`, the identity service under
   `/auth`.

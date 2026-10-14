@@ -63,7 +63,7 @@ error messages or stack traces, in any state.
 ### Requirement: The health endpoint accepts only read requests
 
 The health endpoint SHALL accept `GET` and `HEAD`, and SHALL answer `405 Method Not Allowed` to any other
-method.
+method. A CORS preflight request is answered before it reaches the service.
 
 #### Scenario: HEAD request to the health endpoint
 

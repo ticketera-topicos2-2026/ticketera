@@ -207,7 +207,8 @@ Constraints that shape the approach:
 - `openspec-validate` runs `npx @fission-ai/openspec@1.14.1 validate --all --strict --no-interactive` inside a
   Node.js container, pinned to that version.
 - `quality` builds every image, then runs lint, type check and tests of each service with `docker compose run`,
-  printing the service and step before each command. It also runs the realm check: a script that inspects JSON
+  printing the service and step before each command. Like the smoke test, it derives the services from
+  `docker compose config`, so no service pull request edits the workflow. It also runs the realm check: a script that inspects JSON
   keys (`secret`, `privateKey`, `credentials`, ...), not values, because `client-secret` appears as the value of
   `clientAuthenticatorType`; a `${VAR}` placeholder passes.
 - `smoke-test` runs `docker compose up --wait --wait-timeout 300`, then checks with `curl`: `/healthz`, the realm

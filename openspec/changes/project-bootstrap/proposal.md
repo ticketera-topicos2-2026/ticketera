@@ -10,8 +10,8 @@ works end to end (PLAN.md sections 6, 7.1 and 7.1.1).
 ## What Changes
 
 - Contribution rules and conventions: `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTE.md`, pull request template,
-  `CODEOWNERS`, `.gitignore`, `.env.example`, MIT `LICENSE` (D-11); update of the existing `.gitattributes`
-  (initial commit).
+  `CODEOWNERS`, `.gitignore`, `.editorconfig`, `.env.example`, MIT `LICENSE` (D-11); update of the existing
+  `.gitattributes` (initial commit).
 - Protection of `main` enforced through the GitHub ruleset, including the required status checks
   `openspec-validate`, `quality` and `smoke-test`.
 - A single `docker compose up` from the repository root starts the whole system; every container has a
@@ -113,9 +113,9 @@ settings. Until archived, the change adds no specs to `openspec/specs/`.
 
 ## Impact
 
-- Files: new `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTE.md`, `LICENSE`, `.gitignore`, `.env.example`, `.github/`
-  (CI workflow, pull request template, `CODEOWNERS`), `docker-compose.yml`, `infra/`, `services/`, `frontend/`,
-  `docs/bitacora/`; modified `.gitattributes`.
+- Files: new `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTE.md`, `LICENSE`, `.gitignore`, `.editorconfig`, `.env.example`,
+  `.github/` (CI workflow, pull request template, `CODEOWNERS`), `docker-compose.yml`, `infra/`, `services/`,
+  `frontend/`, `docs/bitacora/`; modified `.gitattributes`.
 - APIs, through the gateway: `GET /api/<service>/health`, the gateway's `/healthz`, the identity service under
   `/auth`.
 - Specs added under `openspec/specs/platform/` on archive: the seven capabilities listed above.

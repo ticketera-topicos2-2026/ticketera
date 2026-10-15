@@ -2,10 +2,10 @@
 
 | Campo | Valor |
 |---|---|
-| Versión | 0.3.0 |
+| Versión | 0.4.0 |
 | Estado | Borrador para aprobación del equipo |
-| Última actualización | 2026-10-11 |
-| Responsable del documento | Integrante A |
+| Última actualización | 2026-10-15 |
+| Responsable del documento | Integrante B (actualización de propuestas) |
 | Fuentes | Consigna «Trabajo final de Tópicos II – 2026»; notas de la clase (lineamiento y profundización) |
 
 > Este plan es un documento vivo. Solo se modifica mediante Pull Request, siguiendo el
@@ -331,7 +331,7 @@ Al aprobarse, cada decisión se documenta en `docs/adr/` y se actualiza `openspe
 | D-06 | Base de datos | Un contenedor PostgreSQL, una base lógica por servicio | Un contenedor por base | Pendiente |
 | D-07 | Mensajería | RabbitMQ desde la Etapa II | Kafka; mensajería desde la Etapa I | Pendiente |
 | D-15 | Herramientas de Python | uv, SQLAlchemy 2 + Alembic, Ruff, mypy, pytest + pytest-cov | pip, Poetry, SQLModel, pyright | Pendiente |
-| D-16 | Herramientas de frontend | Vitest + React Testing Library; librería de componentes a elegir (MUI o Tailwind con shadcn/ui) | Jest; sin librería de componentes | Pendiente |
+| D-16 | Herramientas de frontend | Vitest + React Testing Library; Tailwind CSS con shadcn/ui | MUI; Jest; sin librería de componentes | Pendiente (propuesta por B) |
 | D-17 | Arquitectura interna de los servicios | Hexagonal (puertos y adaptadores) | Capas tradicionales (routers → servicios → modelos ORM) | Pendiente |
 | D-21 | Motor de búsqueda (Etapa III) | Se decide en la Etapa III | OpenSearch o búsqueda de texto completo de PostgreSQL | Diferida |
 | D-22 | Stress test (Etapa III) | Se decide en la Etapa III | k6 o Locust | Diferida |
@@ -342,7 +342,7 @@ Al aprobarse, cada decisión se documenta en `docs/adr/` y se actualiza `openspe
 |---|---|---|---|---|
 | D-08 | Reparto de trabajo | Provisorio por contexto (6.1); definitivo tras el Event Storming | Otra asignación | Pendiente |
 | D-09 | Idioma | Artefactos de OpenSpec, código y commits en inglés; plan, `CONTRIBUTE.md` y bitácora en español; glosario bilingüe | Todo en español salvo el código | Pendiente |
-| D-10 | Copiloto de IA | Libre, compatible con OpenSpec; reglas comunes en `AGENTS.md` (`CLAUDE.md` lo importa) | Copiloto único para todo el equipo | Pendiente |
+| D-10 | Copiloto de IA | Libre, compatible con OpenSpec; reglas comunes en `AGENTS.md` (soporte para Claude Code, Gemini en Antigravity IDE y OpenCode) | Copiloto único para todo el equipo | Pendiente |
 | D-11 | Licencia | MIT | Sin licencia | Pendiente |
 | D-12 | Entorno de desarrollo | *Docker-only* parcial: en el host solo Git, Docker Desktop, VS Code, el copiloto y OpenSpec (con Node.js); todo lo del proyecto en contenedores | Dev Containers (todo dentro del contenedor) | Pendiente |
 | D-13 | Método de merge | Squash and merge | Merge commit, rebase | Pendiente |
@@ -561,6 +561,7 @@ ticketera/
 | 0.1.0 | 2026-10-05 | Borrador inicial para aprobación del equipo | Integrante A | — |
 | 0.2.0 | 2026-10-11 | Consigna actualizada (desafíos y entregables); lineamiento de la clase; método DDD → SDD → TDD; React y FastAPI; contextos candidatos; copiloto libre; bootstrap como change; changes por feature; nuevas decisiones D-14 a D-22 | Integrante A | — |
 | 0.3.0 | 2026-10-11 | El bootstrap incluye el esqueleto andante: todo el sistema se levanta con `docker compose up`; la CI levanta el stack y ejecuta una prueba de humo desde el bootstrap | Integrante A | — |
+| 0.4.0 | 2026-10-15 | Integrante B registra acuerdo con D-01 a D-06, D-15; propone Tailwind CSS + shadcn/ui (D-16) e incorpora Gemini y Claude Code (D-10); entrega primer borrador de glosario (docs/domain/glossary.md) | Integrante B | — |
 
 ---
 

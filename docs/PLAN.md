@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| Versión | 0.3.0 |
-| Estado | Borrador para aprobación del equipo |
-| Última actualización | 2026-10-11 |
+| Versión | 0.4.0 |
+| Estado | Aprobado por el equipo (reunión del 2026-10-27) |
+| Última actualización | 2026-10-28 |
 | Responsable del documento | Integrante A |
-| Fuentes | Consigna «Trabajo final de Tópicos II – 2026»; notas de la clase (lineamiento y profundización) |
+| Fuentes | Consigna «Trabajo final de Tópicos II – 2026»; notas de la clase (lineamiento y profundización); acta de la reunión del equipo del 2026-10-27 |
 
 > Este plan es un documento vivo. Solo se modifica mediante Pull Request, siguiendo el
 > procedimiento de la sección 10. Cada cambio se registra en la sección 11.
@@ -128,6 +128,9 @@ No se debaten: definen el marco dentro del cual se toman las decisiones de la se
 | S-02 | La «bitácora de documentación» es un registro de trabajo del equipo: fecha, autor, qué se hizo, decisiones y uso de IA. | Se adapta al formato que indique la cátedra. |
 | S-03 | «Participante» en la búsqueda designa a quienes actúan en el evento (artistas, oradores, equipos), no a los asistentes. | Se ajusta el modelo del catálogo. |
 
+Estado según el acta del 2026-10-27: S-01 está respondido; S-02 y S-03 siguen pendientes de consulta.
+Las consultas S-04, S-05, S-07 y S-08 están respondidas, y S-06 se consulta al planificar la Etapa II.
+
 ---
 
 ## 3. Método de trabajo: DDD, SDD y TDD
@@ -164,26 +167,31 @@ flowchart TB
 
 ### 3.3 SDD: el contrato
 
-Cada feature es un change de OpenSpec (D-14) escrito con el lenguaje ubicuo:
+Cada feature es un change de OpenSpec (D-14) escrito con el lenguaje ubicuo. Su nombre va en inglés con
+prefijo de etapa, por ejemplo `e1-idempotent-purchase` (D-31):
 
-- **proposal**: por qué, qué cambia, impacto y *non-goals*.
+- **proposal**: por qué, qué cambia, impacto y *non-goals*; cita el nombre que la feature tiene en la clase (D-31).
 - **specs**: requisitos (SHALL/MUST) con escenarios WHEN/THEN, incluidos errores, concurrencia y autorización por rol.
 - **design**: *Goals*, *Non-Goals*, *Decisions* y *Alternatives Considered*; modelo táctico (agregados,
-  invariantes, eventos de dominio); contrato OpenAPI; estrategia de concurrencia e idempotencia.
-- **tasks**: tareas pequeñas, con la tarea de test antes que la de implementación.
+  invariantes, eventos de dominio); contrato OpenAPI acordado antes del código (*contract-first*, D-28);
+  estrategia de concurrencia e idempotencia; enlace al ADR de cada decisión de arquitectura (D-27).
+- **tasks**: tareas pequeñas, con la tarea de test antes que la de implementación y un test por escenario;
+  la colección de tests de API del change (D-24) y, solo si el change toma una decisión de arquitectura,
+  la tarea de escribir su ADR con la skill `create-architectural-decision-record` (D-27).
 
 ### 3.4 TDD: la implementación
 
 Cada tarea se implementa en dos lazos:
 
-1. **Lazo externo (aceptación)**: cada escenario de la spec se convierte en un test de API que falla.
+1. **Lazo externo (aceptación)**: cada escenario de la spec se convierte en un test de API que falla, en la
+   colección de Bruno del change (`tests/api/<servicio>/`), que corre en la CI contra el gateway (D-24).
 2. **Lazo interno (unitario)**: tests del **DDD táctico** que modelan el dominio, cada uno con el ciclo
    **rojo → verde → refactor**:
    - *entidad*: objeto con identidad propia (una orden);
    - *objeto de valor*: definido solo por sus atributos (un precio con su moneda);
    - *agregado*: grupo de objetos que se modifican juntos y protegen sus invariantes
      («no se reserva un asiento ya vendido»);
-   - *evento de dominio*: hecho relevante ocurrido («pago confirmado»).
+   - *evento de dominio*: hecho relevante ocurrido («orden confirmada»).
 
 Reglas:
 
@@ -191,7 +199,8 @@ Reglas:
 - **Evidencia de test-first**: en cada PR, el commit `test(...)` en rojo precede al `feat(...)` en verde.
   GitHub conserva esos commits en la página del PR aunque se integre con *squash*.
 - **Niveles de test**: unitarios (dominio y aplicación, sin base de datos), de integración
-  (repositorios con PostgreSQL real) y de aceptación (API).
+  (repositorios con PostgreSQL real) y de aceptación (API, con Bruno).
+- **Contract test**: compara el `openapi.yaml` acordado con el que genera FastAPI; es un check obligatorio (D-24).
 - **Puerta de calidad**: tests, lint y type check en verde, y cobertura mínima del 80 % en `domain`
   y `application` (D-18).
 - **Frontend**: tests de la lógica y de los componentes críticos con Vitest y React Testing Library.
@@ -209,13 +218,17 @@ Hipótesis inicial, a validar en el Event Storming (los nombres en código van e
 | `identity` | Genérico | Usuarios, roles y autenticación (Keycloak) | I |
 | `catalog` | Soporte | Eventos, tipos, sedes, zonas, mapa de asientos, participantes, publicación | I |
 | `sales` | **Núcleo** | Disponibilidad, reservas temporales, órdenes, tickets, idempotencia; devoluciones en la III | I |
-| `payments` | Genérico | Pago simulado e idempotente | I |
+| `payments` | Genérico | Pasarela de pagos simulada e idempotente (*Legacy Wrapper*) | II (en la I, solo el esqueleto con `/health`) |
 | `recommendation` | Soporte | Recomendaciones según historial y preferencias | II |
 | `search` | Soporte | Índice de búsqueda alimentado por eventos del catálogo | III |
 | `sales-queue` | Soporte | Sala de espera, posición en la cola, notificaciones | III |
 
 Reservas, órdenes y disponibilidad quedan juntas en `sales` para que reservar un asiento y crear la orden
 ocurran en una **transacción local**, sin transacción distribuida justo donde está el riesgo de doble venta.
+
+En la Etapa I la compra no tiene paso de pago: pasa de reservada a confirmada y emite el ticket en una sola
+solicitud idempotente (D-25). El design de la compra documenta como *non-goal* dónde entra el
+`PaymentProvider` en la Etapa II.
 
 ### 4.2 Vista general (Etapa I)
 
@@ -230,7 +243,7 @@ flowchart LR
         identity["identity<br/>Keycloak"]
         catalog["catalog<br/>FastAPI"]
         sales["sales<br/>FastAPI"]
-        payments["payments<br/>FastAPI"]
+        payments["payments<br/>FastAPI<br/>solo /health en la Etapa I"]
         database[("database<br/>PostgreSQL")]
     end
     browser --> frontend
@@ -238,7 +251,6 @@ flowchart LR
     gateway --> identity
     gateway --> catalog
     gateway --> sales
-    sales --> payments
     sales -.-> catalog
     identity --> database
     catalog --> database
@@ -269,13 +281,13 @@ El dominio no depende de nada externo: por eso se puede testear con pytest sin l
 
 | Contenedor | Se construye desde | Volumen | Tipo | Expuesto al host |
 |---|---|---|---|---|
-| `frontend` | `./frontend` | `./frontend` (código) | Bind mount | Sí |
-| `gateway` | Imagen oficial de NGINX | `./infra/gateway` (configuración) | Bind mount | Sí, único acceso a la API |
-| `identity` | Imagen oficial de Keycloak | `./infra/keycloak` (realm con los roles, importado al arrancar) | Bind mount | Solo la consola, en desarrollo |
+| `frontend` | `./frontend` | `./frontend` (código) | Bind mount | Sí, en `127.0.0.1` |
+| `gateway` | Imagen oficial de NGINX | `./infra/gateway` (configuración) | Bind mount | Sí, en `127.0.0.1`; único acceso a la API |
+| `identity` | Imagen oficial de Keycloak | `./infra/keycloak` (realm con los roles, importado al arrancar) | Bind mount | No |
 | `catalog` | `./services/catalog` | `./services/catalog` (código) | Bind mount | No |
 | `sales` | `./services/sales` | `./services/sales` (código) | Bind mount | No |
 | `payments` | `./services/payments` | `./services/payments` (código) | Bind mount | No |
-| `database` | Imagen oficial de PostgreSQL | `ticketera-db-data` (datos) y `./infra/database` (scripts de inicialización) | Volumen con nombre y bind mount | Opcional, en desarrollo |
+| `database` | Imagen oficial de PostgreSQL 18 (`postgres:18-alpine`, anclada por digest, D-34) | `ticketera-db-data` (datos, en `/var/lib/postgresql`) y `./infra/database` (scripts de inicialización) | Volumen con nombre y bind mount | No |
 
 - **Un único comando**: `docker compose up` desde la raíz levanta todos los contenedores; nadie instala
   dependencias del proyecto en su máquina.
@@ -284,72 +296,135 @@ El dominio no depende de nada externo: por eso se puede testear con pytest sin l
   `condition: service_healthy`).
 - **Una base lógica por servicio** dentro de `database` (`catalog`, `sales`, `payments`, `keycloak`),
   creadas por los scripts de `./infra/database` en el primer arranque, con credenciales exclusivas.
-- **Red interna**: solo `frontend` y `gateway` se exponen al host.
+- **Puertos publicados**: solo `gateway` y `frontend` publican puertos, y solo en `127.0.0.1`; el resto se
+  comunica por la red interna de Docker.
+- **Rutas públicas**: el gateway expone `/api/<servicio>/`, sin versión en la ruta (D-29).
 - **Secretos** en `.env` (ignorado por Git); en el repositorio solo `.env.example`.
-- **Dependencias aisladas**: las carpetas de dependencias (`.venv`, `node_modules`) se declaran como
-  volúmenes anónimos para que el bind mount del código no las oculte.
+- **Dependencias aisladas**: el entorno virtual de Python vive en `/opt/venv` dentro de la imagen, fuera del
+  bind mount del código; solo `node_modules` se declara como volumen anónimo para que el bind mount del
+  frontend no lo oculte.
 
 ### 4.5 Comunicación y consistencia
 
 | Etapa | Mecanismo | Uso |
 |---|---|---|
-| I | REST sincrónico con claves de idempotencia | Compra, pago simulado, consultas al catálogo |
+| I | REST sincrónico con claves de idempotencia | Compra (sin paso de pago, D-25), consultas al catálogo |
 | I | Eventos de integración **documentados** en el design | Contrato preparado para la mensajería |
 | II | RabbitMQ (asíncrono, consistencia eventual) | El historial de compras alimenta `recommendation` |
 | III | RabbitMQ + WebSocket o SSE | Cola de venta con posición en tiempo real; índice de `search` |
+
+- **Concurrencia e idempotencia (D-30)**: en la Etapa I no hay Redis ni cache. PostgreSQL es el árbitro de la
+  doble venta (restricción de unicidad o actualización condicional). La clave de idempotencia (header
+  `Idempotency-Key`, generada por el cliente) se guarda en la base de `sales`, en la misma transacción que la
+  orden. El mecanismo exacto, con `expires_at` para las reservas, va en el design de `e1-idempotent-purchase`.
+- **Identidad e inventario (D-28)**: el `CLIENT` se identifica por el `sub` del JWT del realm `ticketera`.
+  `sales` tiene su propio inventario, que solo carga `ADMIN`, con `event_id` como *opaque reference*, y nunca
+  lee la base de `catalog`.
 
 ### 4.6 Bitácora de solicitudes HTTP (DT-03)
 
 Middleware en cada servicio, en este orden: iniciar el timer al recibir la solicitud, procesar la
 autenticación, ejecutar el endpoint, registrar método, ruta, usuario, código de estado y duración, y
-devolver la respuesta. Los rechazos de autenticación también se registran. El formato y el almacenamiento
-se definen en el design del change `e1-request-log`.
+devolver la respuesta. Los rechazos de autenticación también se registran.
+
+Según D-23 (change `e1-request-log`, Integrante B):
+
+- El middleware escribe una línea JSON por solicitud a stdout, con campos en inglés. El usuario registrado
+  es el `sub` del token.
+- El *correlation id* lo genera siempre el gateway; nunca se toma del cliente.
+- Recolección y consulta con Loki + Grafana, con Alloy como recolector; imágenes ancladas por digest y
+  Grafana solo en `127.0.0.1`, con credenciales de `.env`.
+- La retención y los campos excluidos (tokens, datos de pago) se definen en su ADR.
 
 ### 4.7 Crecimiento por etapas
 
 | Etapa | Contenedores que se agregan |
 |---|---|
-| II | `redis` (cache), `rabbitmq` (mensajería), `recommendation` |
+| II | `redis` (cache, D-30), `rabbitmq` (mensajería), `recommendation` |
 | III | `sales-queue`, `search` (motor según D-21); pruebas de estrés según D-22 |
+
+En la Etapa II, `payments` deja de ser un esqueleto e implementa la pasarela de pagos (D-25).
 
 ---
 
 ## 5. Decisiones propuestas
 
-Estado: **Pendiente** (en discusión), **Aprobada** (registrada en un ADR) o **Reemplazada**.
-Al aprobarse, cada decisión se documenta en `docs/adr/` y se actualiza `openspec/config.yaml`.
+Estado según el acta de la reunión del equipo del 2026-10-27:
+
+- **Aprobada**: se aprobó la propuesta.
+- **Aprobada con cambios**: se aprobó la propuesta con los cambios del acta; la columna Propuesta muestra lo aprobado.
+- **Aprobada con la alternativa**: se aprobó la alternativa en lugar de la propuesta original; la columna
+  Propuesta muestra lo aprobado.
+- **Pendiente de voto**: todavía no se votó.
+
+Una decisión aprobada puede pasar más adelante a **Reemplazada**. Solo llevan ADR las decisiones de
+arquitectura que cumplen el criterio de D-27; están en `docs/adr/` ([índice](adr/README.md)). Las decisiones
+de proceso quedan en este plan y en el acta. Al aprobarse una decisión se actualiza `openspec/config.yaml`.
 
 ### 5.1 Tecnología
 
 | ID | Decisión | Propuesta | Alternativas | Estado |
 |---|---|---|---|---|
-| D-01 | Frontend | React + TypeScript + Vite | Angular, Vue | Pendiente |
-| D-02 | Backend | Python + FastAPI | NestJS, Spring Boot | Pendiente |
-| D-03 | Identidad | Keycloak (OAuth 2.0 / OIDC, RBAC) | Servicio propio en FastAPI con JWT | Pendiente |
-| D-04 | API Gateway | NGINX | Kong, Traefik | Pendiente |
-| D-05 | Contenedores | Uno por microservicio | Monolito modular en un contenedor | Pendiente |
-| D-06 | Base de datos | Un contenedor PostgreSQL, una base lógica por servicio | Un contenedor por base | Pendiente |
-| D-07 | Mensajería | RabbitMQ desde la Etapa II | Kafka; mensajería desde la Etapa I | Pendiente |
-| D-15 | Herramientas de Python | uv, SQLAlchemy 2 + Alembic, Ruff, mypy, pytest + pytest-cov | pip, Poetry, SQLModel, pyright | Pendiente |
-| D-16 | Herramientas de frontend | Vitest + React Testing Library; librería de componentes a elegir (MUI o Tailwind con shadcn/ui) | Jest; sin librería de componentes | Pendiente |
-| D-17 | Arquitectura interna de los servicios | Hexagonal (puertos y adaptadores) | Capas tradicionales (routers → servicios → modelos ORM) | Pendiente |
-| D-21 | Motor de búsqueda (Etapa III) | Se decide en la Etapa III | OpenSearch o búsqueda de texto completo de PostgreSQL | Diferida |
-| D-22 | Stress test (Etapa III) | Se decide en la Etapa III | k6 o Locust | Diferida |
+| D-01 | Frontend | React + TypeScript + Vite | Angular, Vue | Aprobada |
+| D-02 | Backend | Python + FastAPI | NestJS, Spring Boot | Aprobada · [ADR-0001](adr/adr-0001-backend-python-fastapi.md) |
+| D-03 | Identidad | Keycloak (OAuth 2.0 / OIDC, RBAC) | Servicio propio en FastAPI con JWT | Aprobada · [ADR-0002](adr/adr-0002-identidad-keycloak.md) |
+| D-04 | API Gateway | NGINX | Kong, Traefik | Aprobada · [ADR-0003](adr/adr-0003-api-gateway-nginx.md) |
+| D-05 | Contenedores | Uno por microservicio | Monolito modular en un contenedor | Aprobada · [ADR-0004](adr/adr-0004-contenedor-y-base-logica-por-servicio.md) |
+| D-06 | Base de datos | Un contenedor PostgreSQL, una base lógica y credenciales por servicio; la variante con Redis se resolvió en D-30 | Un contenedor por base | Aprobada · [ADR-0004](adr/adr-0004-contenedor-y-base-logica-por-servicio.md) |
+| D-07 | Mensajería | RabbitMQ desde la Etapa II | Kafka; mensajería desde la Etapa I | Aprobada |
+| D-15 | Herramientas de Python | uv, SQLAlchemy 2 + Alembic, Ruff, mypy, pytest + pytest-cov | pip, Poetry, SQLModel, pyright | Aprobada |
+| D-16 | Herramientas de frontend | Vitest + React Testing Library; Tailwind CSS con shadcn/ui, que se instala en el primer change con pantallas (el esqueleto solo tiene la página de estado) | Jest; MUI; sin librería de componentes | Aprobada |
+| D-17 | Arquitectura interna de los servicios | Hexagonal (puertos y adaptadores) | Capas tradicionales (routers → servicios → modelos ORM) | Aprobada · [ADR-0005](adr/adr-0005-arquitectura-hexagonal.md) |
+| D-21 | Motor de búsqueda (Etapa III) | Se decide en la Etapa III | OpenSearch o búsqueda de texto completo de PostgreSQL | Aprobada |
+| D-22 | Stress test (Etapa III) | Se decide en la Etapa III | k6 o Locust | Aprobada |
+| D-23 | Bitácora HTTP y observabilidad | Middleware en cada servicio que escribe una línea JSON a stdout (campos en inglés; usuario = `sub` del token); *correlation id* generado siempre por el gateway; Loki + Grafana con Alloy, imágenes ancladas por digest y Grafana solo en `127.0.0.1`. Change `e1-request-log` | Insertar en PostgreSQL desde cada handler; OpenTelemetry completo; solo `docker compose logs` | Aprobada · ADR en `e1-request-log` |
+| D-24 | Tests de API y contrato | Una colección de tests de API por change en `tests/api/<servicio>/`, con Bruno, que corre en la CI contra el gateway; *contract test* entre el `openapi.yaml` acordado y el que genera FastAPI, como check obligatorio. Cambiar de herramienta requiere un ADR nuevo | — | Aprobada · ADR en el primer change e1 con endpoints |
+| D-25 | Pasarela de pagos | `payments` como *Legacy Wrapper* en la Etapa II; en la Etapa I la compra pasa de reservada a confirmada y emite el ticket en una sola solicitud idempotente, sin paso de pago; el esqueleto de `payments` queda solo con `/health` | Pasarela de pagos en la Etapa I (propuesta original) | Aprobada con la alternativa · ADR en `e1-idempotent-purchase` |
+| D-29 | Versión en las rutas públicas | `/api/<servicio>/`, sin versión en las rutas; el bootstrap no cambia | Versión en la ruta, como en la diapositiva 14 de la Clase 7 (propuesta original) | Aprobada con la alternativa · ADR en `project-bootstrap` (grupo 2) |
+| D-30 | Redis en la Etapa I | Sin Redis ni cache en la Etapa I (Redis entra en la II para cache); PostgreSQL es el árbitro de la doble venta (restricción de unicidad o actualización condicional) y la *idempotency key* se guarda en la base de `sales`, en la misma transacción que la orden | Redis 7 con SETNX y reservas con TTL desde la Etapa I | Aprobada con cambios · ADR en `e1-idempotent-purchase` |
+| D-33 | Esqueleto de referencia de los servicios | Lo fija el `design.md` de `e1-idempotent-purchase`; su implementación inicializa Alembic, escribe las reglas en `AGENTS.md` y agrega import-linter al job quality. Los otros servicios lo adoptan en su primer change de features; el bootstrap no cambia | — | Aprobada · dentro del [ADR-0005](adr/adr-0005-arquitectura-hexagonal.md) |
+| D-34 | Versión de PostgreSQL | PostgreSQL 18 (`postgres:18-alpine` anclado por digest, volumen en `/var/lib/postgresql`) | `postgres:16` (ejemplo de la diapositiva 45) | Aprobada |
 
 ### 5.2 Proceso y organización
 
 | ID | Decisión | Propuesta | Alternativas | Estado |
 |---|---|---|---|---|
-| D-08 | Reparto de trabajo | Provisorio por contexto (6.1); definitivo tras el Event Storming | Otra asignación | Pendiente |
-| D-09 | Idioma | Artefactos de OpenSpec, código y commits en inglés; plan, `CONTRIBUTE.md` y bitácora en español; glosario bilingüe | Todo en español salvo el código | Pendiente |
-| D-10 | Copiloto de IA | Libre, compatible con OpenSpec; reglas comunes en `AGENTS.md` (`CLAUDE.md` lo importa) | Copiloto único para todo el equipo | Pendiente |
-| D-11 | Licencia | MIT | Sin licencia | Pendiente |
-| D-12 | Entorno de desarrollo | *Docker-only* parcial: en el host solo Git, Docker Desktop, VS Code, el copiloto y OpenSpec (con Node.js); todo lo del proyecto en contenedores | Dev Containers (todo dentro del contenedor) | Pendiente |
-| D-13 | Método de merge | Squash and merge | Merge commit, rebase | Pendiente |
-| D-14 | Granularidad de los changes | Uno por feature, con prefijo de etapa (S-01) | Uno por etapa | Pendiente |
-| D-18 | Cobertura mínima | 80 % en `domain` y `application` | Umbral global; sin umbral | Pendiente |
-| D-19 | Pre-commit hooks | Livianos (formato y lint), ejecutados dentro de Docker | Sin hooks | Pendiente |
-| D-20 | Seguimiento de tareas | GitHub Issues; cada PR las cierra con `Closes #n` | Solo `tasks.md` | Pendiente |
+| D-08 | Reparto de trabajo | Provisorio por contexto (6.1); definitivo tras el Event Storming. El reparto de la Etapa I está en D-28 | Otra asignación | Aprobada |
+| D-09 | Idioma | Artefactos de OpenSpec, código y commits en inglés; plan, `CONTRIBUTE.md` y bitácora en español; glosario bilingüe | Todo en español salvo el código | Aprobada |
+| D-10 | Copiloto de IA | Libre, compatible con OpenSpec; reglas comunes en `AGENTS.md` (`CLAUDE.md` lo importa) | Copiloto único para todo el equipo | Aprobada |
+| D-11 | Licencia | MIT | Sin licencia | Aprobada |
+| D-12 | Entorno de desarrollo | *Docker-only* parcial: en el host solo Git, Docker Desktop, VS Code, el copiloto y OpenSpec (con Node.js); todo lo del proyecto en contenedores | Dev Containers (todo dentro del contenedor) | Aprobada |
+| D-13 | Método de merge | Squash and merge | Merge commit, rebase | Aprobada |
+| D-14 | Granularidad de los changes | Uno por feature, con prefijo de etapa (S-01) | Uno por etapa | Aprobada |
+| D-18 | Cobertura mínima | 80 % en `domain` y `application` | Umbral global; sin umbral | Aprobada |
+| D-19 | Pre-commit hooks | Livianos (formato y lint), ejecutados dentro de Docker | Sin hooks | Aprobada |
+| D-20 | Seguimiento de tareas | GitHub Issues; cada PR las cierra con `Closes #n` | Solo `tasks.md` | Aprobada |
+| D-26 | Skills de terceros para los copilotos | `create-architectural-decision-record` y, de Matt Pocock, grilling, grill-me, grill-with-docs, domain-modeling, tdd y code-review, copiadas en `.claude/skills/` y `.agents/skills/` con sus licencias. Solo la skill de la cátedra escribe ADR; las que duplican OpenSpec quedan fuera; las herramientas personales no se votan. Se incorporan en un PR propio después de un piloto | — | Aprobada |
+| D-27 | ADR: carpeta, plantilla y granularidad | Un ADR por decisión de arquitectura importante, en `docs/adr/adr-NNNN-slug.md`, en español, con la plantilla de la skill `create-architectural-decision-record` más las secciones *Decision Drivers* y *Confirmation*. Solo lleva ADR una decisión difícil de revertir, que sorprende sin contexto y que salió de un trade-off real; las decisiones de proceso quedan en el plan y en el acta | Un único ADR-0001 con todas las decisiones aprobadas | Aprobada |
+| D-28 | Alcance y orden del MVP (Etapa I) | APIs funcionales, tests de API, mockups y pantallas de React obligatorias para cerrar la Etapa I, cada una hecha por el dueño de su feature (*vertical slice*). Primera feature: la compra idempotente, *contract-first*, con el Event Storming antes. Reparto y orden en 7.3, sin cambiar D-08 | — | Aprobada con cambios |
+| D-31 | Nombres de los changes | Inglés con prefijo de etapa: `e1-idempotent-purchase`, `e1-request-log`, `e1-event-catalog` y `e1-identity-access`; el proposal cita el nombre de la clase. El contrato de compras va dentro de `e1-idempotent-purchase` | — | Aprobada |
+| D-32 | Frontend en el esqueleto (bootstrap) | El frontend está en la Etapa I: esqueleto y stack, contenedor en `docker-compose.yml`, página de estado (grupo 4) y CORS de DS-09 | — | Aprobada |
+
+### 5.3 Puntos abiertos de las decisiones aprobadas
+
+- **D-23**: la retención y los campos excluidos (tokens, datos de pago) se definen en su ADR.
+- **D-24**: el nombre del check y la herramienta de comparación del *contract test* se definen en el design
+  del primer change e1 con endpoints.
+- **D-25**: para la Etapa II, decidir si existe un estado «pago pendiente».
+- **D-28**: las primeras pruebas de `sales` van sin autenticación y el JWT se agrega después. Quedan abiertos:
+  - (a) sin token, el `CLIENT` de la orden es un valor fijo de prueba, nunca un header que mande el cliente;
+  - (b) si se puede integrar a `main` código sin autenticación (el grilling recomendó que no, porque el
+    repositorio es público);
+  - (c) los escenarios de rol (403) se escriben cuando entra el JWT;
+  - (d) el usuario de prueba del realm, con su contraseña en `.env`.
+- **D-29**: si «sin versión» significa «nunca» o «hasta que aparezca una v2», y qué se hace si cambia un
+  contrato (header, ruta nueva o *breaking change* coordinado).
+- **D-33**: la fecha de integración del design de `e1-idempotent-purchase`, para que A y B lo tengan antes
+  de arrancar.
+- **DF-02**: las entradas numeradas y no numeradas son un requisito de la Etapa I que todavía no tiene un
+  change asignado; se asigna después del Event Storming.
+- **D-24, D-33**: la organización de los tests de la sección 4.3 (`tests/acceptance/` dentro de cada servicio
+  frente a `tests/api/` con Bruno) la fija el design de `e1-idempotent-purchase`.
 
 ---
 
@@ -359,10 +434,11 @@ Al aprobarse, cada decisión se documenta en `docs/adr/` y se actualiza `openspe
 
 | Integrante | Responsabilidad | Revisa los PR de |
 |---|---|---|
-| A | `identity`, gateway, plataforma (Compose, CI), bitácora HTTP | C |
+| A | `identity`, gateway, plataforma (Compose, CI) | C |
 | B | `catalog` | A |
 | C | `sales`, `payments` | B |
 
+- El reparto de la Etapa I (D-28), que incluye la bitácora HTTP a cargo de B, está en 7.3.
 - Los cambios en `docs/PLAN.md`, `docs/domain/` y `openspec/config.yaml` los revisan los otros dos integrantes.
 - La revisión no solo aprueba: es la transferencia de conocimiento que permite a cada integrante
   explicar todo el sistema en las entrevistas (RB-14).
@@ -371,7 +447,7 @@ Al aprobarse, cada decisión se documenta en `docs/adr/` y se actualiza `openspe
 ### 6.2 Flujo de Git (GitHub Flow)
 
 1. Actualizar `main` (`git switch main` y `git pull`).
-2. Crear la rama `feature/<change-o-tema>`, por ejemplo `feature/e1-ticket-inventory`.
+2. Crear la rama `feature/<change-o-tema>`, por ejemplo `feature/e1-idempotent-purchase`.
 3. Ciclo TDD con commits pequeños en Conventional Commits: `test(sales): ...` y luego `feat(sales): ...`.
 4. Push de la rama y Pull Request hacia `main`, con `Closes #n` si resuelve una issue.
 5. Revisión del integrante asignado (`CODEOWNERS`) y CI en verde.
@@ -398,6 +474,8 @@ Todo corre dentro de Docker Compose, igual que en las máquinas del equipo.
 | Bootstrap | Tests (pytest, Vitest) de cada servicio |
 | Bootstrap | `docker compose up --wait` y prueba de humo: cada `/health` responde a través del gateway; luego `docker compose down -v` |
 | Etapa I | Cobertura mínima (D-18), cuando exista lógica de dominio |
+| Etapa I (primer change e1 con endpoints) | Tests de API con Bruno (`tests/api/<servicio>/`) contra el gateway y *contract test* entre el `openapi.yaml` acordado y el que genera FastAPI, como check obligatorio (D-24; el nombre del check se define en ese design) |
+| Etapa I (`e1-idempotent-purchase`) | import-linter en el job quality, con las reglas de dependencia de la arquitectura hexagonal (D-33) |
 
 Un check solo puede marcarse como obligatorio en el ruleset después de que el workflow corrió al menos una vez.
 
@@ -407,6 +485,11 @@ Un check solo puede marcarse como obligatorio en el ruleset después de que el w
 - `AGENTS.md` contiene las reglas comunes (DDD, TDD, *Docker-only*, convenciones). OpenCode lo lee
   directamente; `CLAUDE.md` lo importa con `@AGENTS.md` para Claude Code.
 - Las integraciones se generan con `openspec init --tools claude,opencode`; otra herramienta se suma por PR.
+- Skills de terceros (D-26): `create-architectural-decision-record` y, de Matt Pocock, grilling, grill-me,
+  grill-with-docs, domain-modeling, tdd y code-review, copiadas en `.claude/skills/` y `.agents/skills/` con
+  sus licencias. Solo la skill de la cátedra (`create-architectural-decision-record`) escribe ADR; las que
+  duplican OpenSpec quedan fuera, y las herramientas personales no se votan. Se incorporan en un PR propio
+  después de un piloto.
 - Los tres usan la misma versión de OpenSpec y el mismo perfil de workflows; `openspec update` se
   ejecuta solo en un PR dedicado.
 - Se guía al copiloto paso a paso: primero explorar, después una feature a la vez. Nunca «hacé toda la ticketera».
@@ -432,15 +515,15 @@ Siguiendo el lineamiento de la clase, el primer change de OpenSpec es el propio 
 | 3 | A | Activar el ruleset de `main` (todavía sin checks) y el método *squash and merge*. |
 | 4 | A | En el copiloto: `/opsx:explore` y luego `/opsx:new project-bootstrap`. |
 | 5 | A | Reglas y convenciones: `AGENTS.md` y `CLAUDE.md`, `CONTRIBUTE.md`, plantilla de PR, `CODEOWNERS`, `.gitignore`, `.gitattributes`, `.env.example`. |
-| 6 | A | Esqueleto de plataforma: `docker-compose.yml`, `database` con sus scripts de inicialización, `gateway` con las rutas, `identity` con el realm y los roles, workflow de CI. |
-| 7 | B | Esqueleto de `catalog` y del `frontend`. |
-| 8 | C | Esqueleto de `sales` y `payments`. |
+| 6 | A | Esqueleto de plataforma: `docker-compose.yml`, `database` con sus scripts de inicialización, `gateway` con las rutas `/api/<servicio>/` sin versión (D-29, con su ADR), `identity` con el realm y los roles, workflow de CI. |
+| 7 | B | Esqueleto de `catalog` y del `frontend` con su página de estado (D-32). |
+| 8 | C | Esqueleto de `sales` y `payments` (este último, solo con `/health`; D-25). |
 | 9 | A | Marcar los checks de la CI como obligatorios en el ruleset. |
 | 10 | Todos | Clonar, copiar `.env.example` a `.env`, ejecutar `docker compose up` y practicar con `/opsx:onboard`. |
 | 11 | A | `/opsx:archive project-bootstrap`. |
 
 Los pasos 5 a 11 son tareas del change, cada una en su rama y con su PR. Los pasos 6 a 8 fijan tecnología,
-así que requieren aprobadas las decisiones D-01 a D-06, D-12, D-15 y D-16.
+así que requieren aprobadas las decisiones D-01 a D-06, D-12, D-15 y D-16 (aprobadas el 2026-10-27).
 
 #### 7.1.1 Esqueleto andante (*walking skeleton*)
 
@@ -450,11 +533,11 @@ agrega sobre algo que ya corre.
 
 | Contenedor | Contenido mínimo |
 |---|---|
-| `database` | PostgreSQL con una base lógica y un usuario por servicio |
+| `database` | PostgreSQL 18 con una base lógica y un usuario por servicio |
 | `identity` | Keycloak con el realm del proyecto y los roles `ADMIN`, `EVENT_OWNER` y `CLIENT` |
-| `gateway` | NGINX con una ruta por servicio (`/api/catalog`, `/api/sales`, `/api/payments`) y otra hacia Keycloak |
+| `gateway` | NGINX con una ruta por servicio (`/api/catalog`, `/api/sales`, `/api/payments`) y otra hacia Keycloak; CORS con un único origen permitido, el frontend (DS-09) |
 | `catalog`, `sales`, `payments` | FastAPI con estructura hexagonal vacía y un endpoint `GET /health` que informa el estado del servicio y su conexión a la base |
-| `frontend` | React con una página de estado que consulta cada `/health` a través del gateway |
+| `frontend` | React con una página de estado que consulta cada `/health` a través del gateway (D-32); la librería de componentes se instala en el primer change con pantallas (D-16) |
 
 Incluso el esqueleto sigue TDD: el test de `/health` se escribe antes que el endpoint.
 
@@ -465,29 +548,45 @@ Incluso el esqueleto sigue TDD: el test de `/health` se escribe antes que el end
 
 | Paso | Responsable | Resultado |
 |---|---|---|
-| 1 | Todos | Taller de Event Storming (anexo, sección 12). |
-| 2 | B | `docs/domain/glossary.md` (lenguaje ubicuo bilingüe). |
-| 3 | C | `docs/domain/context-map.md` (contextos y relaciones). |
-| 4 | A | ADR-0001 con las decisiones aprobadas; `PLAN.md` y `config.yaml` actualizados. |
+| 1 | A | PR de aprobación: `PLAN.md` v0.4.0, ADR según D-27 (D-02, D-03, D-04, D-05 + D-06 y D-17) y `config.yaml` 0.3.0 (T-05). |
+| 2 | Todos | Taller de Event Storming (anexo, sección 12). |
+| 3 | B | `docs/domain/glossary.md` (lenguaje ubicuo bilingüe). |
+| 4 | C | `docs/domain/context-map.md` (contextos y relaciones). |
+| 5 | A | `PLAN.md` v0.5.0 con el resultado del Event Storming (T-05). |
 
 ### 7.3 Etapa I
 
-Primero el problema difícil, después las features verticales. Cada change incluye su parte de frontend
-y sus mockups.
+Primero el problema difícil, después las features verticales (D-28). Cada change es un *vertical slice*:
+API funcional, tests de API (D-24), mockups y la pantalla de React de su feature, que hace el dueño del
+change. **Las pantallas de React son obligatorias para cerrar la Etapa I** (D-28, D-32).
 
 | Orden | Change | Responsable | Alcance |
 |---|---|---|---|
-| 1 | `e1-ticket-inventory` | C | Disponibilidad numerada y no numerada, reservas con expiración, concurrencia (DF-01, DF-02, DT-01) |
-| 2 | `e1-identity-access` | A | Login, roles, validación de tokens en el gateway, rutas protegidas en el frontend |
-| 3 | `e1-event-catalog` | B | Eventos, tipos, sedes, zonas y asientos, participantes, publicación |
-| 4 | `e1-request-log` | A | Bitácora HTTP con medición de tiempos (DT-03) |
-| 5 | `e1-ticket-purchase` | C | Orden, idempotencia, pago simulado, emisión de tickets |
+| 1 | `e1-idempotent-purchase` | C | Contrato de compras (*contract-first*, después del Event Storming) y compra idempotente: inventario propio de `sales` cargado por `ADMIN`; la compra pasa de reservada a confirmada y emite el ticket en una sola solicitud, sin paso de pago (D-25); PostgreSQL como árbitro de la doble venta (D-30); su design fija el esqueleto de referencia de los servicios (D-33) (DF-01, DT-01) |
+| 2 | `e1-identity-access` | A | API gateway con identidad: login, roles, validación de tokens en el gateway, rutas protegidas en el frontend |
+| 2 | `e1-request-log` | B | Bitácora HTTP con medición de tiempos (DT-03, D-23) |
+| 2 | `e1-event-catalog` | B | Catálogo mínimo de eventos |
+
+- Los changes con orden 2 arrancan cuando está integrado el design de `e1-idempotent-purchase` y siguen su
+  esqueleto de referencia (D-33).
+- Las primeras pruebas de `sales` van sin autenticación; el JWT se agrega después (D-28, puntos abiertos en 5.3).
+
+ADR que se escriben dentro del change que implementa la decisión, como una tarea de su `tasks.md`; su
+`design.md` lo enlaza (D-27). La numeración se fija al escribirlos.
+
+| Decisión | Change donde se escribe el ADR | Responsable |
+|---|---|---|
+| D-23 · Bitácora HTTP y observabilidad | `e1-request-log` | B |
+| D-24 · Tests de API y contrato | El primer change e1 con endpoints | Su dueño |
+| D-25 · Pago en la Etapa II | `e1-idempotent-purchase` | C |
+| D-29 · Rutas sin versión | `project-bootstrap`, grupo 2 (rutas del gateway) | A |
+| D-30 · Concurrencia e idempotencia sobre PostgreSQL | `e1-idempotent-purchase` | C |
 
 ### 7.4 Etapas II y III (preliminar)
 
 | Etapa | Changes previstos |
 |---|---|
-| II | `e2-integration-events` (RabbitMQ), `e2-recommendations`, `e2-cache-strategy` |
+| II | `e2-integration-events` (RabbitMQ), `e2-recommendations`, `e2-cache-strategy`; la pasarela de pagos en `payments` (D-25), que decide si existe un estado «pago pendiente» |
 | III | `e3-sales-queue`, `e3-refunds`, `e3-advanced-search`, `e3-stress-test` |
 
 Su planificación detallada y el reparto se agregan a este documento al cerrar la etapa anterior.
@@ -516,10 +615,12 @@ ticketera/
 ├── docs/
 │   ├── PLAN.md              # Este documento
 │   ├── domain/              # Glosario y mapa de contextos
-│   ├── adr/                 # Architecture Decision Records
+│   ├── adr/                 # Architecture Decision Records (adr-NNNN-slug.md e índice README.md; D-27)
 │   ├── bitacora/            # Bitácora del equipo
 │   └── mockups/
-├── tests/load/              # Pruebas de estrés (Etapa III)
+├── tests/
+│   ├── api/                 # Tests de API con Bruno, una carpeta por servicio (D-24)
+│   └── load/                # Pruebas de estrés (Etapa III)
 ├── docker-compose.yml
 ├── .env.example
 ├── AGENTS.md                # Reglas comunes para los copilotos
@@ -549,6 +650,8 @@ ticketera/
    - **mayor** (1.0.0 → 2.0.0) si cambia un requisito base;
    - **menor** (0.2.0 → 0.3.0) si se aprueba, agrega o reemplaza una decisión, o se replanifica una etapa;
    - **parche** (0.2.0 → 0.2.1) para correcciones de redacción.
+
+   El número de versión lo fija el PR al integrarse (T-05).
 3. Agregar una fila al registro de cambios.
 4. Abrir un Pull Request revisado por los otros dos integrantes.
 
@@ -561,6 +664,7 @@ ticketera/
 | 0.1.0 | 2026-10-05 | Borrador inicial para aprobación del equipo | Integrante A | — |
 | 0.2.0 | 2026-10-11 | Consigna actualizada (desafíos y entregables); lineamiento de la clase; método DDD → SDD → TDD; React y FastAPI; contextos candidatos; copiloto libre; bootstrap como change; changes por feature; nuevas decisiones D-14 a D-22 | Integrante A | — |
 | 0.3.0 | 2026-10-11 | El bootstrap incluye el esqueleto andante: todo el sistema se levanta con `docker compose up`; la CI levanta el stack y ejecuta una prueba de humo desde el bootstrap | Integrante A | — |
+| 0.4.0 | 2026-10-28 | Aprobación del plan según el acta de la reunión del 2026-10-27: D-01 a D-22 aprobadas; nuevas decisiones D-23 a D-34 con sus puntos abiertos; `payments` pasa a la Etapa II y la compra de la Etapa I no tiene paso de pago; Etapa I reordenada con los changes de D-31, primero la compra idempotente, y pantallas de React obligatorias; solo `gateway` y `frontend` publican puertos, en `127.0.0.1`; entorno virtual de Python en `/opt/venv`; PostgreSQL 18; ADR según D-27 en `docs/adr/`; tests de API en `tests/api/`. Propuesta adoptada de Integrante B: Tailwind CSS con shadcn/ui (D-16). Propuestas adoptadas de Integrante C: bitácora HTTP y observabilidad, tests de API y contrato, pasarela de pagos en la Etapa II e idempotencia sobre PostgreSQL (D-23, D-24, D-25 y D-30) | Integrante A | — |
 
 ---
 

@@ -1,14 +1,15 @@
 # =============================================================================
 # openspec/config.yaml  -  Ticketera virtual para eventos (microservicios)
-# Versión del archivo: 0.2.1  (propuesta pendiente de aprobación del equipo)
+# Versión del archivo: 0.3.0  (aprobada con el plan v0.4.0, reunión del 2026-10-27)
 #
 # Notas para el equipo (en español):
 # - La extensión DEBE ser .yaml (OpenSpec no lee config.yml).
 # - El contenido está en inglés porque se inyecta en los prompts de la IA
-#   (decisión propuesta D-09; si el equipo elige español, se traduce).
+#   (decisión D-09, aprobada).
 # - Este archivo guía a la IA; no obliga. La verificación real es la CI
 #   y la revisión humana de cada Pull Request.
-# - Las decisiones marcadas "proposed" figuran en docs/PLAN.md (sección 5).
+# - Las decisiones figuran en docs/PLAN.md (sección 5); las de arquitectura,
+#   además, en docs/adr/ (D-27).
 # =============================================================================
 
 # Esquema de trabajo: proposal -> specs -> design -> tasks
@@ -38,11 +39,13 @@ context: |
   If implementation reveals a gap in the model, open a new change that
   updates the spec; never silently diverge from it.
 
-  ## Change granularity (proposed, pending confirmation with the professor)
+  ## Change granularity (approved: D-14, D-31)
   One OpenSpec change per feature, grouped by stage with a prefix:
   project-bootstrap, e1-*, e2-*, e3-*.
-  - Stage I (core): backend, APIs, authentication, ticket purchase, mockups.
-  - Stage II: recommendation system integration and caching.
+  - Stage I (core): backend, APIs, authentication, ticket purchase without
+    a payment step, mockups, React frontend.
+  - Stage II: recommendation system integration, caching and the payment
+    gateway (payments as a Legacy Wrapper).
   - Stage III: sales queues, refunds, advanced search, stress test.
 
   ## Candidate bounded contexts (hypothesis until Event Storming)
@@ -51,7 +54,8 @@ context: |
     (performers), event types, publication lifecycle.
   - sales (core): availability, temporary reservations with expiration,
     orders, tickets, idempotency; refunds in Stage III.
-  - payments (generic): simulated, idempotent payments.
+  - payments (generic, Stage II): simulated, idempotent payment gateway.
+    In Stage I it is only a skeleton with /health.
   - Later: recommendation (II), search (III), sales-queue (III).
 
   ## Domain rules that must never be violated
@@ -59,6 +63,8 @@ context: |
   - Two ticket modalities: numbered (specific seat) and unnumbered (zone
     capacity), each with its own business rules.
   - Every state-changing request that may be retried uses an idempotency key.
+    The client generates the Idempotency-Key; sales stores it in its own
+    database in the same transaction as the order.
   - Refunds: CLIENT requests, ADMIN approves or rejects; approval releases
     the seat or zone capacity.
 
@@ -76,9 +82,12 @@ context: |
   - HTTP request log (all services): start a timer on arrival, process
     authentication, record method, path, user, status and duration, then
     return the response. Authentication failures are logged too.
+    Each request is written as one JSON line to stdout, with a correlation
+    id that the gateway always generates (never taken from the client).
 
-  ## Stack (proposed)
-  - Frontend: React + TypeScript + Vite; tests with Vitest and React Testing Library.
+  ## Stack (approved)
+  - Frontend (Stage I): React + TypeScript + Vite; Tailwind CSS with
+    shadcn/ui; tests with Vitest and React Testing Library.
   - Backend: Python + FastAPI + Pydantic; SQLAlchemy 2 + Alembic; uv for
     dependencies; Ruff (lint and format); mypy (type check).
   - Tests: pytest, pytest-cov; integration tests against real PostgreSQL.
@@ -132,10 +141,21 @@ rules:
       orders or payments are involved.
     - Include Mermaid sequence diagrams for multi-service flows.
     - Analyze security threats of the change (for example with STRIDE).
+    - Link the ADR (docs/adr/adr-NNNN-slug.md) of every architecture
+      decision the design makes or relies on.
   tasks:
     - Small, verifiable tasks (less than one day), grouped by bounded context.
     - For every behavior, the test task comes before its implementation task.
+    - Write one test per spec scenario.
     - Each task references the requirement and scenario it satisfies.
+    - Include a task for the change's API test collection, written with
+      Bruno in tests/api/<service>/, and a contract test that compares the
+      agreed openapi.yaml with the one FastAPI generates.
+    - Only when the change makes an architecture decision (hard to reverse,
+      surprising without context, result of a real trade-off), include a
+      task to write its ADR in docs/adr/ with the
+      create-architectural-decision-record skill. The ADR of a decision is
+      written in the change that implements it.
     - Include documentation and team-log tasks.
 
 # Indicaciones para las operaciones de implementación y archivo.

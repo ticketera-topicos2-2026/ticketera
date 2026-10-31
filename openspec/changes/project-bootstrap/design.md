@@ -9,8 +9,9 @@ Constraints that shape the approach:
 
 - The repository is public and holds only the OpenSpec setup, `docs/PLAN.md` and `.gitattributes` (LF endings).
 - Every team member works on Windows with WSL 2 and Docker Desktop; GitHub-hosted runners run Ubuntu.
-- Nothing is implemented before the approval pull request (`docs/PLAN.md` v0.4.0, ADR-0001) is merged; the
-  decisions referenced below as D-xx are the ones that pull request approves.
+- The approval pull request (#4, `docs/PLAN.md` v0.4.0) is merged: every decision referenced below as D-xx was
+  approved at the team meeting of 2026-10-27, and the architecture decisions among them are recorded in
+  `docs/adr/` (ADR-0001 to ADR-0005, D-27). The Decisions table links each one to its record.
 - Work is split into nine task groups (proposal, "Bounded Contexts and Responsibility"); groups 3 to 6 run in
   parallel and add to the same compose file, gateway configuration and smoke test.
 
@@ -29,39 +30,55 @@ Constraints that shape the approach:
 **Non-Goals:**
 
 - Production hardening: TLS, Keycloak production mode, image registries, deployment.
-- Authentication flows: no OIDC client for the frontend, no token validation in the services (Stage I changes).
-- Rate limiting or request logging at the gateway (`e1-request-log`, Stage III).
-- Database migrations tooling beyond what the empty skeleton needs.
+- Authentication flows: no OIDC client for the frontend, no token validation in the services
+  (`e1-identity-access`, Stage I, D-28).
+- Request logging, the correlation id and the log stack (Loki, Grafana, Alloy): change `e1-request-log`, Stage I
+  (D-23, D-28).
+- Rate limiting at the gateway.
+- Payments beyond `/health`: the payment gateway is Stage II, and the Stage I purchase has no payment step (D-25).
+- Redis or any cache (Stage II, D-30); API test collections with Bruno and contract tests (first e1-* change with
+  endpoints, D-24).
+- Database migrations tooling beyond what the empty skeleton needs; the reference skeleton (Alembic,
+  import-linter) is set by `e1-idempotent-purchase` (D-33).
 
 ## Decisions
 
+The Trace column links every D-xx that has an architecture decision record (D-27). A D-xx without a link is a
+process or tooling decision recorded only in `docs/PLAN.md` section 5. The ADR of D-29 is written in task 2.21.
+
 | # | Decision | Trace | Alternatives considered (reason rejected) |
 | --- | --- | --- | --- |
-| DS-01 | One container per service in a root `docker-compose.yml`; each service PR adds its own block, route and smoke-test coverage | D-05, PLAN 7.1 | Modular monolith (contradicts D-05); `include:` with one compose file per service |
-| DS-02 | One PostgreSQL container with one database per service, owned by the administrator; the service role gets `CONNECT`+`TEMPORARY` and owns its `public` schema; `CONNECT` revoked from `PUBLIC`; extensions installed by the init script | D-06 | One container per database (more memory, no isolation gain in development); service role owning its database (it can grant `CONNECT` to other roles, verified); schema per service in one database (shared database, boundary lost) |
-| DS-03 | The init script creates every bootstrap database in task group 2 | D-06 | Each service PR adds its database (the script does not run on existing volumes); init container on every start (more moving parts) |
-| DS-04 | Keycloak in `start-dev --import-realm`, with `KC_HTTP_RELATIVE_PATH=/auth`, `KC_HOSTNAME` set to the public gateway URL, `KC_HEALTH_ENABLED=true` (enables the management interface on port 9000) and the bootstrap administrator from `.env` | D-03 | Own identity service with JWT (D-03 alternative); `start` production mode (requires TLS and strict hostname); creating the realm with a script against the admin API (more code to maintain) |
-| DS-05 | Realm changes exported with the admin console "Partial export"; future secrets as `${VAR}` placeholders | D-03 | Committing the output of `kc.sh export` (includes users and secrets) |
-| DS-06 | Keycloak healthcheck: `GET /auth/health/ready` on port 9000 with `bash /dev/tcp` | D-03 | `curl` (not in the image); discovery document (fallback if "ready" does not imply the import finished); `legacy-observability-interface` (exposes health and metrics on the main port) |
-| DS-07 | NGINX with static upstreams: one explicit route per service that strips the prefix, `/auth` to the identity service, local `/healthz`, explicit block of `/auth/health` and `/auth/metrics`; only the expected host names are served (`server_name localhost 127.0.0.1`) and a `default_server` answers `421` to any other `Host` | D-04 | Kong and Traefik (D-04 alternatives); runtime DNS resolution (four reasons, see Alternatives Considered); upstream `resolve` parameter in NGINX 1.27.3/1.28.0 (would start with a missing service) |
-| DS-08 | Replace `X-Forwarded-For/Host/Proto` with the real values of the connection | D-04 | Appending to the client's header with `$proxy_add_x_forwarded_for` (lets forged values through) |
-| DS-09 | **To confirm at the team meeting.** CORS in the gateway for `/api/*`, with one allowed origin from `.env` (no wildcard); the gateway answers the `OPTIONS` preflight itself, so the services' 405 rule does not break CORS; the identity service client Web Origins are needed in either option | D-01, D-04 | Vite proxy (three reasons, see Alternatives Considered) |
+| DS-01 | One container per service in a root `docker-compose.yml`; each service PR adds its own block, route and smoke-test coverage | D-05 [ADR-0004][adr-0004], PLAN 7.1 | Modular monolith (contradicts D-05); `include:` with one compose file per service |
+| DS-02 | One PostgreSQL container with one database per service, owned by the administrator; the service role gets `CONNECT`+`TEMPORARY` and owns its `public` schema; `CONNECT` revoked from `PUBLIC`; extensions installed by the init script | D-06 [ADR-0004][adr-0004] | One container per database (more memory, no isolation gain in development); service role owning its database (it can grant `CONNECT` to other roles, verified); schema per service in one database (shared database, boundary lost) |
+| DS-03 | The init script creates every bootstrap database in task group 2 | D-06 [ADR-0004][adr-0004] | Each service PR adds its database (the script does not run on existing volumes); init container on every start (more moving parts) |
+| DS-04 | Keycloak in `start-dev --import-realm`, with `KC_HTTP_RELATIVE_PATH=/auth`, `KC_HOSTNAME` set to the public gateway URL, `KC_HEALTH_ENABLED=true` (enables the management interface on port 9000) and the bootstrap administrator from `.env` | D-03 [ADR-0002][adr-0002] | Own identity service with JWT (D-03 alternative); `start` production mode (requires TLS and strict hostname); creating the realm with a script against the admin API (more code to maintain) |
+| DS-05 | Realm changes exported with the admin console "Partial export"; future secrets as `${VAR}` placeholders | D-03 [ADR-0002][adr-0002] | Committing the output of `kc.sh export` (includes users and secrets) |
+| DS-06 | Keycloak healthcheck: `GET /auth/health/ready` on port 9000 with `bash /dev/tcp` | D-03 [ADR-0002][adr-0002] | `curl` (not in the image); discovery document (fallback if "ready" does not imply the import finished); `legacy-observability-interface` (exposes health and metrics on the main port) |
+| DS-07 | NGINX with static upstreams: one explicit route per service under `/api/<service>/`, with no version in the path, that strips the prefix, `/auth` to the identity service, local `/healthz`, explicit block of `/auth/health` and `/auth/metrics`; only the expected host names are served (`server_name localhost 127.0.0.1`) and a `default_server` answers `421` to any other `Host` | D-04 [ADR-0003][adr-0003], D-29 (ADR in task 2.21) | Kong and Traefik (D-04 alternatives); `/api/v1/<service>/` (D-29, see Alternatives Considered); runtime DNS resolution (four reasons, see Alternatives Considered); upstream `resolve` parameter in NGINX 1.27.3/1.28.0 (would start with a missing service) |
+| DS-08 | Replace `X-Forwarded-For/Host/Proto` with the real values of the connection | D-04 [ADR-0003][adr-0003] | Appending to the client's header with `$proxy_add_x_forwarded_for` (lets forged values through) |
+| DS-09 | CORS in the gateway for `/api/*`, with one allowed origin, the frontend, from `.env` (no wildcard); the gateway answers the `OPTIONS` preflight itself, so the services' 405 rule does not break CORS; the identity service client Web Origins are needed in either option. Approved at the team meeting of 2026-10-27 | D-01, D-04 [ADR-0003][adr-0003], D-32 | Vite proxy (three reasons, see Alternatives Considered) |
 | DS-10 | Only the gateway and the frontend publish ports, on `127.0.0.1`, with the port configurable in `.env`; the database is used only through `docker compose exec` | D-12 | Publishing on `0.0.0.0` (exposed to the network); publishing the Keycloak console and the database port as in the original PLAN 4.4 (unnecessary surface) |
-| DS-11 | Hexagonal FastAPI skeleton; `/health` declared with `api_route` for GET and HEAD; `root_path` set to the gateway prefix; `SELECT 1` probe with connect and query timeouts; 503 with `unavailable` | D-02, D-15, D-17 | Traditional layers (D-17 alternative); IETF `application/health+json` format (never became a standard, three fields are enough); 200 with `degraded` (the container would stay healthy without a database) |
-| DS-12 | Healthchecks: Python `urllib` in the backends; `pg_isready` in the database; for the gateway, the image `nginxinc/nginx-unprivileged:1.28-alpine` (no project build; pinned by digest per DS-25) with BusyBox `wget -q --spider http://127.0.0.1:8080/healthz`; `bash /dev/tcp` in Keycloak; interval, timeout and retries adding up to at most 60 s | D-12, D-04 | Installing `curl` in the images (more packages, more surface); official `nginx` image (runs as root) |
+| DS-11 | Hexagonal FastAPI skeleton; `/health` declared with `api_route` for GET and HEAD; `root_path` set to the gateway prefix; `SELECT 1` probe with connect and query timeouts; 503 with `unavailable` | D-02 [ADR-0001][adr-0001], D-15, D-17 [ADR-0005][adr-0005] | Traditional layers (D-17 alternative); IETF `application/health+json` format (never became a standard, three fields are enough); 200 with `degraded` (the container would stay healthy without a database) |
+| DS-12 | Healthchecks: Python `urllib` in the backends; `pg_isready` in the database; for the gateway, the image `nginxinc/nginx-unprivileged:1.28-alpine` (no project build; pinned by digest per DS-25) with BusyBox `wget -q --spider http://127.0.0.1:8080/healthz`; `bash /dev/tcp` in Keycloak; interval, timeout and retries adding up to at most 60 s | D-12, D-04 [ADR-0003][adr-0003] | Installing `curl` in the images (more packages, more surface); official `nginx` image (runs as root) |
 | DS-13 | Non-root containers; UID/GID as build arguments (default 1000) or tests that do not write into mounted folders; project containers and the gateway run with `security_opt: no-new-privileges:true` and `cap_drop: [ALL]`; no container mounts `/var/run/docker.sock`; database: `no-new-privileges`; database and identity: capabilities per group 2 | D-12 | Running as root (fails the spec); fixed UID 1000 (GitHub runners use 1001); default capabilities (unneeded privileges) |
 | DS-14 | Python: uv, Ruff, mypy and pytest; the virtual environment lives in `/opt/venv` inside the image, outside the bind mount and with no anonymous volume; only `node_modules` is an anonymous volume, refreshed with `up --build -V` | D-15 | pip, Poetry, SQLModel, pyright (D-15 alternatives); `.venv` as an anonymous volume (keeps stale dependencies) |
-| DS-15 | React + TypeScript + Vite frontend, Vitest + React Testing Library; status page with a 5-second limit per request | D-01, D-16 | Angular and Vue (D-01 alternatives); Jest (D-16 alternative) |
+| DS-15 | React + TypeScript + Vite frontend, Vitest + React Testing Library; status page with a 5-second limit per request; no component library yet: Tailwind CSS with shadcn/ui is installed by the first change with screens | D-01, D-16, D-32 | Angular and Vue (D-01 alternatives); Jest (D-16 alternative) |
 | DS-16 | Required variables with `${VAR:?message}`, no required `env_file` | D-12 | Required `env_file: .env` (the error does not name the missing variable) |
 | DS-17 | Live reload with bind mounts and the code inside the WSL 2 file system; polling as a fallback | D-12 | Dev Containers (D-12 alternative) |
 | DS-18 | CI workflow: jobs `openspec-validate`, `quality` (a single job) and `smoke-test`; triggers `pull_request` and `push` to `main`; `contents: read`; no `pull_request_target`; `cancel-in-progress` only for pull requests; actions pinned by SHA; OpenSpec 1.14.1; layer cache and each image built once | RB-08, D-15, D-16 | Matrix per service (check names vary and the ruleset cannot require them); path filters (an unreported required check blocks the pull request); `pull_request_target` (runs pull request code with write permissions and secrets) |
 | DS-19 | Smoke test that derives the services from `docker compose config` (label with the health path); backends are identified by the build context `./services/<name>`, and one without the label fails the test | RB-09, PLAN 6.4 | Hand-maintained list (can be forgotten) |
-| DS-20 | Realm check by JSON keys; `${VAR}` placeholders pass | D-03 | `grep` of values (`client-secret` appears as a value of `clientAuthenticatorType`) |
+| DS-20 | Realm check by JSON keys; `${VAR}` placeholders pass | D-03 [ADR-0002][adr-0002] | `grep` of values (`client-secret` appears as a value of `clientAuthenticatorType`) |
 | DS-21 | Protection of `main`: ruleset with no bypass, squash with "Default to pull request title", automatic deletion of head branches, `CODEOWNERS` with usernames. **"Require branches to be up to date before merging" stays off**; CI on every push to `main` is the backstop (a broken `main` is reverted) | RB-01/04/05/08, D-08, D-13, D-20 | Classic branch protection (no empty bypass list); team in `CODEOWNERS` (requests the team, not the two non-authors); merge commit and rebase (D-13 alternatives); requiring up-to-date branches (serializes groups 3 to 6 and repeats 15 minutes of CI per merge); merge queue (excessive for three people) |
-| DS-22 | Convention files: `AGENTS.md` imported by `CLAUDE.md`, pull request template with an AI usage section, pre-commit hooks inside Docker, languages per D-09, MIT `LICENSE` | D-09, D-10, D-11, D-19 | Single assistant (D-10 alternative); no hooks (D-19 alternative); no license (D-11 alternative) |
-| DS-23 | Two Compose networks: `edge` (frontend, gateway) and `backend` (gateway, identity service, backend services, database); only the gateway joins both | D-04, D-05 | One default network (the frontend container could reach the database and the services directly) |
-| DS-24 | PostgreSQL 18: the named volume is mounted at `/var/lib/postgresql`, as the version 18 image expects | D-06 | The pre-18 path `/var/lib/postgresql/data` (does not match the version 18 image layout) |
+| DS-22 | Convention files: `AGENTS.md` with the common rules, read by every assistant the team uses (Claude Code through `CLAUDE.md`, which imports it; OpenCode and Antigravity directly), pull request template with an AI usage section, pre-commit hooks inside Docker, languages per D-09, MIT `LICENSE` | D-09, D-10, D-11, D-19 | Single assistant (D-10 alternative); no hooks (D-19 alternative); no license (D-11 alternative) |
+| DS-23 | Two Compose networks: `edge` (frontend, gateway) and `backend` (gateway, identity service, backend services, database); only the gateway joins both | D-04 [ADR-0003][adr-0003], D-05 [ADR-0004][adr-0004] | One default network (the frontend container could reach the database and the services directly) |
+| DS-24 | PostgreSQL 18 (`postgres:18-alpine`): the named volume is mounted at `/var/lib/postgresql`, as the version 18 image expects | D-06 [ADR-0004][adr-0004], D-34 | The pre-18 path `/var/lib/postgresql/data` (does not match the version 18 image layout); `postgres:16`, the example of slide 45 (rejected in D-34, which keeps PostgreSQL 18) |
 | DS-25 | Supply chain: dependencies installed only from lockfiles (`uv sync --frozen` with `uv.lock`, `npm ci` with `package-lock.json`); every base image pinned by digest | D-12, D-15, D-16 | Version ranges or floating tags (a changed dependency or image enters without review) |
+
+[adr-0001]: /docs/adr/adr-0001-backend-python-fastapi.md
+[adr-0002]: /docs/adr/adr-0002-identidad-keycloak.md
+[adr-0003]: /docs/adr/adr-0003-api-gateway-nginx.md
+[adr-0004]: /docs/adr/adr-0004-contenedor-y-base-logica-por-servicio.md
+[adr-0005]: /docs/adr/adr-0005-arquitectura-hexagonal.md
 
 ### Decision notes by capability
 
@@ -154,9 +171,8 @@ Constraints that shape the approach:
 - DS-09 interaction with forwarding: with CORS, the browser reaches the gateway directly and the replacement rule
   of DS-08 stays unconditional. With a Vite proxy, the gateway would see the frontend container as the client
   and would have to trust `X-Forwarded-*` only from that container.
-- The two CORS preflight scenarios of `platform/api-gateway` depend on the DS-09 decision; if the team chooses
-  another option, they must be revised with `/opsx:update` before implementation. The smoke test checks both
-  with `curl`.
+- The two CORS preflight scenarios of `platform/api-gateway` implement DS-09. The smoke test checks both with
+  `curl`.
 
 #### platform/database-isolation
 
@@ -238,6 +254,19 @@ Every decision above lists its alternatives with the reason for rejection. These
 3. The gateway uses a generic route, so a pull request that adds a service does not touch the gateway
    configuration and the reviewer cannot see the new public route in the diff.
 4. It ties the gateway configuration to Docker's embedded DNS (`resolver 127.0.0.11`).
+
+**Version in the public path, `/api/v1/<service>/` (rejected for DS-07, D-29):** the plan originally proposed a
+version in the path, following slide 14 of Class 7. The team meeting of 2026-10-27 approved D-29 with the
+alternative: the routes stay `/api/<service>/` with no version, and the bootstrap does not change. The minutes
+record the outcome but not a further reason. The ADR of D-29 (task 2.21) records the trade-off and settles the
+open points: whether "no version" means never or until a v2 exists, and what happens when a contract changes (a
+header, a new route or a coordinated breaking change).
+
+**Payment gateway in Stage I (rejected for group 6, D-25):** the plan originally had `payments` implement the
+payment gateway (Legacy Wrapper) in Stage I. D-25 moves it to Stage II. In Stage I, a purchase goes from reserved
+to confirmed and issues the ticket in one idempotent request, with no payment step. So the `payments` skeleton
+of this change only answers `/health`: no payment endpoints, no `PaymentProvider` port and no payment data. The
+ADR of D-25 is written in `e1-idempotent-purchase`.
 
 **Vite proxy for same-origin access (rejected for DS-09):**
 
@@ -415,8 +444,8 @@ the concurrency and idempotency strategy start with the first e1-* change.
 
 ## Risks / Trade-offs
 
-- [The team changes a gated decision or DS-09 at the meeting] → Update the specs, this design and the tasks with
-  `/opsx:update` before implementation starts.
+- [An approved decision changes later, after the Event Storming or in a Stage I design] → Update the specs, this
+  design and the tasks with `/opsx:update` before the affected group starts.
 - [The repository is cloned under `/mnt/c`: slow mounts, no file events, no reload] → `CONTRIBUTE.md` requires a
   clone inside WSL; polling fallback; group 8 checks every machine.
 - [CRLF line endings break shell scripts (`/bin/sh^M`)] → `.gitattributes` forces LF; `.editorconfig` added in
@@ -441,16 +470,18 @@ the concurrency and idempotency strategy start with the first e1-* change.
 
 ## Migration Plan
 
-1. Open the planning pull request (`feature/project-bootstrap-plan`, this change) as a draft and review it at the
-   team meeting.
-2. Merge the approval pull request (`docs/PLAN.md` v0.4.0). It sets the gated decisions to Approved in section 5,
-   records them in `docs/adr/ADR-0001`, updates PLAN 4.4 (published ports, the Python virtual environment in the
-   image, the PostgreSQL 18 volume path `/var/lib/postgresql`), PLAN 7.1 (D-17 in the gate list) and PLAN 7.2
-   (the domain decisions become ADR-0002), and adds the entry to the change log in section 11.
-3. Run `/opsx:update` to fold the meeting outcomes (DS-09 included) into the proposal, specs, design and tasks.
+1. Done: the planning pull request (`feature/project-bootstrap-plan`, this change) was opened as a draft and
+   reviewed at the team meeting of 2026-10-27.
+2. Done: the approval pull request (#4, `docs/PLAN.md` v0.4.0) is merged. It sets D-01 to D-34 to Approved in
+   section 5, records the architecture decisions in `docs/adr/` (ADR-0001 to ADR-0005, D-27) and adds the entry
+   to the change log in section 11.
+3. Done: `/opsx:update` folded the meeting outcomes (DS-09 confirmed; D-25, D-29, D-32 and D-34) into the
+   proposal, design and tasks.
 4. Mark the planning pull request ready, review and merge it.
-5. Group 1: convention files, `LICENSE`, `.env.example` skeleton.
-6. Group 2: database with all bootstrap databases, identity service, gateway, smoke test (red first), CI workflow.
+5. Group 1, after Integrante B's Antigravity integration pull request (T-01) is merged: convention files,
+   `LICENSE`, `.env.example` skeleton.
+6. Group 2: database with all bootstrap databases, identity service, gateway, smoke test (red first), CI workflow,
+   and the ADR of D-29.
 7. Group 7: mark `openspec-validate`, `quality` and `smoke-test` as required, right after group 2 is merged.
 8. Groups 3 to 6 in parallel: each adds its service or the frontend, its route and its smoke-test coverage.
 9. Group 8: onboarding on a clean clone on every member's machine; fixes get their own pull requests.
@@ -463,5 +494,5 @@ stays blocked. Local state is removed with `docker compose down -v`.
 
 ## Open Questions
 
-None. DS-09 is a decision to confirm at the team meeting, not an open question: if it changes, the specs and this
-design are updated before implementation.
+None for this design. The open points of D-29 (whether "no version" means never or until a v2 exists, and what
+happens when a contract changes) are settled in its ADR, task 2.21; they do not change the routes of this change.

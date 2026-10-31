@@ -22,8 +22,10 @@ works end to end (PLAN.md sections 6, 7.1 and 7.1.1).
 - Only the gateway and the frontend publish ports, on the local machine; the database and the identity service
   publish none.
 - Backend skeletons for `catalog`, `sales` and `payments` with `GET /health` reporting service status and
-  database connectivity, reachable through the gateway.
-- Frontend status page that shows the health of every service through the gateway.
+  database connectivity, reachable through the gateway. `payments` is a Stage II context, so its skeleton has
+  only `/health` (D-25).
+- Frontend status page that shows the health of every service through the gateway (D-32).
+- The ADR of D-29 (public routes `/api/<service>/` with no version), written in group 2 in `docs/adr/` (D-27).
 - CI workflow on every pull request: `openspec validate --all --strict`, compose build, lint, type check,
   tests, and a smoke test of every health endpoint through the gateway.
 - No secrets in the repository.
@@ -57,9 +59,17 @@ None: the project has no specs yet.
 
 - No business logic, domain model, business endpoints or database migrations.
 - No authentication or role enforcement on endpoints; the `ticketera` realm only needs to contain the roles.
-- No messaging, cache or Stage II/III containers (RabbitMQ, Redis, recommendation, search, sales-queue).
-- No HTTP request log middleware (change `e1-request-log`).
-- No glossary, context map or Event Storming results; no ADR-0002.
+- No payment flow, payment endpoints or `PaymentProvider`: the payment gateway is Stage II, and the Stage I
+  purchase has no payment step (D-25).
+- No messaging, cache or Stage II/III containers (RabbitMQ, Redis, recommendation, search, sales-queue); Redis
+  arrives in Stage II (D-30).
+- No HTTP request log middleware, correlation id or log stack (Loki, Grafana, Alloy): change `e1-request-log`,
+  Stage I (D-23, D-28).
+- No API test collection (Bruno) or contract test: they arrive with the first e1-* change with endpoints (D-24).
+- No reference skeleton (Alembic, import-linter): `e1-idempotent-purchase` sets it (D-33).
+- No third-party skills for the assistants (D-26) and no Antigravity integration files: each arrives in its own
+  pull request.
+- No glossary, context map or Event Storming results; no ADR other than the one of D-29.
 - No production deployment, TLS or published ports beyond the local machine.
 
 ## Bounded Contexts and Responsibility
@@ -76,7 +86,7 @@ skeletons).
 | 3 | `catalog` skeleton | B | `feature/bootstrap-catalog` |
 | 4 | Frontend status page | B | `feature/bootstrap-frontend` |
 | 5 | `sales` skeleton | C | `feature/bootstrap-sales` |
-| 6 | `payments` skeleton | C | `feature/bootstrap-payments` |
+| 6 | `payments` skeleton (`/health` only, D-25) | C | `feature/bootstrap-payments` |
 | 7 | Required status checks in the ruleset; runs right after group 2 is merged | A | none (settings only) |
 | 8 | Onboarding on a clean clone (A coordinates; A, B and C each run it) | A | none |
 | 9 | Verification and archive; commits the evidence of groups 7 and 8 | A | `feature/bootstrap-archive` |
@@ -85,10 +95,19 @@ Any fix found during onboarding gets its own branch and pull request.
 
 ## Prerequisites
 
-Groups 1 to 6 do not start until the approval pull request (`docs/PLAN.md` v0.4.0) is merged. It sets
-the technical decisions D-01 to D-06, D-12 and D-15 to D-17, and the process decisions that group 1 applies
-(D-08, D-09, D-10, D-11, D-13, D-19 and D-20), to Approved and records them in `docs/adr/ADR-0001`. Until then
-these decisions are proposed, and this change implements nothing.
+Satisfied. The approval pull request (#4: `docs/PLAN.md` v0.4.0 and `openspec/config.yaml` 0.3.0) is merged
+into `main`. Following the team meeting of 2026-10-27, it sets D-01 to D-34 to Approved and records the
+architecture decisions this change relies on in `docs/adr/` (D-27):
+
+- ADR-0001 `adr-0001-backend-python-fastapi.md` (D-02).
+- ADR-0002 `adr-0002-identidad-keycloak.md` (D-03).
+- ADR-0003 `adr-0003-api-gateway-nginx.md` (D-04).
+- ADR-0004 `adr-0004-contenedor-y-base-logica-por-servicio.md` (D-05, D-06).
+- ADR-0005 `adr-0005-arquitectura-hexagonal.md` (D-17, including D-33).
+
+The other decisions this change applies (D-01, D-08 to D-16, D-19, D-20, D-32, D-34) are process or tooling
+decisions recorded only in `docs/PLAN.md` section 5. Group 1 also waits for Integrante B's Antigravity
+integration pull request (T-01), so that task 1.2 can verify Antigravity.
 
 ## Rule Applicability
 
@@ -96,12 +115,15 @@ these decisions are proposed, and this change implements nothing.
   `docs/PLAN.md`.
 - No role-authorization scenarios, except that the `ticketera` realm contains the three roles.
 - No tactical DDD, integration events or concurrency/idempotency strategy until the first e1-* change.
+- No API test collection or contract test task: the change adds no business endpoints (D-24).
+- One ADR task: D-29 is an architecture decision this change implements (gateway routes), so its ADR is written
+  here; the ADRs of D-23, D-24, D-25 and D-30 are written in the changes that implement them.
 
 ## Risks and Rollback
 
 | Risk | Mitigation |
 | --- | --- |
-| A gated decision changes at the team meeting | `/opsx:update` the artifacts before implementation starts. |
+| An approved decision changes later (Event Storming, a Stage I design) | `/opsx:update` the artifacts before the affected group starts. |
 | Groups 3 to 6 edit shared files in parallel | Each pull request adds only its own entries and rebases on `main`. |
 | Groups 1 and 2 merge before the checks are required | Group 7 runs right after group 2 is merged; until then, reviewers do not approve a red pull request. |
 | `docker compose up` fails on Windows with WSL 2 | Prevented in `design.md` and `CONTRIBUTE.md`; group 8 checks every member's machine. |
@@ -115,7 +137,8 @@ settings. Until archived, the change adds no specs to `openspec/specs/`.
 
 - Files: new `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTE.md`, `LICENSE`, `.gitignore`, `.editorconfig`, `.env.example`,
   `.github/` (CI workflow, pull request template, `CODEOWNERS`), `docker-compose.yml`, `infra/`, `services/`,
-  `frontend/`, `docs/bitacora/`; modified `.gitattributes`.
+  `frontend/`, `docs/bitacora/`, the ADR of D-29 in `docs/adr/`; modified `.gitattributes` and
+  `docs/adr/README.md` (index).
 - APIs, through the gateway: `GET /api/<service>/health`, the gateway's `/healthz`, the identity service under
   `/auth`.
 - Specs added under `openspec/specs/platform/` on archive: the seven capabilities listed above.

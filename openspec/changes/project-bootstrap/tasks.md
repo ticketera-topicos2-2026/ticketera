@@ -1,8 +1,9 @@
 # Tasks
 
-> **Gate:** groups 1 to 6 do not start until the approval pull request (`docs/PLAN.md` v0.4.0 with ADR-0001) is
-> merged.
-> **Dependencies:** 1 → 2 → 7 (right after 2 is merged) → 3, 4, 5, 6 (in parallel, after 2) → 8 (after 3 to 6)
+> **Gate (satisfied):** groups 1 to 6 waited for the approval pull request: `docs/PLAN.md` v0.4.0 with the
+> architecture decision records of D-27 (ADR-0001 to ADR-0005 in `docs/adr/`). It was merged into `main` in #4,
+> so it no longer blocks groups 1 to 6.
+> **Dependencies:** Integrante B's Antigravity integration pull request (T-01) is merged → 1 → 2 → 7 (right after 2 is merged) → 3, 4, 5, 6 (in parallel, after 2) → 8 (after 3 to 6)
 > → 9 (last).
 > Notation: `Req` = requirement of `specs/platform/<capability>`; `DS` = decision in `design.md`.
 
@@ -12,7 +13,8 @@
   this one included, closes its issue with `Closes #n` (Req contribution-workflow: Pull requests reference the
   issues they resolve; D-20). Verify: issue #n of this group closes when this pull request is merged.
 - [ ] 1.2 Write `AGENTS.md` (DDD, TDD, Docker-only, conventions, branch and pull request rules) and `CLAUDE.md`
-  importing it with `@AGENTS.md` (DS-22). Verify: Claude Code and OpenCode each list the rules when asked.
+  importing it with `@AGENTS.md` (DS-22, D-10). Verify: Claude Code, OpenCode and Antigravity each list the rules
+  when asked; the Antigravity check is done by Integrante B or Integrante C.
 - [ ] 1.3 Write the contribution sections of `CONTRIBUTE.md` in Spanish: prerequisites (Git, Docker Desktop with
   WSL integration, clone inside the WSL file system), branch, commit and pull request flow (DS-17, DS-21).
   Verify: the reviewer follows it on this pull request.
@@ -141,6 +143,12 @@
 - [ ] 2.20 Evidence: this pull request opens with the pull request template and requests the reviewer from
   `CODEOWNERS`, both read from `main` after group 1 (Req contribution-workflow: Every pull request declares AI
   usage; Reviewers are requested automatically by path). Verify: screenshots recorded for the team log.
+- [ ] 2.21 Write the ADR of D-29 (public routes `/api/<service>/` with no version) in `docs/adr/` with the
+  `create-architectural-decision-record` skill, following D-27: rejected alternative `/api/v1/<service>/`, and
+  its open points (whether "no version" means never or until a v2 exists; what happens when a contract changes).
+  Move D-29 from "ADR previstos" to the index of `docs/adr/README.md`, link the ADR from DS-07 in `design.md`,
+  and record AI usage in the team log entry of 2.19 (DS-07, D-27, D-29). Verify: the ADR is in this pull request
+  and listed in the index, and DS-07 links it.
 
 ## 3. catalog (B, feature/bootstrap-catalog)
 
@@ -174,7 +182,8 @@
 
 - [ ] 4.1 Scaffold `frontend/`: React + TypeScript + Vite with `package-lock.json`, Dockerfile from a digest-pinned
   Node.js image, UID/GID build arguments, non-root user, Vite on `0.0.0.0` with the default `allowedHosts` and
-  optional polling (DS-13, DS-15, DS-17, DS-25). Verify: the image builds and `id -u` is not 0.
+  optional polling, and no component library (Tailwind CSS with shadcn/ui arrives with the first change with
+  screens, D-16) (DS-13, DS-15, DS-17, DS-25). Verify: the image builds and `id -u` is not 0.
 - [ ] 4.2 Write the status page tests with Vitest and React Testing Library (red): all healthy; one 503; one 502;
   one request expiring after 5 s while the others are healthy; gateway unreachable shows every service unhealthy
   and the message (Req service-health: The status page shows the health of every backend service; Each health
@@ -206,6 +215,9 @@
 - [ ] 5.8 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
 
 ## 6. payments (C, feature/bootstrap-payments)
+
+> `payments` is a Stage II context (D-25): this group adds only the skeleton with `/health`, with no payment
+> endpoints, no `PaymentProvider` port and no payment data.
 
 - [ ] 6.1 Scaffold `services/payments` as in 3.1 (DS-11, DS-13, DS-14, DS-25). Verify: the image builds and runs
   as non-root.

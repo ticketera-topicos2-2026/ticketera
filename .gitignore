@@ -1,0 +1,32 @@
+# Configuración local y secretos: nunca se versionan (RB-02). Solo .env.example va al repositorio.
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node.js y Vite
+node_modules/
+dist/
+.vite/
+*.local
+
+# Cobertura de tests
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+coverage/
+
+# Configuración local de los copilotos
+.claude/settings.local.json
+
+# Sistema operativo
+.DS_Store
+Thumbs.db

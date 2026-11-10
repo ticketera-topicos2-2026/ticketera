@@ -152,18 +152,18 @@
 
 ## 3. catalog (B, feature/bootstrap-catalog)
 
-- [ ] 3.1 Scaffold `services/catalog`: `pyproject.toml` and `uv.lock`, empty hexagonal packages, Dockerfile from
+- [x] 3.1 Scaffold `services/catalog`: `pyproject.toml` and `uv.lock`, empty hexagonal packages, Dockerfile from
   a digest-pinned Python image with the environment in `/opt/venv`, UID/GID build arguments, non-root user,
   `PYTHONDONTWRITEBYTECODE=1` (DS-11, DS-13, DS-14, DS-25). Verify: the image builds and `id -u` in the container
   is not 0.
-- [ ] 3.2 Write the tests of `/health` (red): 200 with exactly `status`, `service`, `database` within 1 s; 503
+- [x] 3.2 Write the tests of `/health` (red): 200 with exactly `status`, `service`, `database` within 1 s; 503
   with `unavailable` within 3 s when the database is unreachable; 200 again after recovery; HEAD with the same
   status code and no body; POST answers 405 (Req service-health: The health endpoint reports a healthy service;
   reports an unreachable database; requires no authentication; reveals no internal details; accepts only read
   requests). Verify: pytest fails.
-- [ ] 3.3 Implement `/health` with `api_route` for GET and HEAD, `root_path=/api/catalog` and the `SELECT 1` probe
+- [x] 3.3 Implement `/health` with `api_route` for GET and HEAD, `root_path=/api/catalog` and the `SELECT 1` probe
   with connect and query timeouts (DS-11). Verify: the tests of 3.2 pass.
-- [ ] 3.4 Configure Ruff and mypy for the service. Verify: lint and type check pass in the container.
+- [x] 3.4 Configure Ruff and mypy for the service. Verify: lint and type check pass in the container.
 - [ ] 3.5 Add the compose entry: build `./services/catalog`, label `ticketera.health-path=/health`, `backend`
   network, depends on a healthy database, `urllib` healthcheck, bind mount with uvicorn reload on `0.0.0.0`,
   `no-new-privileges`, `cap_drop: [ALL]`; the gateway depends on a healthy `catalog` (DS-01, DS-12, DS-13, DS-17,

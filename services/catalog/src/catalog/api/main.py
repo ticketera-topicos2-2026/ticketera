@@ -1,6 +1,16 @@
-"""FastAPI application of the catalog service."""
+"""Composition root: wires the adapters from the environment and exposes the ASGI app."""
 
-from fastapi import FastAPI
+import os
 
-# The gateway publishes this service under /api/catalog (D-29, DS-11).
-app = FastAPI(title="catalog", root_path="/api/catalog")
+from catalog.api.app import create_app
+from catalog.infrastructure.database_probe import SqlAlchemyDatabaseProbe
+
+
+def _required_env(name: str) -> str:
+    value = os.environ.get(name)
+    if not value:
+        raise RuntimeError(f"Missing required environment variable {name}")
+    return value
+
+
+app = create_app(SqlAlchemyDatabaseProbe(_required_env("DATABASE_URL")))

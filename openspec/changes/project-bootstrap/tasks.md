@@ -161,7 +161,7 @@
   status code and no body; POST answers 405 (Req service-health: The health endpoint reports a healthy service;
   reports an unreachable database; requires no authentication; reveals no internal details; accepts only read
   requests). Verify: pytest fails.
-- [ ] 3.3 Implement `/health` with `api_route` for GET and HEAD, `root_path=/api/catalog` and the `SELECT 1` probe
+- [x] 3.3 Implement `/health` with `api_route` for GET and HEAD, `root_path=/api/catalog` and the `SELECT 1` probe
   with connect and query timeouts (DS-11). Verify: the tests of 3.2 pass.
 - [ ] 3.4 Configure Ruff and mypy for the service. Verify: lint and type check pass in the container.
 - [ ] 3.5 Add the compose entry: build `./services/catalog`, label `ticketera.health-path=/health`, `backend`

@@ -152,7 +152,7 @@
 
 ## 3. catalog (B, feature/bootstrap-catalog)
 
-- [ ] 3.1 Scaffold `services/catalog`: `pyproject.toml` and `uv.lock`, empty hexagonal packages, Dockerfile from
+- [x] 3.1 Scaffold `services/catalog`: `pyproject.toml` and `uv.lock`, empty hexagonal packages, Dockerfile from
   a digest-pinned Python image with the environment in `/opt/venv`, UID/GID build arguments, non-root user,
   `PYTHONDONTWRITEBYTECODE=1` (DS-11, DS-13, DS-14, DS-25). Verify: the image builds and `id -u` in the container
   is not 0.

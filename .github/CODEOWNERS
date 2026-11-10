@@ -1,0 +1,26 @@
+# Revisores automáticos por ruta, según la revisión cruzada de docs/PLAN.md, sección 6.1 (DS-21).
+# GitHub aplica la última regla que coincide, así que las reglas generales van primero.
+# Integrante A: @edupiray · Integrante B: @arielbulacio-coder · Integrante C: @gustavoandresfu
+
+# Rutas sin dueño en PLAN 6.1: se pide revisión a los otros dos integrantes; alcanza con una aprobación.
+*                            @edupiray @arielbulacio-coder @gustavoandresfu
+
+# Plataforma de A (identity, gateway, Compose, CI): la revisa B.
+/docker-compose.yml          @arielbulacio-coder
+/.env.example                @arielbulacio-coder
+/infra/                      @arielbulacio-coder
+/.github/                    @arielbulacio-coder
+
+# catalog y frontend de B: los revisa C.
+/services/catalog/           @gustavoandresfu
+/frontend/                   @gustavoandresfu
+
+# sales y payments de C: los revisa A.
+/services/sales/             @edupiray
+/services/payments/          @edupiray
+
+# Archivos de planificación compartidos: los revisan los otros dos integrantes (PLAN 6.1).
+# Se listan los tres por usuario; GitHub no le pide la revisión al autor.
+/docs/PLAN.md                @edupiray @arielbulacio-coder @gustavoandresfu
+/docs/domain/                @edupiray @arielbulacio-coder @gustavoandresfu
+/openspec/config.yaml        @edupiray @arielbulacio-coder @gustavoandresfu

@@ -9,35 +9,35 @@
 
 ## 1. Conventions (A, feature/bootstrap-conventions)
 
-- [ ] 1.1 Create one GitHub issue per task group (1 to 9) before any other work, so each group's pull request,
+- [x] 1.1 Create one GitHub issue per task group (1 to 9) before any other work, so each group's pull request,
   this one included, closes its issue with `Closes #n` (Req contribution-workflow: Pull requests reference the
   issues they resolve; D-20). Verify: issue #n of this group closes when this pull request is merged.
-- [ ] 1.2 Write `AGENTS.md` (DDD, TDD, Docker-only, conventions, branch and pull request rules) and `CLAUDE.md`
+- [x] 1.2 Write `AGENTS.md` (DDD, TDD, Docker-only, conventions, branch and pull request rules) and `CLAUDE.md`
   importing it with `@AGENTS.md` (DS-22, D-10). Verify: Claude Code, OpenCode and Antigravity each list the rules
   when asked; the Antigravity check is done by Integrante B or Integrante C.
-- [ ] 1.3 Write the contribution sections of `CONTRIBUTE.md` in Spanish: prerequisites (Git, Docker Desktop with
+- [x] 1.3 Write the contribution sections of `CONTRIBUTE.md` in Spanish: prerequisites (Git, Docker Desktop with
   WSL integration, clone inside the WSL file system), branch, commit and pull request flow (DS-17, DS-21).
   Verify: the reviewer follows it on this pull request.
-- [ ] 1.4 Create the pull request template with the AI usage section and a checklist for branch name, test-first
+- [x] 1.4 Create the pull request template with the AI usage section and a checklist for branch name, test-first
   commits, Conventional Commits title and `Closes #n` (Req contribution-workflow: Every pull request declares AI
   usage; Behavior changes are committed test first; Pull request titles follow Conventional Commits; Pull requests
   reference the issues they resolve). Verify: the file is in this pull request; GitHub reads it from the base
   branch, so it is verified on the pull request of group 2 (task 2.20).
-- [ ] 1.5 Create `CODEOWNERS` from PLAN 6.1, listing the three members by username for `docs/PLAN.md`,
+- [x] 1.5 Create `CODEOWNERS` from PLAN 6.1, listing the three members by username for `docs/PLAN.md`,
   `docs/domain/` and `openspec/config.yaml` (Req contribution-workflow: Reviewers are requested automatically by
   path; DS-21). Verify: the file is in this pull request; GitHub reads it from the base branch, so it is verified
   on the pull request of group 2 (task 2.20).
-- [ ] 1.6 Create `.gitignore` (`.env`, caches, `node_modules`, coverage) and the `.env.example` skeleton with its
+- [x] 1.6 Create `.gitignore` (`.env`, caches, `node_modules`, coverage) and the `.env.example` skeleton with its
   header comment (Req local-environment: Secrets are kept out of the repository). Verify: after copying
   `.env.example` to `.env`, `git status` does not list `.env`.
-- [ ] 1.7 Update `.gitattributes` (explicit LF for `*.sh`, `*.sql`, `*.conf`, `Dockerfile`, `*.json`) and add
+- [x] 1.7 Update `.gitattributes` (explicit LF for `*.sh`, `*.sql`, `*.conf`, `Dockerfile`, `*.json`) and add
   `.editorconfig` (LF, final newline, indentation) (design Risks: CRLF). Verify: `git ls-files --eol` shows `lf`
   for every text file.
-- [ ] 1.8 Add the MIT `LICENSE` (DS-22, D-11). Verify: GitHub shows the repository license as MIT.
-- [ ] 1.9 Configure repository settings: squash merge only with "Default to pull request title", merge commit and
+- [x] 1.8 Add the MIT `LICENSE` (DS-22, D-11). Verify: GitHub shows the repository license as MIT.
+- [x] 1.9 Configure repository settings: squash merge only with "Default to pull request title", merge commit and
   rebase disabled, "Automatically delete head branches", "Require approval for first-time contributors" (DS-21,
   DS-18). Verify: screenshots recorded for the team log.
-- [ ] 1.10 Review the ruleset of `main` against DS-21 (no bypass actors, one approval, approval of the most recent
+- [x] 1.10 Review the ruleset of `main` against DS-21 (no bypass actors, one approval, approval of the most recent
   push, stale approvals dismissed, conversation resolution, deletion and force push blocked, up-to-date branches
   not required). Verify: exported ruleset JSON recorded for the team log.
 - [ ] 1.11 Evidence: a direct push, a force push and a deletion of `main` are rejected, including for an
@@ -49,7 +49,7 @@
   approval from a member other than the author; The most recent push is approved by someone other than its pusher;
   Approvals are dismissed when new commits are pushed; Unresolved review conversations block the merge; Pull
   requests are integrated only by squash and merge). Verify: screenshots recorded for the team log.
-- [ ] 1.13 Create `docs/bitacora/` with the weekly entry template and the entry for this group, including AI usage.
+- [x] 1.13 Create `docs/bitacora/` with the weekly entry template and the entry for this group, including AI usage.
   Verify: the entry is in this pull request.
 
 ## 2. Platform (A, feature/bootstrap-platform)

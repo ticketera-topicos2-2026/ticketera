@@ -1,6 +1,14 @@
 # Normaliza saltos de línea: LF en el repositorio para todos los integrantes
 * text=auto eol=lf
+
+# LF explícito en los archivos que se ejecutan o se leen dentro de los contenedores (design, Risks: CRLF)
 *.sh text eol=lf
+*.sql text eol=lf
+*.conf text eol=lf
+Dockerfile text eol=lf
+*.json text eol=lf
+
+# Binarios: sin normalización ni diff de texto
 *.png binary
 *.jpg binary
 *.pdf binary

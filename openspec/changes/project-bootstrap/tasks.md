@@ -156,7 +156,7 @@
   a digest-pinned Python image with the environment in `/opt/venv`, UID/GID build arguments, non-root user,
   `PYTHONDONTWRITEBYTECODE=1` (DS-11, DS-13, DS-14, DS-25). Verify: the image builds and `id -u` in the container
   is not 0.
-- [ ] 3.2 Write the tests of `/health` (red): 200 with exactly `status`, `service`, `database` within 1 s; 503
+- [x] 3.2 Write the tests of `/health` (red): 200 with exactly `status`, `service`, `database` within 1 s; 503
   with `unavailable` within 3 s when the database is unreachable; 200 again after recovery; HEAD with the same
   status code and no body; POST answers 405 (Req service-health: The health endpoint reports a healthy service;
   reports an unreachable database; requires no authentication; reveals no internal details; accepts only read

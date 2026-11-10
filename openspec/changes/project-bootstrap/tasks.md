@@ -54,13 +54,13 @@
 
 ## 2. Platform (A, feature/bootstrap-platform)
 
-- [ ] 2.1 Write the smoke test `tests/smoke/smoke-test.sh` (red): `/healthz` answers 200; realm discovery answers
+- [x] 2.1 Write the smoke test `tests/smoke/smoke-test.sh` (red): `/healthz` answers 200; realm discovery answers
   200 with the public issuer; `Host: evil.example` gets 421; `/auth/health`, `/auth/metrics` and
   `/api/unknown/health` get 404 (Req api-gateway: The gateway reports its own health; The gateway serves only the
   expected host names; Requests that match no route are rejected; Identity service health and metrics are never
   exposed; The identity service is served under /auth; Req continuous-integration: The smoke-test check verifies
   the running system through the gateway). Verify: the script fails against a repository with no system.
-- [ ] 2.2 Extend the smoke test (red): derive the services from `docker compose config` (label
+- [x] 2.2 Extend the smoke test (red): derive the services from `docker compose config` (label
   `ticketera.health-path`; backends = services built from `./services/<name>`, failing when one lacks the label;
   backends are checked through the gateway at `/api/<service><health-path>`, and other labeled services, such as
   the frontend, on their own published port); only the gateway and the frontend publish ports, on `127.0.0.1`;
@@ -68,12 +68,12 @@
   service the system starts; Req local-environment: Only the gateway and the frontend publish ports; Published
   ports are reachable only from the local machine; Containers run as a non-root user; DS-19). Verify: the script
   fails for each missing piece.
-- [ ] 2.3 Write `tests/platform/database-isolation.sh` (red), run with `docker compose exec database psql`:
+- [x] 2.3 Write `tests/platform/database-isolation.sh` (red), run with `docker compose exec database psql`:
   cross-service connection rejected, role without grants rejected, `GRANT CONNECT` by a service role grants
   nothing, `CREATE DATABASE`, `CREATE ROLE` and `CREATE EXTENSION dblink` rejected, a service role can create a
   table in its own database (Req database-isolation: all requirements). Verify: the script fails before the
   database exists.
-- [ ] 2.4 Write the realm check tests (red): a literal secret fails naming the field; a `${VAR}` placeholder
+- [x] 2.4 Write the realm check tests (red): a literal secret fails naming the field; a `${VAR}` placeholder
   passes; `clientAuthenticatorType: client-secret` passes (Req continuous-integration: The quality check rejects
   literal secrets in the realm definition; DS-20). Verify: the tests fail with no check script.
 - [ ] 2.5 Implement the realm check script, inspecting JSON keys and run in a digest-pinned Python container
@@ -101,11 +101,12 @@
   restart; Administrator credentials come from local configuration; The identity service is healthy only after the
   realm is available).
 - [ ] 2.11 Add the gateway base: `nginxinc/nginx-unprivileged:1.28-alpine` pinned by digest, `server_name
-  localhost 127.0.0.1`, `default_server` answering 421, `/healthz`, `include routes/*.conf`,
-  `127.0.0.1:${GATEWAY_PORT}`, `edge` and `backend` networks, `wget` healthcheck, `no-new-privileges`,
+  localhost 127.0.0.1`, `default_server` answering 421, `/healthz`, `include routes/*/*.conf` with
+  `infra/gateway/routes` mounted read-only at `/etc/nginx/routes/platform` (test-only routes go in a sibling folder,
+  task 2.12), `127.0.0.1:${GATEWAY_PORT}`, `edge` and `backend` networks, `wget` healthcheck, `no-new-privileges`,
   `cap_drop: [ALL]` (DS-07, DS-10, DS-12, DS-13, DS-23). Verify: the `/healthz`, 421 and port checks of the smoke
   test pass.
-- [ ] 2.12 Write the forwarding test (red): a test-only compose file `tests/smoke/compose.echo.yml` adds an echo
+- [x] 2.12 Write the forwarding test (red): a test-only compose file `tests/smoke/compose.echo.yml` adds an echo
   container (`traefik/whoami` pinned by digest) on the `backend` network and mounts a test-only gateway route to
   it; the smoke test sends forged `X-Forwarded-For`, `X-Forwarded-Host` and `X-Forwarded-Proto` and asserts that
   the echo receives exactly one address in `X-Forwarded-For`, which is not the forged value (with Docker port

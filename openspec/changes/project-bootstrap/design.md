@@ -65,7 +65,7 @@ process or tooling decision recorded only in `docs/PLAN.md` section 5. The ADR o
 | DS-15 | React + TypeScript + Vite frontend, Vitest + React Testing Library; status page with a 5-second limit per request; no component library yet: Tailwind CSS with shadcn/ui is installed by the first change with screens | D-01, D-16, D-32 | Angular and Vue (D-01 alternatives); Jest (D-16 alternative) |
 | DS-16 | Required variables with `${VAR:?message}`, no required `env_file` | D-12 | Required `env_file: .env` (the error does not name the missing variable) |
 | DS-17 | Live reload with bind mounts and the code inside the WSL 2 file system; polling as a fallback | D-12 | Dev Containers (D-12 alternative) |
-| DS-18 | CI workflow: jobs `openspec-validate`, `quality` (a single job) and `smoke-test`; triggers `pull_request` and `push` to `main`; `contents: read`; no `pull_request_target`; `cancel-in-progress` only for pull requests; actions pinned by SHA; OpenSpec 1.14.1; layer cache and each image built once | RB-08, D-15, D-16 | Matrix per service (check names vary and the ruleset cannot require them); path filters (an unreported required check blocks the pull request); `pull_request_target` (runs pull request code with write permissions and secrets) |
+| DS-18 | CI workflow: jobs `openspec-validate`, `quality` (a single job) and `smoke-test`; triggers `pull_request` and `push` to `main`; `contents: read`; no `pull_request_target`; `cancel-in-progress` only for pull requests; actions pinned by SHA; OpenSpec 1.14.1; layer cache and each image built once; `quality` checks every Compose service with a `build` section and runs the commands of its labels `ticketera.lint`, `ticketera.typecheck` and `ticketera.test` | RB-08, D-15, D-16 | Matrix per service (check names vary and the ruleset cannot require them); commands fixed in the workflow by kind of service (a service could not keep its own tool configuration, and a new kind would edit the workflow); path filters (an unreported required check blocks the pull request); `pull_request_target` (runs pull request code with write permissions and secrets) |
 | DS-19 | Smoke test that derives the services from `docker compose config` (label with the health path); backends are identified by the build context `./services/<name>`, and one without the label fails the test | RB-09, PLAN 6.4 | Hand-maintained list (can be forgotten) |
 | DS-20 | Realm check by JSON keys; `${VAR}` placeholders pass | D-03 [ADR-0002][adr-0002] | `grep` of values (`client-secret` appears as a value of `clientAuthenticatorType`) |
 | DS-21 | Protection of `main`: ruleset with no bypass, squash with "Default to pull request title", automatic deletion of head branches, `CODEOWNERS` with usernames. **"Require branches to be up to date before merging" stays off**; CI on every push to `main` is the backstop (a broken `main` is reverted) | RB-01/04/05/08, D-08, D-13, D-20 | Classic branch protection (no empty bypass list); team in `CODEOWNERS` (requests the team, not the two non-authors); merge commit and rebase (D-13 alternatives); requiring up-to-date branches (serializes groups 3 to 6 and repeats 15 minutes of CI per merge); merge queue (excessive for three people) |
@@ -229,6 +229,14 @@ process or tooling decision recorded only in `docs/PLAN.md` section 5. The ADR o
   `docker compose config`, so no service pull request edits the workflow. It also runs the realm check: a script that inspects JSON
   keys (`secret`, `privateKey`, `credentials`, ...), not values, because `client-secret` appears as the value of
   `clientAuthenticatorType`; a `${VAR}` placeholder passes.
+- The services `quality` checks are the Compose services with a `build` section (the backends and the frontend).
+  Each declares its commands in three labels, as it declares `ticketera.health-path`: `ticketera.lint`,
+  `ticketera.typecheck` and `ticketera.test`, each holding the command that `quality` runs with
+  `docker compose run --rm <service>` (for example `ruff check .`, `mypy` and `pytest`). The command is split on
+  whitespace and run without a shell, so it cannot use shell syntax. A service without one of the labels fails
+  `quality`, naming the service and the label. Services keep their own tool configuration this way: `catalog`
+  runs `mypy` without arguments, configured in its `pyproject.toml`. With no service built by the project,
+  `quality` says that it found none and passes.
 - `smoke-test` runs `docker compose up --wait --wait-timeout 300`, then checks with `curl`: `/healthz`, the realm
   discovery document, every backend health endpoint, the frontend, and the two CORS preflight scenarios. On
   failure it prints `docker compose logs` of the unhealthy containers. `docker compose down -v` runs in a step

@@ -165,10 +165,12 @@
 - [ ] 3.3 Implement `/health` with `api_route` for GET and HEAD, `root_path=/api/catalog` and the `SELECT 1` probe
   with connect and query timeouts (DS-11). Verify: the tests of 3.2 pass.
 - [ ] 3.4 Configure Ruff and mypy for the service. Verify: lint and type check pass in the container.
-- [ ] 3.5 Add the compose entry: build `./services/catalog`, label `ticketera.health-path=/health`, `backend`
-  network, depends on a healthy database, `urllib` healthcheck, bind mount with uvicorn reload on `0.0.0.0`,
-  `no-new-privileges`, `cap_drop: [ALL]`; the gateway depends on a healthy `catalog` (DS-01, DS-12, DS-13, DS-17,
-  DS-19). Verify: `docker compose up --wait` reaches healthy.
+- [ ] 3.5 Add the compose entry: build `./services/catalog`, label `ticketera.health-path=/health`, labels
+  `ticketera.lint`, `ticketera.typecheck` and `ticketera.test` with the commands of 3.4 and 3.2 (for example
+  `ruff check .`, `mypy` and `pytest`), `backend` network, depends on a healthy database, `urllib` healthcheck,
+  bind mount with uvicorn reload on `0.0.0.0`, `no-new-privileges`, `cap_drop: [ALL]`; the gateway depends on a
+  healthy `catalog` (DS-01, DS-12, DS-13, DS-17, DS-18, DS-19). Verify: `docker compose up --wait` reaches healthy;
+  `docker compose run --rm catalog <command>` passes for the command of each `ticketera.*` check label.
 - [ ] 3.6 Add the CORS preflight checks for `/api/catalog/health` to the smoke test (red): the frontend origin is
   allowed and `catalog` does not receive the request; another origin gets no permission (Req api-gateway: The
   frontend can call the API from the browser). Verify: the smoke test fails without the route.
@@ -194,9 +196,12 @@
   environment (DS-15). Verify: the tests of 4.2 pass.
 - [ ] 4.4 Configure ESLint and `tsc --noEmit`. Verify: both pass in the container.
 - [ ] 4.5 Add the compose entry: `edge` network only, `127.0.0.1:${FRONTEND_PORT}`, `node_modules` as an anonymous
-  volume, `wget` healthcheck, label `ticketera.health-path=/`, `no-new-privileges`, `cap_drop: [ALL]`; add
-  `FRONTEND_PORT` to `.env.example` (DS-10, DS-13, DS-14, DS-23). Verify: the smoke test checks the frontend on its
-  own published port, not through the gateway (which answers 404 for `/`), and it answers 200.
+  volume, `wget` healthcheck, label `ticketera.health-path=/`, labels `ticketera.lint`, `ticketera.typecheck` and
+  `ticketera.test` with the commands of 4.4 and 4.2 (for example `npx eslint .`, `npx tsc --noEmit` and
+  `npx vitest run`), `no-new-privileges`, `cap_drop: [ALL]`; add `FRONTEND_PORT` to `.env.example` (DS-10, DS-13,
+  DS-14, DS-18, DS-23). Verify: the smoke test checks the frontend on its own published port, not through the
+  gateway (which answers 404 for `/`), and it answers 200; `docker compose run --rm frontend <command>` passes for
+  the command of each `ticketera.*` check label.
 - [ ] 4.6 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
 
 ## 5. sales (C, feature/bootstrap-sales)
@@ -207,8 +212,10 @@
   Verify: pytest fails.
 - [ ] 5.3 Implement `/health` with `root_path=/api/sales` (DS-11). Verify: the tests of 5.2 pass.
 - [ ] 5.4 Configure Ruff and mypy. Verify: both pass in the container.
-- [ ] 5.5 Add the compose entry with label `ticketera.health-path=/health`, as in 3.5; the gateway depends on a
-  healthy `sales` (DS-01, DS-12, DS-13, DS-17, DS-19). Verify: the smoke test fails until the route exists.
+- [ ] 5.5 Add the compose entry with label `ticketera.health-path=/health` and the labels `ticketera.lint`,
+  `ticketera.typecheck` and `ticketera.test`, as in 3.5; the gateway depends on a healthy `sales` (DS-01, DS-12,
+  DS-13, DS-17, DS-18, DS-19). Verify: the smoke test fails until the route exists; the command of each check label
+  passes with `docker compose run --rm sales`.
 - [ ] 5.6 Add `infra/gateway/routes/sales.conf` (Req api-gateway: Each backend service has one route). Verify: the
   smoke test passes.
 - [ ] 5.7 Check the ownership of files the tests generate in the mounted folder (Req local-environment: Files
@@ -226,8 +233,10 @@
   Verify: pytest fails.
 - [ ] 6.3 Implement `/health` with `root_path=/api/payments` (DS-11). Verify: the tests of 6.2 pass.
 - [ ] 6.4 Configure Ruff and mypy. Verify: both pass in the container.
-- [ ] 6.5 Add the compose entry with label `ticketera.health-path=/health`, as in 3.5; the gateway depends on a
-  healthy `payments` (DS-01, DS-12, DS-13, DS-17, DS-19). Verify: the smoke test fails until the route exists.
+- [ ] 6.5 Add the compose entry with label `ticketera.health-path=/health` and the labels `ticketera.lint`,
+  `ticketera.typecheck` and `ticketera.test`, as in 3.5; the gateway depends on a healthy `payments` (DS-01, DS-12,
+  DS-13, DS-17, DS-18, DS-19). Verify: the smoke test fails until the route exists; the command of each check label
+  passes with `docker compose run --rm payments`.
 - [ ] 6.6 Add `infra/gateway/routes/payments.conf` (Req api-gateway: Each backend service has one route). Verify:
   the smoke test passes.
 - [ ] 6.7 Check the ownership of files the tests generate in the mounted folder (Req local-environment: Files

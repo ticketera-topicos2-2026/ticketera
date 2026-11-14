@@ -53,7 +53,7 @@ process or tooling decision recorded only in `docs/PLAN.md` section 5. The ADR o
 | DS-03 | The init script creates every bootstrap database in task group 2 | D-06 [ADR-0004][adr-0004] | Each service PR adds its database (the script does not run on existing volumes); init container on every start (more moving parts) |
 | DS-04 | Keycloak in `start-dev --import-realm`, with `KC_HTTP_RELATIVE_PATH=/auth`, `KC_HOSTNAME` set to the public gateway URL, `KC_HEALTH_ENABLED=true` (enables the management interface on port 9000) and the bootstrap administrator from `.env` | D-03 [ADR-0002][adr-0002] | Own identity service with JWT (D-03 alternative); `start` production mode (requires TLS and strict hostname); creating the realm with a script against the admin API (more code to maintain) |
 | DS-05 | Realm changes exported with the admin console "Partial export"; future secrets as `${VAR}` placeholders | D-03 [ADR-0002][adr-0002] | Committing the output of `kc.sh export` (includes users and secrets) |
-| DS-06 | Keycloak healthcheck: `GET /auth/health/ready` on port 9000 with `bash /dev/tcp` | D-03 [ADR-0002][adr-0002] | `curl` (not in the image); discovery document (fallback if "ready" does not imply the import finished); `legacy-observability-interface` (exposes health and metrics on the main port) |
+| DS-06 | Keycloak healthcheck: the realm discovery document, `GET /auth/realms/ticketera/.well-known/openid-configuration`, on port 8080 with `bash /dev/tcp`, so the service is healthy only while the realm exists | D-03 [ADR-0002][adr-0002] | `curl` (not in the image); `GET /auth/health/ready` on management port 9000 (reports UP once the import finished, even when there was nothing to import: seen in task 2.10, when a container with an empty import folder was healthy without the realm); `legacy-observability-interface` (exposes health and metrics on the main port) |
 | DS-07 | NGINX with static upstreams: one explicit route per service under `/api/<service>/`, with no version in the path, that strips the prefix, `/auth` to the identity service, local `/healthz`, explicit block of `/auth/health` and `/auth/metrics`; only the expected host names are served (`server_name localhost 127.0.0.1`) and a `default_server` answers `421` to any other `Host` | D-04 [ADR-0003][adr-0003], D-29 (ADR in task 2.21) | Kong and Traefik (D-04 alternatives); `/api/v1/<service>/` (D-29, see Alternatives Considered); runtime DNS resolution (four reasons, see Alternatives Considered); upstream `resolve` parameter in NGINX 1.27.3/1.28.0 (would start with a missing service) |
 | DS-08 | Replace `X-Forwarded-For/Host/Proto` with the real values of the connection | D-04 [ADR-0003][adr-0003] | Appending to the client's header with `$proxy_add_x_forwarded_for` (lets forged values through) |
 | DS-09 | CORS in the gateway for `/api/*`, with one allowed origin, the frontend, from `.env` (no wildcard); the gateway answers the `OPTIONS` preflight itself, so the services' 405 rule does not break CORS; the identity service client Web Origins are needed in either option. Approved at the team meeting of 2026-10-27 | D-01, D-04 [ADR-0003][adr-0003], D-32 | Vite proxy (three reasons, see Alternatives Considered) |
@@ -200,9 +200,11 @@ process or tooling decision recorded only in `docs/PLAN.md` section 5. The ADR o
   The output of `kc.sh export` is never committed. A change to the definition reaches an existing environment
   only after `docker compose down -v`; `CONTRIBUTE.md` explains both.
 - Future secrets in the realm definition use `${VAR}` placeholders resolved from `.env` at import time.
-- Healthcheck: the image has no `curl`; the check opens `/dev/tcp/127.0.0.1/9000` with `bash` and requests
-  `/auth/health/ready`, because the management interface inherits the `/auth` relative path. Task group 2
-  verifies that "ready" implies the import finished; if not, the check requests the realm discovery document.
+- Healthcheck: the image has no `curl`; the check opens `/dev/tcp/127.0.0.1/8080` with `bash` and requests the
+  realm discovery document, `/auth/realms/ticketera/.well-known/openid-configuration`, which answers `200` only
+  while the realm exists. Task group 2 found that `/auth/health/ready` on port 9000 does come after the import,
+  but reports UP when the import finished with nothing to import (a container started with an empty import
+  folder was healthy without the realm), so it cannot show that the realm is available.
 
 #### platform/service-health
 
@@ -367,7 +369,7 @@ sequenceDiagram
         Compose->>IdP: start (import ticketera realm if absent)
         Compose->>Svc: start
     end
-    IdP-->>Compose: healthy (/auth/health/ready on port 9000)
+    IdP-->>Compose: healthy (realm discovery document on port 8080)
     Svc-->>Compose: healthy (GET /health = 200)
     Compose->>GW: start (resolves every upstream at startup)
     GW-->>Compose: healthy (GET /healthz)

@@ -1,0 +1,149 @@
+# Ticketera platform: the whole system, started with a single "docker compose up" from the repository root (RB-09).
+#
+# Configuration comes from .env, a copy of .env.example (cp .env.example .env). Every required variable is written
+# as ${VAR:?message}: when it is missing or empty, Compose stops before creating any container and names it
+# (DS-16). .env is not declared as an env_file.
+#
+# Networks (DS-23): "edge" joins the frontend and the gateway; "backend" joins the gateway, the identity service,
+# the backend services and the database. Only the gateway joins both, and only the gateway and the frontend publish
+# ports, on 127.0.0.1 (DS-10).
+#
+# Every image is written as name:tag@sha256:<index digest>; the digest pins it and the tag documents it (DS-25).
+#
+# Change project-bootstrap, task group 2 (design: platform/local-environment).
+
+# Default healthcheck timing, merged into each service's healthcheck with "<<: *healthcheck-defaults": a container
+# becomes unhealthy at most 3 × (10 s + 5 s) = 45 s after it stops responding, inside the 60 s of Req
+# local-environment: Every container reports its health.
+x-healthcheck-defaults: &healthcheck-defaults
+  interval: 10s
+  timeout: 5s
+  retries: 3
+
+services:
+  database:
+    image: postgres:18-alpine@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env (copy .env.example to .env)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env (copy .env.example to .env)}
+      # Passwords of the service roles, read by the init script in infra/database/ (DS-02).
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD in .env (copy .env.example to .env)}
+      SALES_DB_PASSWORD: ${SALES_DB_PASSWORD:?set SALES_DB_PASSWORD in .env (copy .env.example to .env)}
+      PAYMENTS_DB_PASSWORD: ${PAYMENTS_DB_PASSWORD:?set PAYMENTS_DB_PASSWORD in .env (copy .env.example to .env)}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env (copy .env.example to .env)}
+    volumes:
+      - ticketera-db-data:/var/lib/postgresql
+      # Init scripts, run by the entrypoint only when the data volume is empty (DS-03).
+      - ./infra/database:/docker-entrypoint-initdb.d:ro
+    networks:
+      - backend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    # The entrypoint starts as root, prepares the data directory and switches to the postgres user, which keeps no
+    # capability. This is the minimal set, found by adding one capability at a time to cap_drop ALL and checking a
+    # first start (which runs the init scripts) and a restart with existing data (DS-13):
+    # - CHOWN: gives the data directory to the postgres user.
+    # - DAC_READ_SEARCH: lets root list the existing data directory (mode 0700, owned by postgres) on a restart.
+    # - SETGID and SETUID: switch to the postgres user (gosu).
+    # Without FOWNER, root's chmod of the data and socket directories fails and is logged as "Operation not
+    # permitted"; the entrypoint ignores it and repeats the chmod as the postgres user, which owns both directories.
+    cap_add:
+      - CHOWN
+      - DAC_READ_SEARCH
+      - SETGID
+      - SETUID
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Over TCP, so the database is healthy only after the init scripts finish: the temporary server that runs them
+      # listens only on the Unix socket. -U and -d avoid a "role does not exist" log line on every check.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d postgres"]
+
+  identity:
+    image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+    # Development mode: no TLS and no strict host name (DS-04). --import-realm imports the realm definition only
+    # when the realm does not exist, so a restart keeps the current realm.
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_HTTP_RELATIVE_PATH: /auth
+      # Public URL of the gateway: it fixes the issuer and every URL the identity service publishes.
+      KC_HOSTNAME: http://localhost:${GATEWAY_PORT:?set GATEWAY_PORT in .env (copy .env.example to .env)}/auth
+      # Enables the management interface on port 9000, which serves /auth/health and is never routed by the gateway.
+      KC_HEALTH_ENABLED: "true"
+      # Its own database and role, created by infra/database/ (DS-02).
+      KC_DB: postgres
+      KC_DB_URL_HOST: database
+      KC_DB_URL_DATABASE: keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?set KEYCLOAK_DB_PASSWORD in .env (copy .env.example to .env)}
+      # Bootstrap administrator, created only on the first start, when the master realm does not exist yet.
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?set KC_BOOTSTRAP_ADMIN_USERNAME in .env (copy .env.example to .env)}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?set KC_BOOTSTRAP_ADMIN_PASSWORD in .env (copy .env.example to .env)}
+    volumes:
+      # Realm definition with the platform roles (task 2.9; Req identity-provisioning).
+      - ./infra/keycloak:/opt/keycloak/data/import:ro
+    networks:
+      - backend
+    depends_on:
+      database:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      <<: *healthcheck-defaults
+      start_period: 120s
+      # The image has no curl: bash opens a TCP connection to the HTTP port and requests the realm discovery
+      # document, which answers 200 only while the realm exists (DS-06). Readiness on the management port is not
+      # enough: it reports UP once the import finished, even when there was nothing to import (task 2.10).
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/8080 &&
+          printf '%s\r\n' 'GET /auth/realms/ticketera/.well-known/openid-configuration HTTP/1.1'
+          'Host: localhost' 'Connection: close' '' >&3 &&
+          read -r status_line <&3 &&
+          [[ $$status_line == *' 200 '* ]]
+
+  gateway:
+    image: nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8
+    ports:
+      # Published only on the local machine (DS-10); the image runs NGINX as a non-root user on port 8080.
+      - "127.0.0.1:${GATEWAY_PORT:?set GATEWAY_PORT in .env (copy .env.example to .env)}:8080"
+    environment:
+      # The only origin allowed to call the API from a browser (DS-09), substituted into the template.
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?set FRONTEND_ORIGIN in .env (copy .env.example to .env)}
+    volumes:
+      # Server configuration, rendered by the image's entrypoint into /etc/nginx/conf.d/default.conf.
+      - ./infra/gateway/templates:/etc/nginx/templates:ro
+      # One route file per service (DS-07); test-only routes are mounted in a sibling folder (task 2.12).
+      - ./infra/gateway/routes:/etc/nginx/routes/platform:ro
+      # Snippets shared by the routes, such as the forwarding headers (DS-08).
+      - ./infra/gateway/snippets:/etc/nginx/snippets:ro
+    networks:
+      - edge
+      - backend
+    # NGINX resolves every upstream when it starts, so the gateway starts only after the services it routes to are
+    # healthy; each service pull request adds its own entry (DS-07).
+    depends_on:
+      identity:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      <<: *healthcheck-defaults
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+
+networks:
+  edge:
+  backend:
+
+volumes:
+  # PostgreSQL data, mounted at /var/lib/postgresql (DS-24); removed only with "docker compose down -v".
+  ticketera-db-data:

@@ -76,31 +76,31 @@
 - [x] 2.4 Write the realm check tests (red): a literal secret fails naming the field; a `${VAR}` placeholder
   passes; `clientAuthenticatorType: client-secret` passes (Req continuous-integration: The quality check rejects
   literal secrets in the realm definition; DS-20). Verify: the tests fail with no check script.
-- [ ] 2.5 Implement the realm check script, inspecting JSON keys and run in a digest-pinned Python container
+- [x] 2.5 Implement the realm check script, inspecting JSON keys and run in a digest-pinned Python container
   (DS-20, DS-25). Verify: the tests of 2.4 pass.
-- [ ] 2.6 Create the base `docker-compose.yml`: networks `edge` and `backend`, volume `ticketera-db-data`,
+- [x] 2.6 Create the base `docker-compose.yml`: networks `edge` and `backend`, volume `ticketera-db-data`,
   `${VAR:?message}` for every required variable, default healthcheck values (10 s, 5 s, 3) (DS-01, DS-16, DS-23,
   DS-24; Req local-environment: Missing configuration stops startup with a clear error). Verify:
   `docker compose config` with an empty required variable fails and names it.
-- [ ] 2.7 Add the database: `postgres:18-alpine` pinned by digest, volume at `/var/lib/postgresql`, `pg_isready`
+- [x] 2.7 Add the database: `postgres:18-alpine` pinned by digest, volume at `/var/lib/postgresql`, `pg_isready`
   healthcheck, `backend` network only, no published port, `no-new-privileges`, `cap_drop: [ALL]` plus the minimal
   `cap_add` recorded (DS-12, DS-13, DS-24, DS-25). Verify: the container reaches healthy.
-- [ ] 2.8 Write the init script in `infra/database/`: databases `catalog`, `sales`, `payments` and `keycloak`
+- [x] 2.8 Write the init script in `infra/database/`: databases `catalog`, `sales`, `payments` and `keycloak`
   owned by the administrator; one `NOSUPERUSER NOCREATEDB NOCREATEROLE` role each with `CONNECT`+`TEMPORARY`,
   owner of its `public` schema; `CONNECT` revoked from `PUBLIC`; passwords from `.env`, added to `.env.example`
   (DS-02, DS-03). Verify: `tests/platform/database-isolation.sh` passes.
-- [ ] 2.9 Write the realm definition `infra/keycloak/ticketera-realm.json` with the roles `ADMIN`, `EVENT_OWNER`
+- [x] 2.9 Write the realm definition `infra/keycloak/ticketera-realm.json` with the roles `ADMIN`, `EVENT_OWNER`
   and `CLIENT` and no secrets (Req identity-provisioning: The realm contains the platform roles; The realm
   definition contains no secrets). Verify: the realm check passes on it.
-- [ ] 2.10 Add the identity service: Keycloak pinned by digest, `start-dev --import-realm`,
+- [x] 2.10 Add the identity service: Keycloak pinned by digest, `start-dev --import-realm`,
   `KC_HTTP_RELATIVE_PATH=/auth`, `KC_HOSTNAME`, `KC_HEALTH_ENABLED=true`, bootstrap administrator with
-  `${VAR:?message}`, its own database role, `backend` network only, healthcheck with `bash /dev/tcp` on port 9000,
-  `start_period: 120s`; try `cap_drop: [ALL]` (DS-04, DS-06, DS-13). Verify: healthy only after the realm is
-  imported (otherwise switch the check to the discovery document); a restart keeps the realm (Req
-  identity-provisioning: The ticketera realm is imported on startup; An existing realm is not overwritten on
-  restart; Administrator credentials come from local configuration; The identity service is healthy only after the
-  realm is available).
-- [ ] 2.11 Add the gateway base: `nginxinc/nginx-unprivileged:1.28-alpine` pinned by digest, `server_name
+  `${VAR:?message}`, its own database role, `backend` network only, healthcheck with `bash /dev/tcp` requesting the
+  realm discovery document on port 8080, `start_period: 120s`; try `cap_drop: [ALL]` (DS-04, DS-06, DS-13).
+  Verify: healthy only after the realm is imported, and unhealthy when the realm is missing; a restart keeps the
+  realm (Req identity-provisioning: The ticketera realm is imported on startup; An existing realm is not
+  overwritten on restart; Administrator credentials come from local configuration; The identity service is healthy
+  only after the realm is available).
+- [x] 2.11 Add the gateway base: `nginxinc/nginx-unprivileged:1.28-alpine` pinned by digest, `server_name
   localhost 127.0.0.1`, `default_server` answering 421, `/healthz`, `include routes/*/*.conf` with
   `infra/gateway/routes` mounted read-only at `/etc/nginx/routes/platform` (test-only routes go in a sibling folder,
   task 2.12), `127.0.0.1:${GATEWAY_PORT}`, `edge` and `backend` networks, `wget` healthcheck, `no-new-privileges`,
@@ -114,12 +114,12 @@
   `X-Forwarded-Proto` equal to the host and scheme actually used. The real system does not include the echo
   service, and it is not a backend for the coverage check (Req api-gateway: The gateway forwards the original
   client information; DS-08). Verify: the forwarding checks fail before 2.13.
-- [ ] 2.13 Add the `/auth` route with replaced `X-Forwarded-*` headers, the explicit 404 for `/auth/health` and
+- [x] 2.13 Add the `/auth` route with replaced `X-Forwarded-*` headers, the explicit 404 for `/auth/health` and
   `/auth/metrics`, and the CORS map with `FRONTEND_ORIGIN` and `OPTIONS` answered with 204 under `/api/`; add
   `FRONTEND_ORIGIN` (default `http://localhost:5173`) to `.env.example`, since the gateway requires it with
   `${VAR:?message}` from this group on (DS-07, DS-08, DS-09). Verify: the forwarding checks of 2.12 pass; realm
   discovery through the gateway shows the public issuer; the admin console loads at `/auth/admin/`.
-- [ ] 2.14 Run the whole platform locally with the test-only compose file. Verify: `tests/smoke/smoke-test.sh` and
+- [x] 2.14 Run the whole platform locally with the test-only compose file. Verify: `tests/smoke/smoke-test.sh` and
   `tests/platform/database-isolation.sh` pass.
 - [ ] 2.15 Create the CI workflow skeleton: triggers `pull_request` and `push` to `main`, `permissions: contents:
   read`, concurrency with `cancel-in-progress` only for pull requests, actions pinned by SHA; job

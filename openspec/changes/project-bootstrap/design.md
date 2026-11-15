@@ -44,7 +44,7 @@ Constraints that shape the approach:
 ## Decisions
 
 The Trace column links every D-xx that has an architecture decision record (D-27). A D-xx without a link is a
-process or tooling decision recorded only in `docs/PLAN.md` section 5. The ADR of D-29 is written in task 2.21.
+process or tooling decision recorded only in `docs/PLAN.md` section 5.
 
 | # | Decision | Trace | Alternatives considered (reason rejected) |
 | --- | --- | --- | --- |
@@ -54,7 +54,7 @@ process or tooling decision recorded only in `docs/PLAN.md` section 5. The ADR o
 | DS-04 | Keycloak in `start-dev --import-realm`, with `KC_HTTP_RELATIVE_PATH=/auth`, `KC_HOSTNAME` set to the public gateway URL, `KC_HEALTH_ENABLED=true` (enables the management interface on port 9000) and the bootstrap administrator from `.env` | D-03 [ADR-0002][adr-0002] | Own identity service with JWT (D-03 alternative); `start` production mode (requires TLS and strict hostname); creating the realm with a script against the admin API (more code to maintain) |
 | DS-05 | Realm changes exported with the admin console "Partial export"; future secrets as `${VAR}` placeholders | D-03 [ADR-0002][adr-0002] | Committing the output of `kc.sh export` (includes users and secrets) |
 | DS-06 | Keycloak healthcheck: the realm discovery document, `GET /auth/realms/ticketera/.well-known/openid-configuration`, on port 8080 with `bash /dev/tcp`, so the service is healthy only while the realm exists | D-03 [ADR-0002][adr-0002] | `curl` (not in the image); `GET /auth/health/ready` on management port 9000 (reports UP once the import finished, even when there was nothing to import: seen in task 2.10, when a container with an empty import folder was healthy without the realm); `legacy-observability-interface` (exposes health and metrics on the main port) |
-| DS-07 | NGINX with static upstreams: one explicit route per service under `/api/<service>/`, with no version in the path, that strips the prefix, `/auth` to the identity service, local `/healthz`, explicit block of `/auth/health` and `/auth/metrics`; only the expected host names are served (`server_name localhost 127.0.0.1`) and a `default_server` answers `421` to any other `Host` | D-04 [ADR-0003][adr-0003], D-29 (ADR in task 2.21) | Kong and Traefik (D-04 alternatives); `/api/v1/<service>/` (D-29, see Alternatives Considered); runtime DNS resolution (four reasons, see Alternatives Considered); upstream `resolve` parameter in NGINX 1.27.3/1.28.0 (would start with a missing service) |
+| DS-07 | NGINX with static upstreams: one explicit route per service under `/api/<service>/`, with no version in the path, that strips the prefix, `/auth` to the identity service, local `/healthz`, explicit block of `/auth/health` and `/auth/metrics`; only the expected host names are served (`server_name localhost 127.0.0.1`) and a `default_server` answers `421` to any other `Host` | D-04 [ADR-0003][adr-0003], D-29 [ADR-0006][adr-0006] | Kong and Traefik (D-04 alternatives); `/api/v1/<service>/` (D-29, see Alternatives Considered); runtime DNS resolution (four reasons, see Alternatives Considered); upstream `resolve` parameter in NGINX 1.27.3/1.28.0 (would start with a missing service) |
 | DS-08 | Replace `X-Forwarded-For/Host/Proto` with the real values of the connection | D-04 [ADR-0003][adr-0003] | Appending to the client's header with `$proxy_add_x_forwarded_for` (lets forged values through) |
 | DS-09 | CORS in the gateway for `/api/*`, with one allowed origin, the frontend, from `.env` (no wildcard); the gateway answers the `OPTIONS` preflight itself, so the services' 405 rule does not break CORS; the identity service client Web Origins are needed in either option. Approved at the team meeting of 2026-10-27 | D-01, D-04 [ADR-0003][adr-0003], D-32 | Vite proxy (three reasons, see Alternatives Considered) |
 | DS-10 | Only the gateway and the frontend publish ports, on `127.0.0.1`, with the port configurable in `.env`; the database is used only through `docker compose exec` | D-12 | Publishing on `0.0.0.0` (exposed to the network); publishing the Keycloak console and the database port as in the original PLAN 4.4 (unnecessary surface) |
@@ -79,6 +79,7 @@ process or tooling decision recorded only in `docs/PLAN.md` section 5. The ADR o
 [adr-0003]: /docs/adr/adr-0003-api-gateway-nginx.md
 [adr-0004]: /docs/adr/adr-0004-contenedor-y-base-logica-por-servicio.md
 [adr-0005]: /docs/adr/adr-0005-arquitectura-hexagonal.md
+[adr-0006]: /docs/adr/adr-0006-rutas-publicas-sin-version.md
 
 ### Decision notes by capability
 
@@ -268,9 +269,9 @@ Every decision above lists its alternatives with the reason for rejection. These
 **Version in the public path, `/api/v1/<service>/` (rejected for DS-07, D-29):** the plan originally proposed a
 version in the path, following slide 14 of Class 7. The team meeting of 2026-10-27 approved D-29 with the
 alternative: the routes stay `/api/<service>/` with no version, and the bootstrap does not change. The minutes
-record the outcome but not a further reason. The ADR of D-29 (task 2.21) records the trade-off and settles the
-open points: whether "no version" means never or until a v2 exists, and what happens when a contract changes (a
-header, a new route or a coordinated breaking change).
+record the outcome but not a further reason. [ADR-0006][adr-0006] records the trade-off and settles the open
+points: "no version" means no version in the public paths for the whole project, and a contract change is
+decided by the team when it comes up; if it needs a version in the path, a new ADR supersedes ADR-0006.
 
 **Payment gateway in Stage I (rejected for group 6, D-25):** the plan originally had `payments` implement the
 payment gateway (Legacy Wrapper) in Stage I. D-25 moves it to Stage II. In Stage I, a purchase goes from reserved
@@ -471,7 +472,7 @@ the concurrency and idempotency strategy start with the first e1-* change.
 - [A realm change does not reach an existing environment] → `docker compose down -v`, documented.
 - [UID mismatch between members and CI] → UID/GID build arguments; tests do not write into mounted folders.
 - [Parallel pull requests of groups 3 to 6 conflict] → One route file per service; each pull request adds only
-  its own compose block; rebase on `main` before review.
+  its own compose block; merge `origin/main` into the branch before review.
 - [`main` breaks after two compatible-looking merges, since up-to-date branches are not required] → CI on every
   push to `main`; revert the commit.
 - [CI exceeds 15 minutes] → Layer cache, each image built once, `cancel-in-progress` on pull requests.
@@ -505,4 +506,5 @@ stays blocked. Local state is removed with `docker compose down -v`.
 ## Open Questions
 
 None for this design. The open points of D-29 (whether "no version" means never or until a v2 exists, and what
-happens when a contract changes) are settled in its ADR, task 2.21; they do not change the routes of this change.
+happens when a contract changes) are settled in [ADR-0006][adr-0006]; they do not change the routes of this
+change.

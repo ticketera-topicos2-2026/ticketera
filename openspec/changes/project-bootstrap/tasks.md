@@ -40,7 +40,7 @@
 - [x] 1.10 Review the ruleset of `main` against DS-21 (no bypass actors, one approval, approval of the most recent
   push, stale approvals dismissed, conversation resolution, deletion and force push blocked, up-to-date branches
   not required). Verify: exported ruleset JSON recorded for the team log.
-- [ ] 1.11 Evidence: a direct push, a force push and a deletion of `main` are rejected, including for an
+- [x] 1.11 Evidence: a direct push, a force push and a deletion of `main` are rejected, including for an
   administrator (Req contribution-workflow: Changes reach main only through pull requests). Verify: command outputs
   recorded for the team log.
 - [ ] 1.12 Evidence on this pull request: self-approval does not count; a reviewer who pushes and approves stays
@@ -135,16 +135,16 @@
   compose file of 2.12, smoke and database isolation scripts, logs of unhealthy containers on failure, `down -v`
   with `if: always()` (Req continuous-integration: The smoke test has a startup time limit; The smoke test leaves
   no state behind; DS-19). Verify: the check is green on this pull request.
-- [ ] 2.18 Add the running and troubleshooting sections of `CONTRIBUTE.md`: first run, `up --build -V`, `down -v`,
+- [x] 2.18 Add the running and troubleshooting sections of `CONTRIBUTE.md`: first run, `up --build -V`, `down -v`,
   `restart gateway`, realm changes with "Partial export", bootstrap administrator created once, WSL pitfalls, and
   a note that groups 3, 5 and 6 all edit the gateway `depends_on` in `docker-compose.yml`, so each updates its
   branch from `main` before requesting review (DS-05, DS-17, design Risks). Verify: the reviewer starts the
   platform by following it.
-- [ ] 2.19 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
+- [x] 2.19 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
 - [ ] 2.20 Evidence: this pull request opens with the pull request template and requests the reviewer from
   `CODEOWNERS`, both read from `main` after group 1 (Req contribution-workflow: Every pull request declares AI
   usage; Reviewers are requested automatically by path). Verify: screenshots recorded for the team log.
-- [ ] 2.21 Write the ADR of D-29 (public routes `/api/<service>/` with no version) in `docs/adr/` with the
+- [x] 2.21 Write the ADR of D-29 (public routes `/api/<service>/` with no version) in `docs/adr/` with the
   `create-architectural-decision-record` skill, following D-27: rejected alternative `/api/v1/<service>/`, and
   its open points (whether "no version" means never or until a v2 exists; what happens when a contract changes).
   Move D-29 from "ADR previstos" to the index of `docs/adr/README.md`, link the ADR from DS-07 in `design.md`,

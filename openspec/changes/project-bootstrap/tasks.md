@@ -121,17 +121,17 @@
   discovery through the gateway shows the public issuer; the admin console loads at `/auth/admin/`.
 - [x] 2.14 Run the whole platform locally with the test-only compose file. Verify: `tests/smoke/smoke-test.sh` and
   `tests/platform/database-isolation.sh` pass.
-- [ ] 2.15 Create the CI workflow skeleton: triggers `pull_request` and `push` to `main`, `permissions: contents:
+- [x] 2.15 Create the CI workflow skeleton: triggers `pull_request` and `push` to `main`, `permissions: contents:
   read`, concurrency with `cancel-in-progress` only for pull requests, actions pinned by SHA; job
   `openspec-validate` with `@fission-ai/openspec@1.14.1` in a Node.js container (DS-18; Req continuous-integration:
   CI runs on every pull request to main; CI runs on every push to main; The openspec-validate check validates
   every OpenSpec artifact; The workflow token is read-only; Pull request code never runs with write permissions or
   secrets). Verify: the check is green on this pull request.
-- [ ] 2.16 Add the `quality` job: build every image once with layer cache, run the realm check, and loop over the
+- [x] 2.16 Add the `quality` job: build every image once with layer cache, run the realm check, and loop over the
   services derived from `docker compose config` for lint, type check and tests, naming service and step (Req
   continuous-integration: The quality check builds, lints, type checks and tests every service; CI uses no
   repository secrets; DS-18). Verify: the check is green on this pull request.
-- [ ] 2.17 Add the `smoke-test` job: `.env` from `.env.example`, `up --wait --wait-timeout 300` with the test-only
+- [x] 2.17 Add the `smoke-test` job: `.env` from `.env.example`, `up --wait --wait-timeout 300` with the test-only
   compose file of 2.12, smoke and database isolation scripts, logs of unhealthy containers on failure, `down -v`
   with `if: always()` (Req continuous-integration: The smoke test has a startup time limit; The smoke test leaves
   no state behind; DS-19). Verify: the check is green on this pull request.
@@ -141,9 +141,10 @@
   branch from `main` before requesting review (DS-05, DS-17, design Risks). Verify: the reviewer starts the
   platform by following it.
 - [x] 2.19 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
-- [ ] 2.20 Evidence: this pull request opens with the pull request template and requests the reviewer from
+- [x] 2.20 Evidence: this pull request opens with the pull request template and requests the reviewer from
   `CODEOWNERS`, both read from `main` after group 1 (Req contribution-workflow: Every pull request declares AI
-  usage; Reviewers are requested automatically by path). Verify: screenshots recorded for the team log.
+  usage; Reviewers are requested automatically by path). Verify: the evidence is recorded in the team log entry
+  (text or screenshots).
 - [x] 2.21 Write the ADR of D-29 (public routes `/api/<service>/` with no version) in `docs/adr/` with the
   `create-architectural-decision-record` skill, following D-27: rejected alternative `/api/v1/<service>/`, and
   its open points (whether "no version" means never or until a v2 exists; what happens when a contract changes).

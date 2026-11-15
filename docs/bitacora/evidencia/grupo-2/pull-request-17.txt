@@ -1,0 +1,11 @@
+Pull request 17 del grupo 2 (project-bootstrap, tarea 2.20), rama feature/bootstrap-platform
+Fecha: 2026-11-15 16:27:55 UTC
+
+$ gh pr view 17 --json number,title,url,baseRefName,headRefName,reviewRequests
+{"baseRefName":"main","headRefName":"feature/bootstrap-platform","number":17,"reviewRequests":[{"__typename":"User","login":"arielbulacio-coder"},{"__typename":"User","login":"gustavoandresfu"}],"title":"feat(bootstrap): add platform with database, identity, gateway and CI","url":"https://github.com/ticketera-topicos2-2026/ticketera/pull/17"}
+
+$ gh pr checks 17
+openspec-validate	pass	13s	https://github.com/ticketera-topicos2-2026/ticketera/actions/runs/43734981311/job/132875472296	
+quality	pass	9s	https://github.com/ticketera-topicos2-2026/ticketera/actions/runs/43734981311/job/132875472131	
+smoke-test	pass	1m8s	https://github.com/ticketera-topicos2-2026/ticketera/actions/runs/43734981311/job/132875472299	
+

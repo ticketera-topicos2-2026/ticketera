@@ -252,8 +252,11 @@ check_create_extensions() {
 }
 
 main() {
-  if ! admin_role=$(docker compose exec -T database printenv POSTGRES_USER 2>&1) || [[ -z $admin_role ]]; then
-    unreachable_reason="the database container is not reachable with docker compose exec: ${admin_role:-no output}"
+  local exec_error
+  # Only standard output is the role name; a Compose warning on standard error must not become part of it.
+  if ! admin_role=$(docker compose exec -T database printenv POSTGRES_USER 2> /dev/null) || [[ -z $admin_role ]]; then
+    exec_error=$({ docker compose exec -T database printenv POSTGRES_USER > /dev/null; } 2>&1)
+    unreachable_reason="the database container is not reachable with docker compose exec: ${exec_error:-no output}"
   fi
   trap cleanup EXIT
 

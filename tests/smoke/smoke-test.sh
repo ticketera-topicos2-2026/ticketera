@@ -16,7 +16,7 @@
 # missing or older than 8.1 (no check runs).
 #
 # The host needs only bash, curl (8.1 or later, for %{errormsg} in --write-out) and docker (D-12). JSON is parsed
-# inside a Python container pinned by digest (DS-25).
+# inside a Python container pinned by digest (DS-25); only its standard output is read as data (see run_python).
 #
 # Change project-bootstrap, task group 2 (design: platform/continuous-integration, platform/api-gateway).
 
@@ -69,6 +69,8 @@ gateway_port=""
 gateway_port_problem=""
 compose_service_lines=""
 compose_problem=""
+# Directory for the standard error of docker run (see run_python); created by main and removed on exit.
+temp_dir=""
 STATUS=""
 BODY=""
 ERROR=""
@@ -173,18 +175,60 @@ compose_error() {
   { docker compose "$@" > /dev/null; } 2>&1
 }
 
-# Prints the string field named $1 of the JSON document read from standard input; fails when the input is not a
-# JSON object or the field is not a string.
+# Creates the temporary directory and removes it when the script exits. Bash runs the EXIT trap also when a check
+# fails, on "exit", and when the script is ended by SIGINT or SIGTERM. Run it in the main shell, never in a
+# command substitution, whose traps and variables are lost when it ends. When the directory cannot be created,
+# temp_dir stays empty and run_python reports it as the reason of each check that needs it.
+create_temp_dir() {
+  trap remove_temp_dir EXIT
+  temp_dir=$(mktemp -d) || temp_dir=""
+}
+
+remove_temp_dir() {
+  if [[ -n $temp_dir ]]; then
+    rm -rf "$temp_dir"
+  fi
+}
+
+# Runs a Python program inside the container pinned by PYTHON_IMAGE, with no network and with standard input passed
+# on. Only the container's standard output is data: on success it is printed, and anything on its standard error is
+# copied to the script's standard error. On failure the container's standard error is printed instead, as the
+# reason, and the function fails. --quiet keeps a pull of the image silent. The standard error goes to a file in
+# temp_dir, the only way to capture it apart from standard output.
+# Usage: run_python <program> [arguments...]
+run_python() {
+  local program=$1 errors_file="${temp_dir}/docker-run-stderr" output errors status
+  shift
+  if [[ -z $temp_dir ]]; then
+    printf 'mktemp could not create a directory for the standard error of docker run\n'
+    return 1
+  fi
+  output=$(docker run --rm -i --quiet --network none "$PYTHON_IMAGE" python -I -c "$program" "$@" \
+    2> "$errors_file")
+  status=$?
+  errors=$(< "$errors_file")
+  if ((status != 0)); then
+    printf '%s\n' "${errors:-docker run exited with status $status and printed no error}"
+    return 1
+  fi
+  if [[ -n $errors ]]; then
+    printf '%s\n' "$errors" >&2
+  fi
+  printf '%s\n' "$output"
+}
+
+# Prints the string field named $1 of the JSON document read from standard input; when the input is not a JSON
+# object with that string field, or the container fails, prints the reason and fails.
 json_string_field() {
-  docker run --rm -i --network none "$PYTHON_IMAGE" python -I -c '
+  run_python '
 import json, sys
 try:
-    value = json.load(sys.stdin).get(sys.argv[1])
-except (ValueError, AttributeError):
-    sys.exit(1)
-if not isinstance(value, str):
-    sys.exit(1)
-print(value)
+    document = json.load(sys.stdin)
+except ValueError:
+    sys.exit("it is not JSON")
+if not isinstance(document, dict) or not isinstance(document.get(sys.argv[1]), str):
+    sys.exit(f"it is not a JSON object with a string field {sys.argv[1]}")
+print(document[sys.argv[1]])
 ' "$1"
 }
 
@@ -229,7 +273,7 @@ check_realm_discovery() {
     return
   fi
   if ! issuer=$(json_string_field issuer <<< "$BODY"); then
-    fail "$check" "the response to $path is not a JSON object with an issuer"
+    fail "$check" "the issuer could not be read from the response to $path: $issuer"
     return
   fi
   if [[ $issuer == "$expected_issuer" ]]; then
@@ -242,13 +286,16 @@ check_realm_discovery() {
 # Prints the services of the Compose configuration, one line each (see COMPOSE_SERVICES_PROGRAM), or the reason
 # when the configuration cannot be read.
 compose_services() {
-  local config
+  local config services
   if ! config=$(docker compose config --format json 2> /dev/null); then
     printf 'docker compose config failed: %s\n' "$(compose_error config --format json)"
     return 1
   fi
-  docker run --rm -i --network none "$PYTHON_IMAGE" \
-    python -I -c "$COMPOSE_SERVICES_PROGRAM" "$PWD" "$HEALTH_PATH_LABEL" <<< "$config" 2>&1
+  if ! services=$(run_python "$COMPOSE_SERVICES_PROGRAM" "$PWD" "$HEALTH_PATH_LABEL" <<< "$config"); then
+    printf 'the services could not be read from docker compose config: %s\n' "$services"
+    return 1
+  fi
+  printf '%s\n' "$services"
 }
 
 # Req continuous-integration: The smoke test covers every backend service the system starts - Scenario: Service
@@ -483,6 +530,7 @@ check_forwarding() {
 main() {
   parse_arguments "$@"
   require_curl
+  create_temp_dir
 
   if ! gateway_port=$(config_value GATEWAY_PORT); then
     gateway_port_problem="GATEWAY_PORT is not set in the environment or in .env"

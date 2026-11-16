@@ -175,7 +175,7 @@
 - [x] 3.6 Add the CORS preflight checks for `/api/catalog/health` to the smoke test (red): the frontend origin is
   allowed and `catalog` does not receive the request; another origin gets no permission (Req api-gateway: The
   frontend can call the API from the browser). Verify: the smoke test fails without the route.
-- [ ] 3.7 Add `infra/gateway/routes/catalog.conf` (Req api-gateway: Each backend service has one route; An
+- [x] 3.7 Add `infra/gateway/routes/catalog.conf` (Req api-gateway: Each backend service has one route; An
   unavailable service does not affect other routes). Verify: the smoke test passes, including the CORS checks.
 - [ ] 3.8 Check that the files the tests generate in the mounted folder belong to the host user (Req
   local-environment: Files created in mounted folders belong to the host user). Verify: the host user deletes them

@@ -177,10 +177,10 @@
   frontend can call the API from the browser). Verify: the smoke test fails without the route.
 - [x] 3.7 Add `infra/gateway/routes/catalog.conf` (Req api-gateway: Each backend service has one route; An
   unavailable service does not affect other routes). Verify: the smoke test passes, including the CORS checks.
-- [ ] 3.8 Check that the files the tests generate in the mounted folder belong to the host user (Req
+- [x] 3.8 Check that the files the tests generate in the mounted folder belong to the host user (Req
   local-environment: Files created in mounted folders belong to the host user). Verify: the host user deletes them
   without `sudo`.
-- [ ] 3.9 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
+- [x] 3.9 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
 
 ## 4. Frontend and status page (B, feature/bootstrap-frontend)
 

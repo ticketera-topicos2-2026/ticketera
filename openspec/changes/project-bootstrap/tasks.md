@@ -172,7 +172,7 @@
   bind mount with uvicorn reload on `0.0.0.0`, `no-new-privileges`, `cap_drop: [ALL]`; the gateway depends on a
   healthy `catalog` (DS-01, DS-12, DS-13, DS-17, DS-18, DS-19). Verify: `docker compose up --wait` reaches healthy;
   `docker compose run --rm catalog <command>` passes for the command of each `ticketera.*` check label.
-- [ ] 3.6 Add the CORS preflight checks for `/api/catalog/health` to the smoke test (red): the frontend origin is
+- [x] 3.6 Add the CORS preflight checks for `/api/catalog/health` to the smoke test (red): the frontend origin is
   allowed and `catalog` does not receive the request; another origin gets no permission (Req api-gateway: The
   frontend can call the API from the browser). Verify: the smoke test fails without the route.
 - [ ] 3.7 Add `infra/gateway/routes/catalog.conf` (Req api-gateway: Each backend service has one route; An

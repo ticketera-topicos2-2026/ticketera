@@ -15,6 +15,8 @@ En el host solo se instala lo siguiente; todo lo del proyecto corre en contenedo
   servidor.
 - **VS Code** con la extensión WSL, y el copiloto de IA que elijas, compatible con OpenSpec (D-10).
 - **OpenSpec** 1.14.1 (con Node.js), la misma para los tres integrantes y la CI (PLAN 6.5, DS-18).
+- **curl** 8.1 o posterior, que la prueba de humo exige en el host. Ubuntu 24.04 trae una versión suficiente;
+  Ubuntu 22.04 no, y hay que actualizarla (`curl --version` la muestra).
 - **GitHub CLI** (`gh`), opcional, para crear issues y pull requests desde la terminal.
 
 ### Identidad de Git
@@ -50,8 +52,221 @@ cd ticketera
 code .
 ```
 
-Cómo levantar el sistema y resolver problemas frecuentes se agrega en las secciones de ejecución
-(tarea 2.18 del change `project-bootstrap`).
+## Levantar el sistema
+
+Todo corre en contenedores con `docker compose`, desde la raíz del repositorio (RB-09, D-12). Hoy el sistema tiene
+tres servicios: `database`, `identity` (Keycloak) y `gateway` (NGINX); los grupos 3 a 6 agregan `catalog`, el
+frontend, `sales` y `payments`.
+
+### Primera vez
+
+1. Copiá la plantilla de configuración. `.env` no se sube a Git; los valores de `.env.example` sirven tal cual en
+   local:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Levantá el sistema y esperá a que todos los contenedores estén sanos:
+
+   ```bash
+   docker compose up -d --wait --wait-timeout 300
+   ```
+
+   La primera vez descarga las imágenes. Keycloak importa el realm antes de abrir sus puertos y su healthcheck
+   tiene `start_period: 120s`, así que el comando puede tardar un par de minutos. Si falta una variable
+   obligatoria, Compose se detiene antes de crear contenedores y la nombra: revisá que `.env` tenga todas las
+   de `.env.example`.
+
+3. Comprobá el resultado (con `GATEWAY_PORT=18080`, el valor de `.env.example`):
+
+   - `docker compose ps` muestra `database`, `identity` y `gateway` en `healthy`.
+   - <http://127.0.0.1:18080/healthz> responde `200`.
+   - <http://localhost:18080/auth/realms/ticketera/.well-known/openid-configuration> devuelve el documento de
+     descubrimiento del realm `ticketera`.
+   - <http://localhost:18080/auth/admin/> abre la consola de administración; entrá con
+     `KC_BOOTSTRAP_ADMIN_USERNAME` y `KC_BOOTSTRAP_ADMIN_PASSWORD` de `.env`.
+
+El único puerto que se publica es el del gateway (`GATEWAY_PORT`), solo en `127.0.0.1`; la base de datos no
+publica puerto y se usa con `docker compose exec` (DS-10). Para entrar a `psql`:
+
+```bash
+docker compose exec database sh -c 'psql -U "$POSTGRES_USER" -d postgres'
+```
+
+### Pruebas de la plataforma
+
+La prueba de humo y la de aislamiento de la base de datos corren contra el sistema levantado, igual que en la CI.
+La prueba de humo necesita `curl` 8.1 o posterior en el host y el archivo de prueba `tests/smoke/compose.echo.yml`,
+que agrega un contenedor `echo` para las pruebas de reenvío de encabezados y que nunca forma parte del sistema
+real:
+
+```bash
+export COMPOSE_FILE=docker-compose.yml:tests/smoke/compose.echo.yml
+docker compose up -d --wait --wait-timeout 300
+tests/smoke/smoke-test.sh --require-echo
+tests/platform/database-isolation.sh
+docker compose down
+unset COMPOSE_FILE
+```
+
+`COMPOSE_FILE` queda definida en esa terminal. Cuando termines, ejecutá `unset COMPOSE_FILE` (o cerrá la terminal),
+aunque una prueba falle antes de llegar a esa línea; si no, los `docker compose` siguientes levantan también el
+servicio `echo`.
+
+Cada script imprime una línea `PASS` o `FAIL` por comprobación y termina con código distinto de cero si alguna
+falla. La comprobación de secretos del realm corre en un contenedor, como en la CI:
+
+```bash
+docker run --rm --network none --read-only --user "$(id -u):$(id -g)" -v "$PWD:/repo:ro" -w /repo \
+  python:3.13-alpine@sha256:1e1f6334529d1fb26a2ef619d7cffb30a7c7d7cc1cc7338ebee283a58d1aeaca \
+  python -I -B scripts/check_realm_secrets.py infra/keycloak/ticketera-realm.json
+```
+
+### Día a día
+
+| Quiero... | Comando |
+|---|---|
+| Ver el estado | `docker compose ps` |
+| Ver los logs de un servicio | `docker compose logs -f <servicio>` |
+| Reconstruir las imágenes y renovar los volúmenes anónimos (por ejemplo, después de cambiar las dependencias de un servicio: evita un `node_modules` viejo) | `docker compose up -d --build -V` |
+| Detener sin borrar datos | `docker compose down` |
+| Reiniciar el gateway | `docker compose restart gateway` |
+| Empezar de cero, borrando la base de datos y el realm | `docker compose down -v` |
+
+`docker compose down -v` borra el volumen `ticketera-db-data`: las bases de todos los servicios y el realm
+importado. Es el comando que hace falta cuando:
+
+- cambió `infra/keycloak/ticketera-realm.json`: Keycloak importa el realm solo si no existe, así que un cambio
+  no llega a un entorno que ya lo tiene;
+- se agregó una base o un rol en `infra/database/`: el script de inicialización corre solo con el volumen vacío
+  (DS-03);
+- querés cambiar el administrador inicial de Keycloak (ver más abajo).
+
+`docker compose restart gateway` es la solución cuando el gateway responde `502` después de recrear un servicio:
+NGINX resuelve la dirección de cada servicio al arrancar, y un servicio recreado puede recibir otra IP (DS-07).
+
+### Cambios en el realm
+
+El realm se define en `infra/keycloak/ticketera-realm.json` y no lleva secretos (DS-05, DS-20).
+
+1. Hacé el cambio en la consola de administración (<http://localhost:18080/auth/admin/>).
+2. Exportalo con *Realm settings → Action → Partial export*. No uses `kc.sh export`: su salida incluye usuarios
+   y secretos.
+3. Reemplazá cualquier secreto por un marcador `${NOMBRE}` y guardá el resultado en
+   `infra/keycloak/ticketera-realm.json`.
+4. Corré la comprobación de secretos del realm (comando de arriba). Falla y nombra el campo si queda un secreto
+   literal.
+5. Para ver el cambio en tu entorno: `docker compose down -v` y `docker compose up -d --wait`.
+
+### Administrador inicial de Keycloak
+
+Keycloak crea el administrador de `KC_BOOTSTRAP_ADMIN_USERNAME` y `KC_BOOTSTRAP_ADMIN_PASSWORD` solo en el primer
+arranque, cuando todavía no existe el realm `master`. Cambiar esas variables en `.env` después no tiene efecto:
+cambiá la contraseña en la consola o borrá el volumen con `docker compose down -v`. Es un administrador temporal
+de desarrollo; un entorno real no se crea así.
+
+### Cómo agregar un servicio
+
+Cada servicio nuevo (grupos 3, 5 y 6) agrega su bloque a `docker-compose.yml` y su archivo de rutas, y la CI
+deriva todo lo demás de `docker compose config`: no hay que editar el workflow.
+
+**Etiquetas.** El servicio declara en `labels` el camino de salud y los tres comandos de verificación que el job
+`quality` ejecuta con `docker compose run --rm <servicio>`:
+
+- `ticketera.health-path`: la ruta de salud (por ejemplo, `/health`), que la prueba de humo pide a través del
+  gateway en `/api/<servicio><ruta>`.
+- `ticketera.lint`, `ticketera.typecheck` y `ticketera.test`: los comandos de lint, de verificación de tipos y de
+  tests. El comando se separa por espacios y corre sin shell, así que no admite `&&`, tuberías ni comillas.
+
+Un servicio con sección `build` al que le falte una etiqueta hace fallar `quality`, que nombra el servicio y la
+etiqueta. Ejemplo:
+
+```yaml
+catalog:
+  build: ./services/catalog
+  labels:
+    ticketera.health-path: /health
+    ticketera.lint: ruff check .
+    ticketera.typecheck: mypy
+    ticketera.test: pytest
+```
+
+Probá cada comando en local antes del pull request, por ejemplo `docker compose run --rm catalog ruff check .`.
+Para el frontend, los comandos de ESLint, `tsc --noEmit` y Vitest (por ejemplo `npx eslint .`,
+`npx tsc --noEmit` y `npx vitest run`).
+
+**Ruta del gateway.** Un archivo por servicio, `infra/gateway/routes/<servicio>.conf`, con un único `location`
+que incluye los encabezados de reenvío. La barra final de `proxy_pass` quita el prefijo `/api/<servicio>/`, y la
+ruta pública no lleva versión (ADR-0006):
+
+```nginx
+location /api/catalog/ {
+    include snippets/forwarded-headers.conf;
+    proxy_pass http://catalog:8000/;
+}
+```
+
+Dos reglas para estos archivos:
+
+- Un `location` de `infra/gateway/routes/` no declara `add_header`. CORS se resuelve a nivel de servidor en
+  `infra/gateway/templates/default.conf.template`, y un `location` que declara su propio `add_header` deja de
+  heredar esos encabezados.
+- Cada ruta es un solo `location` que incluye `snippets/forwarded-headers.conf`.
+
+**`depends_on` del gateway.** NGINX resuelve cada servicio al arrancar, así que el gateway espera a que los
+servicios a los que enruta estén sanos. Los grupos 3, 5 y 6 agregan su entrada al mismo `depends_on` del gateway
+en `docker-compose.yml`, y esas líneas chocan entre pull requests. Antes de pedir la revisión, actualizá tu rama
+con `main` y conservá las entradas de todos los servicios si hay conflicto:
+
+```bash
+git fetch
+git merge origin/main
+```
+
+### Problemas frecuentes
+
+**Base de datos: líneas `chmod: ... Operation not permitted` en el log.** Aparecen una vez en el primer arranque
+(`/var/run/postgresql`) y dos en cada reinicio con datos (también `/var/lib/postgresql/18/docker`). Son
+esperables: el contenedor corre con `cap_drop: [ALL]` y sin la capacidad `FOWNER`, el entrypoint ignora el error
+y repite el `chmod` como usuario `postgres`, dueño de las dos carpetas (DS-13). No hay que corregir nada.
+
+**Una carpeta montada aparece vacía dentro del contenedor.** Después de reiniciar el PC puede quedar un
+contenedor creado pero nunca arrancado, que `docker compose up` reutiliza con la carpeta montada vacía: por
+ejemplo, Keycloak queda `healthy` sin importar el realm y este responde `404`. Comprobalo con:
+
+```bash
+docker compose exec <servicio> ls <ruta>
+```
+
+Si la carpeta está vacía, recreá el contenedor sin borrar volúmenes:
+
+```bash
+docker compose up -d --force-recreate <servicio>
+```
+
+**`docker compose up --wait` termina por tiempo en `identity`.** Keycloak es lento al arrancar. Subí la memoria
+de WSL en `%UserProfile%\.wslconfig` (por ejemplo, `memory=6GB` en la sección `[wsl2]`; es un ejemplo, ajustalo
+a la memoria de tu máquina) y reiniciá WSL con `wsl --shutdown` desde PowerShell.
+
+**Falta una variable o el puerto está ocupado.** Compose nombra la variable que falta: agregala a `.env` desde
+`.env.example`. Si `GATEWAY_PORT` está en uso o Hyper-V lo tiene reservado
+(`netsh interface ipv4 show excludedportrange protocol=tcp`, en PowerShell), elegí otro puerto en `.env` y
+levantá de nuevo; `FRONTEND_ORIGIN` no cambia con el puerto del gateway.
+
+**`docker` no se encuentra o no conecta desde WSL.** Activá la integración de Docker Desktop con tu distribución
+(*Settings → Resources → WSL integration*) y comprobá `docker version`.
+
+**El reloj de WSL se atrasa después de suspender el PC.** Los tokens firmados con una hora desfasada se
+rechazan. Reiniciá WSL con `wsl --shutdown`; será relevante desde el primer change con autenticación.
+
+**Error `/bin/sh^M` o `bad interpreter` en un script.** Terminaciones de línea CRLF: `.gitattributes` fuerza LF
+en `*.sh`, `*.sql`, `*.conf`, `Dockerfile` y `*.json`. Cloná el repositorio dentro de WSL, no en `/mnt/c`, y
+comprobá con `git ls-files --eol` que los archivos estén en `i/lf w/lf`.
+
+**Los cambios de archivos no se ven en el contenedor o la recarga en vivo no funciona.** Casi siempre el
+repositorio está bajo `/mnt/c`: en esa ruta los bind mounts son lentos y no llegan los eventos de archivos
+(DS-17). Cloná dentro de WSL; el sondeo (*polling*) queda como alternativa que define el grupo del frontend.
 
 ## Flujo de trabajo
 

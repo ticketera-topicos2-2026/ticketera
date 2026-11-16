@@ -1,0 +1,77 @@
+# Gateway: the only entry point to the API and to the identity service (DS-07; Req api-gateway).
+#
+# The image's entrypoint renders this template into /etc/nginx/conf.d/default.conf, replacing the image's default
+# server; each ${NAME} that names an environment variable is replaced with its value.
+#
+# Change project-bootstrap, task group 2 (design: platform/api-gateway).
+
+# Hides the NGINX version in the Server header and in error pages, those of the 421 default server included: the
+# version is an internal detail that helps an attacker look up known vulnerabilities (design, Security Threat
+# Analysis: Information disclosure). This file is included in the http context, so it applies to both servers.
+server_tokens off;
+
+# CORS for the API (DS-09; Req api-gateway: The frontend can call the API from the browser). The only allowed
+# origin is the frontend's, FRONTEND_ORIGIN in .env, substituted when the template is rendered. Any other origin
+# maps to an empty value, and NGINX sends no header whose value is empty, so it gets no permission: neither a
+# wildcard nor its own origin echoed back.
+map $uri $is_api_request {
+    default 0;
+    ~^/api/ 1;
+}
+
+map "$is_api_request:$http_origin" $cors_allow_origin {
+    default "";
+    "1:${FRONTEND_ORIGIN}" "${FRONTEND_ORIGIN}";
+}
+
+# Vary: Origin on every API response, so a cache never serves a response to another origin.
+map $is_api_request $cors_vary {
+    default "";
+    1 Origin;
+}
+
+# A CORS preflight under /api/, which the gateway answers itself and never forwards.
+map "$request_method:$is_api_request" $is_api_preflight {
+    default 0;
+    "OPTIONS:1" 1;
+}
+
+# Any other Host gets 421 without being forwarded, which defeats DNS rebinding (Req api-gateway: The gateway serves
+# only the expected host names).
+server {
+    listen 8080 default_server;
+    return 421;
+}
+
+server {
+    listen 8080;
+    # server_name matches the host name without the port, so "localhost:<port>" from the browser is served; the
+    # container healthcheck uses 127.0.0.1.
+    server_name localhost 127.0.0.1;
+
+    # CORS headers of the API, sent with every status code. A location that declares its own add_header stops
+    # inheriting these, so route files never use add_header.
+    add_header Access-Control-Allow-Origin $cors_allow_origin always;
+    add_header Vary $cors_vary always;
+
+    # Answered before any location is chosen, so the preflight never reaches a service.
+    if ($is_api_preflight) {
+        return 204;
+    }
+
+    # Req api-gateway: The gateway reports its own health.
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "ok\n";
+    }
+
+    # One route file per service, infra/gateway/routes/<service>.conf, mounted at routes/platform; test-only routes
+    # are mounted in a sibling folder (task 2.12).
+    include routes/*/*.conf;
+
+    # Req api-gateway: Requests that match no route are rejected.
+    location / {
+        return 404;
+    }
+}

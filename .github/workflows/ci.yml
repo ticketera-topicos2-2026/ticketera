@@ -1,0 +1,217 @@
+# CI of every pull request to main and every new commit on main (design: platform/continuous-integration).
+#
+# The job names openspec-validate, quality and smoke-test are the stable check names required by the ruleset of
+# main (task group 7), so they never depend on the files changed: no matrix and no path filters (DS-18).
+#
+# Least privilege: a read-only token at workflow level, no repository secrets (the configuration comes from
+# .env.example) and no pull_request_target, so pull request code never runs with write permissions or secrets.
+# Every action is pinned to a full commit SHA, with its version in a comment, and every container image is written
+# as name:tag@sha256:<index digest>; the digest pins it and the tag documents it (DS-25).
+#
+# Services are derived from "docker compose config", never listed here, so no service pull request edits this
+# workflow: every Compose service with a build section is built and checked by quality, which runs the commands
+# of its labels ticketera.lint, ticketera.typecheck and ticketera.test with "docker compose run --rm <service>".
+#
+# Change project-bootstrap, tasks 2.15, 2.16 and 2.17.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# One group per pull request, where a new push cancels the run in progress. On main every run gets its own group,
+# so every commit runs its checks to completion and no pending run is replaced by a newer one.
+concurrency:
+  group: >-
+    ${{ github.workflow }}-${{ github.event_name == 'pull_request'
+    && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Images built by the project are tagged <project>-<service>, the names Compose looks for.
+  COMPOSE_PROJECT_NAME: ticketera
+  NODE_IMAGE: node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
+  PYTHON_IMAGE: python:3.13-alpine@sha256:1e1f6334529d1fb26a2ef619d7cffb30a7c7d7cc1cc7338ebee283a58d1aeaca
+
+jobs:
+  openspec-validate:
+    name: openspec-validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Req continuous-integration: The openspec-validate check validates every OpenSpec artifact.
+      - name: Validate every OpenSpec artifact
+        run: >-
+          docker run --rm --read-only --tmpfs /tmp:exec --user "$(id -u):$(id -g)"
+          --env HOME=/tmp --env CI=true --volume "$PWD:/repo:ro" --workdir /repo "$NODE_IMAGE"
+          npx --yes @fission-ai/openspec@1.14.1 validate --all --strict --no-interactive
+
+  quality:
+    name: quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Req continuous-integration: CI uses no repository secrets.
+      - name: Create .env from .env.example
+        run: cp .env.example .env
+
+      # Req continuous-integration: The quality check rejects literal secrets in the realm definition (DS-20).
+      - name: Realm check
+        run: >-
+          docker run --rm --network none --read-only --user "$(id -u):$(id -g)"
+          --volume "$PWD:/repo:ro" --workdir /repo "$PYTHON_IMAGE"
+          python -I -B scripts/check_realm_secrets.py infra/keycloak/ticketera-realm.json
+
+      - name: Realm check tests
+        run: >-
+          docker run --rm --network none --read-only --user "$(id -u):$(id -g)"
+          --volume "$PWD:/repo:ro" --workdir /repo "$PYTHON_IMAGE"
+          python -I -B -m unittest discover -s tests/platform -v
+
+      # Shared with smoke-test (YAML anchor): the services built by the project, and the Bake overrides that tag
+      # each image as Compose names it and give each one its own layer cache scope.
+      - &derive-services
+        name: Derive the services built by the project
+        id: services
+        run: |
+          config="$(docker compose config --format json)"
+          names="$(jq -r '[.services | to_entries[] | select(.value.build != null) | .key] | sort | join(" ")' \
+            <<<"$config")"
+          echo "Services built by the project: ${names:-none}"
+          {
+            echo "names=${names}"
+            echo "bake-set<<BAKE_SET_END"
+            for service in $names; do
+              echo "${service}.tags=${COMPOSE_PROJECT_NAME}-${service}"
+              echo "${service}.cache-from=type=gha,scope=${service}"
+              echo "${service}.cache-to=type=gha,mode=max,scope=${service},ignore-error=true"
+            done
+            echo "BAKE_SET_END"
+          } >>"$GITHUB_OUTPUT"
+
+      - &set-up-buildx
+        name: Set up Docker Buildx
+        if: steps.services.outputs.names != ''
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      # Each image is built once per job, with the BuildKit layer cache of GitHub Actions; a failed build names the
+      # service as its Bake target.
+      - &build-images
+        name: Build the service images
+        if: steps.services.outputs.names != ''
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+        with:
+          source: .
+          files: docker-compose.yml
+          load: true
+          set: ${{ steps.services.outputs.bake-set }}
+
+      # Req continuous-integration: The quality check builds, lints, type checks and tests every service. Every step
+      # of every service runs, and the job fails at the end, naming each failed service and step.
+      - name: Lint, type check and test every service
+        env:
+          SERVICES: ${{ steps.services.outputs.names }}
+        run: |
+          if [[ -z "$SERVICES" ]]; then
+            echo "No services built by the project found in docker compose config: nothing to lint, type check or test."
+            exit 0
+          fi
+          config="$(docker compose config --format json)"
+          failures=()
+          for service in $SERVICES; do
+            for step in lint typecheck test; do
+              label="ticketera.${step}"
+              command="$(jq -r --arg service "$service" --arg label "$label" \
+                '.services[$service].labels[$label] // ""' <<<"$config")"
+              if [[ -z "$command" ]]; then
+                echo "::error title=quality::${service}: ${step}: missing label ${label}"
+                failures+=("${service}: ${step}: missing label ${label}")
+                continue
+              fi
+              # The label holds a command split on whitespace, with no shell syntax.
+              read -r -a words <<<"$command"
+              echo "::group::${service}: ${step}: ${command}"
+              if docker compose run --rm -T "$service" "${words[@]}"; then status=0; else status=$?; fi
+              echo "::endgroup::"
+              if ((status == 0)); then
+                echo "PASS ${service}: ${step}"
+              else
+                echo "::error title=quality::${service}: ${step} failed with exit status ${status}"
+                failures+=("${service}: ${step}: exit status ${status}")
+              fi
+            done
+          done
+          if ((${#failures[@]} > 0)); then
+            printf 'FAIL %s\n' "${failures[@]}"
+            exit 1
+          fi
+
+  smoke-test:
+    name: smoke-test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      # The system plus the test-only echo service and gateway route used by the forwarding checks (task 2.12).
+      COMPOSE_FILE: docker-compose.yml:tests/smoke/compose.echo.yml
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Req continuous-integration: CI uses no repository secrets.
+      - name: Create .env from .env.example
+        run: cp .env.example .env
+
+      - *derive-services
+      - *set-up-buildx
+      - *build-images
+
+      # Req continuous-integration: The smoke test has a startup time limit (5 minutes after the images are built).
+      - name: Start the system
+        id: start
+        run: docker compose up -d --wait --wait-timeout 300
+
+      # Req continuous-integration: The smoke-test check verifies the running system through the gateway; The smoke
+      # test covers every backend service the system starts (DS-19).
+      - name: Smoke test
+        run: tests/smoke/smoke-test.sh --require-echo
+
+      # Runs after a failed smoke test too, as long as the system started, so both results are reported.
+      - name: Database isolation test
+        if: ${{ !cancelled() && steps.start.outcome == 'success' }}
+        run: tests/platform/database-isolation.sh
+
+      - name: Show the logs of every container that is not healthy
+        if: failure()
+        run: |
+          docker compose ps --all
+          docker compose ps --all --format '{{.Service}} {{.State}} {{.Health}}' |
+            while read -r service state health; do
+              if [[ "$state" != running || ( -n "$health" && "$health" != healthy ) ]]; then
+                echo "::group::Logs of ${service} (${state}${health:+, ${health}})"
+                docker compose logs --no-color --timestamps "$service"
+                echo "::endgroup::"
+              fi
+            done
+
+      # Req continuous-integration: The smoke test leaves no state behind.
+      - name: Stop the system and remove its containers and volumes
+        if: always()
+        run: docker compose down -v

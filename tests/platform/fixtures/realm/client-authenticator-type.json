@@ -1,0 +1,10 @@
+{
+  "realm": "ticketera",
+  "clients": [
+    {
+      "clientId": "frontend",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "realm": "ticketera",
+  "enabled": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "ADMIN",
+        "description": "Full platform management, maintenance and operations; approves or rejects refund requests."
+      },
+      {
+        "name": "EVENT_OWNER",
+        "description": "Designs, configures and publishes events."
+      },
+      {
+        "name": "CLIENT",
+        "description": "Browses published events and buys tickets."
+      }
+    ]
+  }
+}

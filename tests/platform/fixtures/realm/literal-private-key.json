@@ -1,0 +1,15 @@
+{
+  "realm": "ticketera",
+  "components": {
+    "org.keycloak.keys.KeyProvider": [
+      {
+        "name": "rsa-generated",
+        "providerId": "rsa-generated",
+        "config": {
+          "priority": ["100"],
+          "privateKey": ["example-literal-private-key"]
+        }
+      }
+    ]
+  }
+}

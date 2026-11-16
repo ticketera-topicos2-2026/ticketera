@@ -1,0 +1,192 @@
+Verde del grupo 2 (project-bootstrap, tarea 2.14), rama feature/bootstrap-platform, commit base 98c9666
+COMPOSE_FILE=docker-compose.yml:tests/smoke/compose.echo.yml
+
+===== Entorno  [2026-11-14 22:34:02 UTC]
+$ bash -c docker version --format "Docker {{.Server.Version}}"; docker compose version; curl --version | head -1
+Docker 29.9.2
+Docker Compose version v5.6.1
+curl 8.18.0 (x86_64-pc-linux-gnu) libcurl/8.18.0 OpenSSL/3.5.5 zlib/1.3.1 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libpsl/0.21.2 libssh2/1.11.1 nghttp2/1.68.0 librtmp/2.3 mit-krb5/1.22.1 OpenLDAP/2.6.10
+-> exit 0
+
+===== Configuración  [2026-11-14 22:34:03 UTC]
+$ docker compose config --services
+database
+echo
+identity
+gateway
+-> exit 0
+
+===== 1. Arranque con el archivo de prueba  [2026-11-14 22:34:03 UTC]
+$ docker compose up -d --wait --wait-timeout 300
+ Container ticketera-identity-1 Running 
+ Container ticketera-database-1 Running 
+ Container ticketera-echo-1 Creating 
+ Container ticketera-echo-1 Created 
+ Container ticketera-gateway-1 Recreate 
+ Container ticketera-gateway-1 Recreated 
+ Container ticketera-database-1 Waiting 
+ Container ticketera-echo-1 Starting 
+ Container ticketera-echo-1 Started 
+ Container ticketera-database-1 Healthy 
+ Container ticketera-identity-1 Waiting 
+ Container ticketera-identity-1 Healthy 
+ Container ticketera-gateway-1 Starting 
+ Container ticketera-gateway-1 Started 
+ Container ticketera-identity-1 Waiting 
+ Container ticketera-gateway-1 Waiting 
+ Container ticketera-echo-1 Waiting 
+ Container ticketera-database-1 Waiting 
+ Container ticketera-echo-1 Healthy 
+ Container ticketera-identity-1 Healthy 
+ Container ticketera-database-1 Healthy 
+ Container ticketera-gateway-1 Healthy 
+-> exit 0
+
+===== Estado de los contenedores  [2026-11-14 22:34:16 UTC]
+$ docker compose ps --format {{.Service}} {{.State}} {{.Health}} [{{.Ports}}]
+database running healthy [5432/tcp]
+echo running  [80/tcp]
+gateway running healthy [127.0.0.1:18080->8080/tcp]
+identity running healthy [8080/tcp, 8443/tcp, 9000/tcp]
+-> exit 0
+
+===== 2. Smoke test con eco obligatorio  [2026-11-14 22:34:16 UTC]
+$ tests/smoke/smoke-test.sh --require-echo
+PASS gateway: /healthz answers 200
+PASS identity: realm discovery document
+PASS gateway: Host evil.example gets 421
+PASS route /auth/health answers 404
+PASS route /auth/health/ready answers 404
+PASS route /auth/metrics answers 404
+PASS route /api/unknown/health answers 404
+PASS route /internal/status answers 404
+PASS backend coverage: no backend services found
+PASS container database: main process runs as non-root
+PASS container echo: main process runs as non-root
+PASS container gateway: main process runs as non-root
+PASS container identity: main process runs as non-root
+PASS ports: only the gateway and the frontend publish ports
+PASS ports: every published port is bound to 127.0.0.1
+PASS ports: the gateway publishes GATEWAY_PORT on 127.0.0.1
+PASS forwarding: X-Forwarded-For holds one real address, not the forged one
+PASS forwarding: X-Forwarded-Host is the host used
+PASS forwarding: X-Forwarded-Proto is the scheme used
+Smoke test: 19 passed, 0 failed, 0 skipped
+-> exit 0
+
+===== 3. Aislamiento de la base de datos  [2026-11-14 22:34:18 UTC]
+$ tests/platform/database-isolation.sh
+PASS Databases after the first start
+PASS Service connects to its own database
+PASS Services do not share credentials
+PASS Role of one service connects to another service's database
+PASS Role of the identity service connects to a backend service's database
+PASS Role with no explicit grant
+PASS Catalog role grants access to the sales role
+PASS Service role tries to create a database
+PASS Service role tries to create a role
+PASS Service role tries to install a cross-database extension
+Database isolation: 10 passed, 0 failed
+-> exit 0
+
+===== 4. Reinicio del servicio de identidad: el realm se conserva  [2026-11-14 22:34:22 UTC]
+$ docker compose restart identity
+Antes del reinicio:
+{
+  "realm" : "ticketera",
+  "enabled" : true
+}
+[ {
+  "name" : "uma_authorization"
+}, {
+  "name" : "ADMIN"
+}, {
+  "name" : "CLIENT"
+}, {
+  "name" : "EVENT_OWNER"
+}, {
+  "name" : "default-roles-ticketera"
+}, {
+  "name" : "offline_access"
+} ]
+ Container ticketera-identity-1 Restarting 
+ Container ticketera-identity-1 Started 
+ Container ticketera-database-1 Running 
+ Container ticketera-echo-1 Running 
+ Container ticketera-identity-1 Running 
+ Container ticketera-gateway-1 Running 
+ Container ticketera-database-1 Waiting 
+ Container ticketera-database-1 Healthy 
+ Container ticketera-identity-1 Waiting 
+ Container ticketera-identity-1 Healthy 
+ Container ticketera-database-1 Waiting 
+ Container ticketera-echo-1 Waiting 
+ Container ticketera-identity-1 Waiting 
+ Container ticketera-gateway-1 Waiting 
+ Container ticketera-echo-1 Healthy 
+ Container ticketera-gateway-1 Healthy 
+ Container ticketera-database-1 Healthy 
+ Container ticketera-identity-1 Healthy 
+-> up exit 0
+identity running healthy
+Log de importación del servicio de identidad:
+2026-11-14 01:26:19,496 INFO  [org.keycloak.exportimport.util.ImportUtils] (main) Realm 'ticketera' already exists. Import skipped
+2026-11-14 01:26:44,781 INFO  [org.keycloak.exportimport.util.ImportUtils] (main) Realm 'ticketera' already exists. Import skipped
+2026-11-14 21:52:58,077 INFO  [org.keycloak.exportimport.util.ImportUtils] (main) Realm 'ticketera' already exists. Import skipped
+2026-11-14 22:34:37,984 INFO  [org.keycloak.exportimport.util.ImportUtils] (main) Realm 'ticketera' already exists. Import skipped
+Después del reinicio:
+{
+  "realm" : "ticketera",
+  "enabled" : true
+}
+[ {
+  "name" : "uma_authorization"
+}, {
+  "name" : "ADMIN"
+}, {
+  "name" : "CLIENT"
+}, {
+  "name" : "EVENT_OWNER"
+}, {
+  "name" : "default-roles-ticketera"
+}, {
+  "name" : "offline_access"
+} ]
+
+===== Smoke test después del reinicio  [2026-11-14 22:34:45 UTC]
+$ tests/smoke/smoke-test.sh --require-echo
+PASS gateway: /healthz answers 200
+PASS identity: realm discovery document
+PASS gateway: Host evil.example gets 421
+PASS route /auth/health answers 404
+PASS route /auth/health/ready answers 404
+PASS route /auth/metrics answers 404
+PASS route /api/unknown/health answers 404
+PASS route /internal/status answers 404
+PASS backend coverage: no backend services found
+PASS container database: main process runs as non-root
+PASS container echo: main process runs as non-root
+PASS container gateway: main process runs as non-root
+PASS container identity: main process runs as non-root
+PASS ports: only the gateway and the frontend publish ports
+PASS ports: every published port is bound to 127.0.0.1
+PASS ports: the gateway publishes GATEWAY_PORT on 127.0.0.1
+PASS forwarding: X-Forwarded-For holds one real address, not the forged one
+PASS forwarding: X-Forwarded-Host is the host used
+PASS forwarding: X-Forwarded-Proto is the scheme used
+Smoke test: 19 passed, 0 failed, 0 skipped
+-> exit 0
+
+===== 5. GATEWAY_PORT vacío detiene la configuración y la nombra  [2026-11-14 22:34:47 UTC]
+$ env GATEWAY_PORT= docker compose config --quiet
+error while interpolating services.gateway.ports.[]: required variable GATEWAY_PORT is missing a value: set GATEWAY_PORT in .env (copy .env.example to .env)
+error while interpolating services.identity.environment.KC_HOSTNAME: required variable GATEWAY_PORT is missing a value: set GATEWAY_PORT in .env (copy .env.example to .env)
+-> exit 1
+
+===== Estado final (el sistema queda en ejecución)  [2026-11-14 22:34:47 UTC]
+$ docker compose ps --format {{.Service}} {{.State}} {{.Health}} [{{.Ports}}]
+database running healthy [5432/tcp]
+echo running  [80/tcp]
+gateway running healthy [127.0.0.1:18080->8080/tcp]
+identity running healthy [8080/tcp, 8443/tcp, 9000/tcp]
+-> exit 0

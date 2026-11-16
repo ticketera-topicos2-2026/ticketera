@@ -1,0 +1,26 @@
+2026-11-10T14:02:20+00:00
+Rol: admin
+main antes: fe6a72716c120deab826c87328098282400ca2be
+remote: error: GH013: Repository rule violations found for refs/heads/main.        
+remote: Review all repository rules at https://github.com/ticketera-topicos2-2026/ticketera/rules?ref=refs%2Fheads%2Fmain        
+remote: 
+remote: - Changes must be made through a pull request.        
+remote: 
+To https://github.com/ticketera-topicos2-2026/ticketera.git
+ ! [remote rejected] HEAD -> main (push declined due to repository rule violations)
+error: failed to push some refs to 'https://github.com/ticketera-topicos2-2026/ticketera.git'
+remote: error: GH013: Repository rule violations found for refs/heads/main.        
+remote: Review all repository rules at https://github.com/ticketera-topicos2-2026/ticketera/rules?ref=refs%2Fheads%2Fmain        
+remote: 
+remote: - Cannot force-push to this branch        
+remote: 
+remote: - Changes must be made through a pull request.        
+remote: 
+To https://github.com/ticketera-topicos2-2026/ticketera.git
+ ! [remote rejected] HEAD~2 -> main (push declined due to repository rule violations)
+error: failed to push some refs to 'https://github.com/ticketera-topicos2-2026/ticketera.git'
+To https://github.com/ticketera-topicos2-2026/ticketera.git
+ ! [remote rejected] main (refusing to delete the current branch: refs/heads/main)
+error: failed to push some refs to 'https://github.com/ticketera-topicos2-2026/ticketera.git'
+Reglas activas en main: deletion, non_fast_forward, pull_request
+main después: fe6a72716c120deab826c87328098282400ca2be	refs/heads/main

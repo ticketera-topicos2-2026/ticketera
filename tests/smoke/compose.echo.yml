@@ -1,0 +1,32 @@
+# Test-only addition to docker-compose.yml: an echo service behind a test-only gateway route, used by the
+# forwarding checks of tests/smoke/smoke-test.sh (task 2.12; Req api-gateway: The gateway forwards the original
+# client information; DS-08). The real system never includes it.
+#
+# Usage, from the repository root:
+#   COMPOSE_FILE=docker-compose.yml:tests/smoke/compose.echo.yml docker compose up --wait
+#   COMPOSE_FILE=docker-compose.yml:tests/smoke/compose.echo.yml tests/smoke/smoke-test.sh --require-echo
+#
+# The echo service has no ticketera.health-path label and is not built from ./services/<name>, so the smoke test
+# does not count it as a backend. Its image is built from scratch, with no shell or HTTP client, so it has no
+# healthcheck: "up --wait" waits until it runs, and the gateway healthcheck covers its route. Relative paths are
+# resolved from the repository root, the directory of docker-compose.yml.
+
+services:
+  echo:
+    image: traefik/whoami:v1.11@sha256:200689790a0a0ea48ca45992e0450bc26ccab5307375b41c84dfc4f2475937ab
+    command: ["-port", "8081"]
+    user: "65534:65534"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    networks:
+      - backend
+
+  gateway:
+    depends_on:
+      echo:
+        condition: service_started
+    volumes:
+      - ./tests/smoke/gateway:/etc/nginx/routes/smoke-test:ro

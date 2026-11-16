@@ -166,7 +166,7 @@
 - [x] 3.3 Implement `/health` with `api_route` for GET and HEAD, `root_path=/api/catalog` and the `SELECT 1` probe
   with connect and query timeouts (DS-11). Verify: the tests of 3.2 pass.
 - [x] 3.4 Configure Ruff and mypy for the service. Verify: lint and type check pass in the container.
-- [ ] 3.5 Add the compose entry: build `./services/catalog`, label `ticketera.health-path=/health`, labels
+- [x] 3.5 Add the compose entry: build `./services/catalog`, label `ticketera.health-path=/health`, labels
   `ticketera.lint`, `ticketera.typecheck` and `ticketera.test` with the commands of 3.4 and 3.2 (for example
   `ruff check .`, `mypy` and `pytest`), `backend` network, depends on a healthy database, `urllib` healthcheck,
   bind mount with uvicorn reload on `0.0.0.0`, `no-new-privileges`, `cap_drop: [ALL]`; the gateway depends on a

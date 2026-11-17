@@ -209,6 +209,47 @@ services:
         - -c
         - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)
 
+  # Frontend with the status page (change project-bootstrap, task 4.5).
+  frontend:
+    build:
+      context: ./frontend
+      # Host user IDs, as for catalog (DS-13).
+      args:
+        UID: ${HOST_UID:-1000}
+        GID: ${HOST_GID:-1000}
+    ports:
+      # Published only on the local machine (DS-10); the browser opens it and calls the API through the gateway.
+      - "127.0.0.1:${FRONTEND_PORT:?set FRONTEND_PORT in .env (copy .env.example to .env)}:5173"
+    labels:
+      # The smoke test checks the frontend on its own published port, not through the gateway (DS-19).
+      ticketera.health-path: /
+      # Commands run by the quality job with "docker compose run --rm frontend <command>" (DS-18).
+      ticketera.lint: npx eslint .
+      ticketera.typecheck: npx tsc --noEmit
+      ticketera.test: npx vitest run
+    environment:
+      # Public address of the gateway, which the browser calls (DS-09, DS-15).
+      VITE_API_BASE_URL: http://localhost:${GATEWAY_PORT:?set GATEWAY_PORT in .env (copy .env.example to .env)}
+      # Polling fallback when file events do not reach the container (DS-17).
+      VITE_USE_POLLING: ${VITE_USE_POLLING:-false}
+    volumes:
+      # Source code for live reload (DS-17); node_modules stays in an anonymous volume with the image's
+      # dependencies, refreshed with "docker compose up --build -V" (DS-14).
+      - ./frontend:/app
+      - /app/node_modules
+    # Only the edge network: the browser reaches the API through the gateway's published port (DS-23).
+    networks:
+      - edge
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      <<: *healthcheck-defaults
+      start_period: 30s
+      # BusyBox wget of the Alpine image (DS-12).
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5173/"]
+
   gateway:
     image: nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8
     ports:

@@ -1,0 +1,65 @@
+# Evidencia TDD verde, project-bootstrap grupo 4 (tareas 4.1, 4.3, 4.4 y 4.5)
+# Fecha: 2026-11-17 15:05:33 UTC
+# Rama: feature/bootstrap-frontend, HEAD 832a58c
+# Host: curl 8.18.0, Docker 29.9.3, Docker Compose version v5.7.0
+
+## 1. Usuario del contenedor (tarea 4.1)
+$ docker compose run --rm frontend id
+uid=1000(app) gid=1000(app) groups=1000(app),1000(app)
+
+## 2. Comandos de las etiquetas ticketera.* (tareas 4.3, 4.4 y 4.5)
+$ docker compose run --rm frontend npx eslint .
+# exit=0
+$ docker compose run --rm frontend npx tsc --noEmit
+# exit=0
+$ docker compose run --rm frontend npx vitest run
+ RUN  v5.1.0 /app
+ ✓ src/App.test.tsx (7 tests) 941ms
+   ✓ status page (7)
+     ✓ shows catalog, sales and payments as healthy when every service answers 200 503ms
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+   Start at  15:06:40
+   Duration  5.67s (environment 63%, tests 18%, setup 9%, transform 8%, import 2%)
+# exit=0
+
+## 3. Estado de los contenedores y prueba de humo, como en la CI (tarea 4.5)
+$ docker compose ps --format '{{.Service}} {{.State}} {{.Health}} {{.Ports}}'
+catalog running healthy 8000/tcp
+database running healthy 5432/tcp
+echo running  80/tcp
+frontend running healthy 127.0.0.1:5173->5173/tcp
+gateway running healthy 127.0.0.1:18080->8080/tcp
+identity running healthy 8080/tcp, 8443/tcp, 9000/tcp
+$ COMPOSE_FILE=docker-compose.yml:tests/smoke/compose.echo.yml tests/smoke/smoke-test.sh --require-echo
+PASS gateway: /healthz answers 200
+PASS identity: realm discovery document
+PASS gateway: Host evil.example gets 421
+PASS route /auth/health answers 404
+PASS route /auth/health/ready answers 404
+PASS route /auth/metrics answers 404
+PASS route /api/unknown/health answers 404
+PASS route /internal/status answers 404
+PASS service catalog: GET /api/catalog/health answers 200
+PASS service frontend: GET / on its port 5173 answers 200
+PASS container catalog: main process runs as non-root
+PASS container database: main process runs as non-root
+PASS container echo: main process runs as non-root
+PASS container frontend: main process runs as non-root
+PASS container gateway: main process runs as non-root
+PASS container identity: main process runs as non-root
+PASS ports: only the gateway and the frontend publish ports
+PASS ports: every published port is bound to 127.0.0.1
+PASS ports: the gateway publishes GATEWAY_PORT on 127.0.0.1
+PASS forwarding: X-Forwarded-For holds one real address, not the forged one
+PASS forwarding: X-Forwarded-Host is the host used
+PASS forwarding: X-Forwarded-Proto is the scheme used
+PASS cors: preflight from FRONTEND_ORIGIN is answered and allows that origin
+PASS cors: GET /api/catalog/health from FRONTEND_ORIGIN answers 200 and allows that origin
+PASS cors: the preflight does not reach catalog
+PASS cors: preflight from another origin gets no permission
+Smoke test: 26 passed, 0 failed, 0 skipped
+# exit=0
+$ tests/platform/database-isolation.sh
+Database isolation: 10 passed, 0 failed
+# exit=0

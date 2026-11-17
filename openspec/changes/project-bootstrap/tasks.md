@@ -203,7 +203,7 @@
   DS-14, DS-18, DS-23). Verify: the smoke test checks the frontend on its own published port, not through the
   gateway (which answers 404 for `/`), and it answers 200; `docker compose run --rm frontend <command>` passes for
   the command of each `ticketera.*` check label.
-- [ ] 4.6 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
+- [x] 4.6 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
 
 ## 5. sales (C, feature/bootstrap-sales)
 

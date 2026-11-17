@@ -1,0 +1,21 @@
+# Evidencia TDD rojo, project-bootstrap grupo 4 (tarea 4.2)
+# Fecha: 2026-11-17 15:05:08 UTC
+# Rama: feature/bootstrap-frontend
+# Host: curl 8.18.0, Docker 29.9.3, Docker Compose version v5.7.0
+
+## Tests de la página de estado en el commit test(frontend) 30042cd, antes de la implementación (a9305da)
+# Se corren en la imagen del frontend con el código de ese commit montado en /app.
+$ docker run --rm -v <worktree de 30042cd>/frontend:/app -v /app/node_modules ticketera-frontend npx vitest run
+     × shows catalog, sales and payments as healthy when every service answers 200 540ms
+     × requests the health of each service through the gateway, each with its own AbortController 28ms
+     × shows sales as unhealthy when it answers 503 and the others as healthy 58ms
+     × shows payments as unhealthy when the gateway answers 502 for it and the others as healthy 69ms
+     × shows a service that does not answer as unhealthy after 5 seconds, without delaying the others 42ms
+     × shows every service as unhealthy and a message when the gateway cannot be reached 36ms
+     × does not report the gateway as unreachable when only one request fails at the network level 45ms
+TestingLibraryElementError: Unable to find an accessible element with the role "listitem" and name "catalog"
+TestingLibraryElementError: Unable to find an accessible element with the role "listitem" and name "sales"
+TestingLibraryElementError: Unable to find an accessible element with the role "listitem" and name "payments"
+ Test Files  1 failed (1)
+      Tests  7 failed (7)
+# exit=1

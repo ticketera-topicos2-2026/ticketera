@@ -188,7 +188,7 @@
   Node.js image, UID/GID build arguments, non-root user, Vite on `0.0.0.0` with the default `allowedHosts` and
   optional polling, and no component library (Tailwind CSS with shadcn/ui arrives with the first change with
   screens, D-16) (DS-13, DS-15, DS-17, DS-25). Verify: the image builds and `id -u` is not 0.
-- [ ] 4.2 Write the status page tests with Vitest and React Testing Library (red): all healthy; one 503; one 502;
+- [x] 4.2 Write the status page tests with Vitest and React Testing Library (red): all healthy; one 503; one 502;
   one request expiring after 5 s while the others are healthy; gateway unreachable shows every service unhealthy
   and the message (Req service-health: The status page shows the health of every backend service; Each health
   request of the status page has a time limit; The status page shows an unreachable gateway). Verify: Vitest

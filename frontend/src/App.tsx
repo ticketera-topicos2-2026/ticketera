@@ -25,7 +25,7 @@ export interface AppProps {
 
 /**
  * Status page of the bootstrap (D-32; spec platform/service-health): the health of every backend service through
- * the gateway, each request with its own 5-second limit (DS-15). Base style of the proposal D-38.
+ * the gateway, each request with its own 5-second limit (DS-15). Base style of the GoPass identity (D-38).
  */
 export default function App({ apiBaseUrl, services = BACKEND_SERVICES }: AppProps) {
   const [health, setHealth] = useState<Record<string, Health>>(() =>

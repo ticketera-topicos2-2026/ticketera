@@ -4,8 +4,7 @@ Common rules for every AI assistant and team member in this repository (D-10). C
 through `CLAUDE.md`; OpenCode and Antigravity read it directly.
 
 The ID after each rule traces it to `docs/PLAN.md` (D-xx in section 5, RB-xx in section 2.1, PLAN n.n for a
-section), to the design of `project-bootstrap` (DS-xx) or to `openspec/config.yaml`. D-35, D-36 and D-37 are team
-proposals still being voted.
+section), to the design of `project-bootstrap` (DS-xx) or to `openspec/config.yaml`.
 
 ## Sources of truth
 
@@ -52,6 +51,8 @@ proposals still being voted.
 - Use PostgreSQL 18 (D-34).
 - Use React, TypeScript, Vite, Vitest and React Testing Library; Tailwind CSS with shadcn/ui, installed in the
   first change with screens (D-01, D-16).
+- Follow the GoPass visual identity (D-38): its palette and fonts are the Tailwind tokens; the name GoPass is
+  only for the UI.
 - Use hexagonal architecture (ports and adapters) in every service (D-17).
 
 ## Service internal structure

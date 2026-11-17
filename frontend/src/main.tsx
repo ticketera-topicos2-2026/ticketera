@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
-// Typography of the proposal D-38, served from the project (no external font CDN).
+// Typography of the GoPass identity (D-38), served from the project (no external font CDN).
 import "@fontsource/plus-jakarta-sans/600.css";
 import "@fontsource/plus-jakarta-sans/700.css";
 import "@fontsource/inter/400.css";

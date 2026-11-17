@@ -1,8 +1,7 @@
 # Cómo contribuir
 
 Guía del equipo para llevar un cambio desde una issue hasta `main`. Las reglas para los copilotos de IA están en
-[`AGENTS.md`](AGENTS.md); el plan y las decisiones, en [`docs/PLAN.md`](docs/PLAN.md). D-35, D-36 y D-37 son
-propuestas del equipo que todavía se están votando.
+[`AGENTS.md`](AGENTS.md); el plan y las decisiones, en [`docs/PLAN.md`](docs/PLAN.md).
 
 ## Requisitos previos
 

@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| Versión | 0.4.0 |
-| Estado | Aprobado por el equipo (reunión del 2026-10-27) |
-| Última actualización | 2026-10-28 |
+| Versión | 0.5.0 |
+| Estado | Aprobado por el equipo (reuniones del 2026-10-27 y del 2026-11-17) |
+| Última actualización | 2026-11-17 |
 | Responsable del documento | Integrante A |
-| Fuentes | Consigna «Trabajo final de Tópicos II – 2026»; notas de la clase (lineamiento y profundización); acta de la reunión del equipo del 2026-10-27 |
+| Fuentes | Consigna «Trabajo final de Tópicos II – 2026»; notas de la clase (lineamiento y profundización); actas de las reuniones del equipo del 2026-10-27 y del 2026-11-17 |
 
 > Este plan es un documento vivo. Solo se modifica mediante Pull Request, siguiendo el
 > procedimiento de la sección 10. Cada cambio se registra en la sección 11.
@@ -349,7 +349,7 @@ En la Etapa II, `payments` deja de ser un esqueleto e implementa la pasarela de 
 
 ## 5. Decisiones propuestas
 
-Estado según el acta de la reunión del equipo del 2026-10-27:
+Estado según las actas de las reuniones del equipo del 2026-10-27 y del 2026-11-17 (videollamada):
 
 - **Aprobada**: se aprobó la propuesta.
 - **Aprobada con cambios**: se aprobó la propuesta con los cambios del acta; la columna Propuesta muestra lo aprobado.
@@ -384,6 +384,7 @@ de proceso quedan en este plan y en el acta. Al aprobarse una decisión se actua
 | D-30 | Redis en la Etapa I | Sin Redis ni cache en la Etapa I (Redis entra en la II para cache); PostgreSQL es el árbitro de la doble venta (restricción de unicidad o actualización condicional) y la *idempotency key* se guarda en la base de `sales`, en la misma transacción que la orden | Redis 7 con SETNX y reservas con TTL desde la Etapa I | Aprobada con cambios · ADR en `e1-idempotent-purchase` |
 | D-33 | Esqueleto de referencia de los servicios | Lo fija el `design.md` de `e1-idempotent-purchase`; su implementación inicializa Alembic, escribe las reglas en `AGENTS.md` y agrega import-linter al job quality. Los otros servicios lo adoptan en su primer change de features; el bootstrap no cambia | — | Aprobada · dentro del [ADR-0005](adr/adr-0005-arquitectura-hexagonal.md) |
 | D-34 | Versión de PostgreSQL | PostgreSQL 18 (`postgres:18-alpine` anclado por digest, volumen en `/var/lib/postgresql`) | `postgres:16` (ejemplo de la diapositiva 45) | Aprobada |
+| D-38 | Identidad visual del frontend | «GoPass», con el eslogan «Viví tus eventos. Conseguí tus entradas.», solo en la interfaz: el repositorio, los servicios y el dominio siguen llamándose `ticketera`. Paleta: primario `#2563EB`, secundario `#7C3AED`, fondo `#F8FAFC`, texto `#111827`, texto secundario `#64748B`, éxito `#22C55E`, alerta `#F59E0B`, error `#EF4444`, y el degradado del primario al secundario. Tipografías Plus Jakarta Sans (títulos) e Inter (texto), servidas por el frontend con `@fontsource`. Logo propio en SVG (un ticket con una estrella). Interfaz limpia, esquinas de 16 a 24 px, sombras suaves y animaciones que respetan `prefers-reduced-motion`. En el primer change con pantallas, la paleta y las tipografías pasan a ser los tokens de Tailwind CSS (D-16). Las pantallas usan datos y fotos de ejemplo con licencia libre, nunca artistas ni festivales reales | — | Aprobada |
 
 ### 5.2 Proceso y organización
 
@@ -404,6 +405,9 @@ de proceso quedan en este plan y en el acta. Al aprobarse una decisión se actua
 | D-28 | Alcance y orden del MVP (Etapa I) | APIs funcionales, tests de API, mockups y pantallas de React obligatorias para cerrar la Etapa I, cada una hecha por el dueño de su feature (*vertical slice*). Primera feature: la compra idempotente, *contract-first*, con el Event Storming antes. Reparto y orden en 7.3, sin cambiar D-08 | — | Aprobada con cambios |
 | D-31 | Nombres de los changes | Inglés con prefijo de etapa: `e1-idempotent-purchase`, `e1-request-log`, `e1-event-catalog` y `e1-identity-access`; el proposal cita el nombre de la clase. El contrato de compras va dentro de `e1-idempotent-purchase` | — | Aprobada |
 | D-32 | Frontend en el esqueleto (bootstrap) | El frontend está en la Etapa I: esqueleto y stack, contenedor en `docker-compose.yml`, página de estado (grupo 4) y CORS de DS-09 | — | Aprobada |
+| D-35 | Integración de los pull requests | Cada autor integra su propio pull request cuando está aprobado y con la CI en verde; quien revisa no hace el merge. GitHub borra solas las ramas integradas. Nadie hace push a la rama de otro integrante ni la borra, salvo el push de prueba acordado en la tarea 1.12 del bootstrap | — | Aprobada |
+| D-36 | Idioma de los documentos del repositorio | `AGENTS.md` en inglés; `CONTRIBUTE.md` y la plantilla de pull request en español; issues con título en inglés y cuerpo en español (complementa D-09) | — | Aprobada |
+| D-37 | Cuándo hace falta una issue | Para cada change de OpenSpec (`Refs #n` en el pull request de planificación y `Closes #n` en el de implementación), cada grupo de tareas del bootstrap, refactorizaciones en varios archivos, correcciones que cambian comportamiento y cambios en la CI, en Docker Compose o en configuración compartida. Sin issue: erratas, redacción, formato, correcciones pedidas en una revisión y subas de versión menores, con «Sin issue: cambio menor» y el motivo en el pull request | — | Aprobada |
 
 ### 5.3 Puntos abiertos de las decisiones aprobadas
 
@@ -665,6 +669,7 @@ ticketera/
 | 0.2.0 | 2026-10-11 | Consigna actualizada (desafíos y entregables); lineamiento de la clase; método DDD → SDD → TDD; React y FastAPI; contextos candidatos; copiloto libre; bootstrap como change; changes por feature; nuevas decisiones D-14 a D-22 | Integrante A | — |
 | 0.3.0 | 2026-10-11 | El bootstrap incluye el esqueleto andante: todo el sistema se levanta con `docker compose up`; la CI levanta el stack y ejecuta una prueba de humo desde el bootstrap | Integrante A | — |
 | 0.4.0 | 2026-10-28 | Aprobación del plan según el acta de la reunión del 2026-10-27: D-01 a D-22 aprobadas; nuevas decisiones D-23 a D-34 con sus puntos abiertos; `payments` pasa a la Etapa II y la compra de la Etapa I no tiene paso de pago; Etapa I reordenada con los changes de D-31, primero la compra idempotente, y pantallas de React obligatorias; solo `gateway` y `frontend` publican puertos, en `127.0.0.1`; entorno virtual de Python en `/opt/venv`; PostgreSQL 18; ADR según D-27 en `docs/adr/`; tests de API en `tests/api/`. Propuesta adoptada de Integrante B: Tailwind CSS con shadcn/ui (D-16). Propuestas adoptadas de Integrante C: bitácora HTTP y observabilidad, tests de API y contrato, pasarela de pagos en la Etapa II e idempotencia sobre PostgreSQL (D-23, D-24, D-25 y D-30) | Integrante A | — |
+| 0.5.0 | 2026-11-17 | Aprobación según el acta de la reunión del equipo del 2026-11-17 (videollamada): D-35 (cada autor integra su pull request), D-36 (idioma de `AGENTS.md`, `CONTRIBUTE.md`, la plantilla de pull request y las issues) y D-37 (cuándo hace falta una issue), aplicadas desde el grupo 1 del bootstrap. Propuesta adoptada de Integrante B: identidad visual GoPass (D-38) | Integrante B | — |
 
 ---
 

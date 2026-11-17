@@ -193,7 +193,7 @@
   and the message (Req service-health: The status page shows the health of every backend service; Each health
   request of the status page has a time limit; The status page shows an unreachable gateway). Verify: Vitest
   fails.
-- [ ] 4.3 Implement the status page with one `AbortController` per request and the API base URL from the
+- [x] 4.3 Implement the status page with one `AbortController` per request and the API base URL from the
   environment (DS-15). Verify: the tests of 4.2 pass.
 - [ ] 4.4 Configure ESLint and `tsc --noEmit`. Verify: both pass in the container.
 - [ ] 4.5 Add the compose entry: `edge` network only, `127.0.0.1:${FRONTEND_PORT}`, `node_modules` as an anonymous

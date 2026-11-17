@@ -1,0 +1,228 @@
+/*
+ * Base style of the proposal D-38 (GoPass visual identity, pending the team's vote): palette, typography, rounded
+ * cards with soft shadows and the primary-to-secondary gradient. Plain CSS: the component library arrives with the
+ * first change with screens (D-16).
+ */
+:root {
+  --color-primary: #2563eb;
+  --color-secondary: #7c3aed;
+  --color-background: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #111827;
+  --color-text-muted: #64748b;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-error: #ef4444;
+  --gradient-brand: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+
+  --font-heading: "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, sans-serif;
+
+  --radius-card: 20px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgb(17 24 39 / 4%), 0 8px 24px rgb(37 99 235 / 8%);
+
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(60rem 30rem at 100% -10%, rgb(124 58 237 / 10%), transparent 70%),
+    radial-gradient(50rem 25rem at -10% 0%, rgb(37 99 235 / 8%), transparent 70%),
+    var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  font-family: var(--font-heading);
+  margin: 0;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+  padding: 0.1em 0.4em;
+  border-radius: 6px;
+  background: rgb(100 116 139 / 12%);
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 0;
+}
+
+.wordmark {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 1.5rem;
+  letter-spacing: -0.02em;
+}
+
+.wordmark__accent {
+  background: var(--gradient-brand);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.content {
+  flex: 1;
+}
+
+.hero {
+  padding: 32px 0 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--color-primary);
+  font-weight: 600;
+  font-size: 0.875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  font-size: clamp(2rem, 5vw, 2.75rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.lead {
+  margin: 12px 0 0;
+  color: var(--color-text-muted);
+  font-size: 1.0625rem;
+}
+
+.alert {
+  margin: 0 0 24px;
+  padding: 16px 20px;
+  border-radius: 16px;
+  border: 1px solid rgb(239 68 68 / 30%);
+  background: rgb(239 68 68 / 8%);
+  color: #991b1b;
+}
+
+.services {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.service-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 24px;
+  border-radius: var(--radius-card);
+  border: 1px solid rgb(255 255 255 / 70%);
+  background: rgb(255 255 255 / 80%);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--shadow-card);
+  transition:
+    transform 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.service-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 1px 2px rgb(17 24 39 / 4%), 0 12px 32px rgb(124 58 237 / 12%);
+}
+
+.service-card h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.service-card__description {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.9375rem;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.badge__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge--checking {
+  background: rgb(100 116 139 / 12%);
+  color: var(--color-text-muted);
+}
+
+.badge--checking .badge__dot {
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.badge--healthy {
+  background: rgb(34 197 94 / 14%);
+  color: #15803d;
+}
+
+.badge--unhealthy {
+  background: rgb(239 68 68 / 12%);
+  color: #b91c1c;
+}
+
+.footer {
+  padding: 32px 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .service-card,
+  .badge--checking .badge__dot {
+    animation: none;
+    transition: none;
+  }
+}

@@ -164,6 +164,51 @@ services:
         - -c
         - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)
 
+  # Sales service (change project-bootstrap, task 5.5).
+  sales:
+    build:
+      context: ./services/sales
+      args:
+        UID: ${HOST_UID:-1000}
+        GID: ${HOST_GID:-1000}
+    command:
+      - uvicorn
+      - sales.api.main:app
+      - --app-dir
+      - src
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - src
+    labels:
+      ticketera.health-path: /health
+      ticketera.lint: ruff check .
+      ticketera.typecheck: mypy
+      ticketera.test: pytest
+    environment:
+      DATABASE_URL: postgresql+psycopg://sales:${SALES_DB_PASSWORD:?set SALES_DB_PASSWORD in .env (copy .env.example to .env)}@database:5432/sales
+    volumes:
+      - ./services/sales:/app
+    networks:
+      - backend
+    depends_on:
+      database:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      <<: *healthcheck-defaults
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)
+
   # Frontend with the status page (change project-bootstrap, task 4.5).
   frontend:
     build:
@@ -229,6 +274,8 @@ services:
       identity:
         condition: service_healthy
       catalog:
+        condition: service_healthy
+      sales:
         condition: service_healthy
     security_opt:
       - no-new-privileges:true

@@ -207,21 +207,21 @@
 
 ## 5. sales (C, feature/bootstrap-sales)
 
-- [ ] 5.1 Scaffold `services/sales` as in 3.1 (DS-11, DS-13, DS-14, DS-25). Verify: the image builds and runs as
+- [x] 5.1 Scaffold `services/sales` as in 3.1 (DS-11, DS-13, DS-14, DS-25). Verify: the image builds and runs as
   non-root.
-- [ ] 5.2 Write the tests of `/health` (red), as in 3.2 (Req service-health: health endpoint requirements).
+- [x] 5.2 Write the tests of `/health` (red), as in 3.2 (Req service-health: health endpoint requirements).
   Verify: pytest fails.
-- [ ] 5.3 Implement `/health` with `root_path=/api/sales` (DS-11). Verify: the tests of 5.2 pass.
-- [ ] 5.4 Configure Ruff and mypy. Verify: both pass in the container.
-- [ ] 5.5 Add the compose entry with label `ticketera.health-path=/health` and the labels `ticketera.lint`,
+- [x] 5.3 Implement `/health` with `root_path=/api/sales` (DS-11). Verify: the tests of 5.2 pass.
+- [x] 5.4 Configure Ruff and mypy. Verify: both pass in the container.
+- [x] 5.5 Add the compose entry with label `ticketera.health-path=/health` and the labels `ticketera.lint`,
   `ticketera.typecheck` and `ticketera.test`, as in 3.5; the gateway depends on a healthy `sales` (DS-01, DS-12,
   DS-13, DS-17, DS-18, DS-19). Verify: the smoke test fails until the route exists; the command of each check label
   passes with `docker compose run --rm sales`.
-- [ ] 5.6 Add `infra/gateway/routes/sales.conf` (Req api-gateway: Each backend service has one route). Verify: the
+- [x] 5.6 Add `infra/gateway/routes/sales.conf` (Req api-gateway: Each backend service has one route). Verify: the
   smoke test passes.
-- [ ] 5.7 Check the ownership of files the tests generate in the mounted folder (Req local-environment: Files
+- [x] 5.7 Check the ownership of files the tests generate in the mounted folder (Req local-environment: Files
   created in mounted folders belong to the host user). Verify: the host user deletes them without `sudo`.
-- [ ] 5.8 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
+- [x] 5.8 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
 
 ## 6. payments (C, feature/bootstrap-payments)
 

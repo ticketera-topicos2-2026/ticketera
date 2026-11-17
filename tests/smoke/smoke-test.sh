@@ -18,7 +18,8 @@
 # The host needs only bash, curl (8.1 or later, for %{errormsg} in --write-out) and docker (D-12). JSON is parsed
 # inside a Python container pinned by digest (DS-25); only its standard output is read as data (see run_python).
 #
-# Change project-bootstrap, task group 2 (design: platform/continuous-integration, platform/api-gateway).
+# Change project-bootstrap, task group 2 (design: platform/continuous-integration, platform/api-gateway), and the
+# CORS checks of task 3.6.
 
 set -uo pipefail
 
@@ -35,6 +36,12 @@ readonly ECHO_SERVICE="echo"
 readonly ECHO_PATH="/smoke-test/echo/"
 readonly FORGED_FOR="203.0.113.7"
 readonly FORGED_HOST="forged.example"
+# CORS checks (task 3.6): the service and path of the spec scenarios, and an origin that is not the frontend's.
+readonly CORS_SERVICE="catalog"
+readonly CORS_PATH="/api/catalog/health"
+readonly OTHER_ORIGIN="http://other.example"
+# How long the CORS checks wait for a request to show up in the access log of the service.
+readonly LOG_WAIT_SECONDS=5
 readonly FORGED_PROTO="https"
 
 # Reads "docker compose config --format json" on standard input and prints one tab-separated line per service:
@@ -527,6 +534,141 @@ check_forwarding() {
   expect_echoed_header "$check_proto" X-Forwarded-Proto http
 }
 
+# Sends a request to a URL and sets STATUS (000 when no HTTP response arrived), HEADERS (the response headers, one
+# per line, with no carriage return) and ERROR (curl's error message, empty when a response arrived). The body is
+# discarded. Extra arguments are passed to curl.
+# Usage: http_headers <method> <url> [curl arguments...]
+http_headers() {
+  local method=$1 url=$2 output last_line
+  shift 2
+  output=$(curl --silent --noproxy '*' --max-time "$REQUEST_TIMEOUT_SECONDS" --request "$method" \
+    --output /dev/null --dump-header - --write-out '\n%{http_code} %{errormsg}' "$@" "$url")
+  last_line=${output##*$'\n'}
+  HEADERS=${output%$'\n'*}
+  HEADERS=${HEADERS//$'\r'/}
+  STATUS=${last_line%% *}
+  ERROR=${last_line#* }
+}
+
+# Prints the values of the response header named $1 (case-insensitive) from HEADERS, one per line.
+response_header_values() {
+  local name=${1,,} line
+  while IFS= read -r line; do
+    if [[ ${line,,} == "$name:"* ]]; then
+      line=${line#*:}
+      line=${line#"${line%%[![:space:]]*}"}
+      printf '%s\n' "$line"
+    fi
+  done <<< "$HEADERS"
+}
+
+# Checks that the last response allowed exactly the expected origin, with one Access-Control-Allow-Origin header.
+# Usage: expect_allowed_origin <check name> <expected origin> <description of the request>
+expect_allowed_origin() {
+  local check=$1 expected=$2 request=$3
+  local -a values
+  mapfile -t values < <(response_header_values Access-Control-Allow-Origin)
+  if ((${#values[@]} != 1)); then
+    fail "$check" "$request: expected one Access-Control-Allow-Origin header, got ${#values[@]}: ${values[*]}"
+  elif [[ ${values[0]} != "$expected" ]]; then
+    fail "$check" "$request: Access-Control-Allow-Origin is '${values[0]}', expected '$expected'"
+  else
+    pass "$check"
+  fi
+}
+
+# Succeeds when the log of a Compose service contains a text, waiting up to LOG_WAIT_SECONDS for it to appear.
+# Usage: service_log_contains <service> <text>
+service_log_contains() {
+  local service=$1 text=$2 attempt
+  for ((attempt = 0; attempt <= LOG_WAIT_SECONDS; attempt++)); do
+    if docker compose logs --no-color "$service" 2> /dev/null | grep --quiet --fixed-strings -- "$text"; then
+      return 0
+    fi
+    if ((attempt < LOG_WAIT_SECONDS)); then
+      sleep 1
+    fi
+  done
+  return 1
+}
+
+# Req api-gateway: The frontend can call the API from the browser - Scenarios: CORS preflight from the frontend's
+# address; CORS preflight from another origin; Status page loads the health of every service (DS-09)
+# The gateway answers every preflight under /api/ itself, so the two preflight scenarios hold even without the route
+# of the service; the cross-origin GET and the access-log control need the route. Each request carries a unique
+# marker in its query string, which the access log of the service shows only when the request reached it: the GET
+# marker must appear, which proves the log is observed, and the preflight marker must not.
+check_cors() {
+  local check_allowed="cors: preflight from FRONTEND_ORIGIN is answered and allows that origin"
+  local check_not_forwarded="cors: the preflight does not reach $CORS_SERVICE"
+  local check_other="cors: preflight from another origin gets no permission"
+  local check_get="cors: GET $CORS_PATH from FRONTEND_ORIGIN answers 200 and allows that origin"
+  local -a checks=("$check_allowed" "$check_not_forwarded" "$check_other" "$check_get") values
+  local check frontend_origin base_url preflight_marker get_marker get_reached=false
+  local problem=""
+
+  if [[ -n $gateway_port_problem ]]; then
+    problem=$gateway_port_problem
+  elif ! frontend_origin=$(config_value FRONTEND_ORIGIN); then
+    problem="FRONTEND_ORIGIN is not set in the environment or in .env"
+  elif [[ -n $compose_problem ]]; then
+    problem="the compose configuration could not be read: $compose_problem"
+  elif [[ $'\n'$compose_service_lines != *$'\n'"$CORS_SERVICE"$'\t'* ]]; then
+    problem="the $CORS_SERVICE service is not in the compose configuration"
+  fi
+  if [[ -n $problem ]]; then
+    for check in "${checks[@]}"; do
+      fail "$check" "$problem"
+    done
+    return
+  fi
+
+  base_url="http://localhost:${gateway_port}${CORS_PATH}"
+  preflight_marker="smoke-cors-preflight-$$-${RANDOM}${RANDOM}"
+  get_marker="smoke-cors-get-$$-${RANDOM}${RANDOM}"
+
+  # Scenario: CORS preflight from the frontend's address
+  http_headers OPTIONS "${base_url}?marker=${preflight_marker}" --header "Origin: $frontend_origin" \
+    --header "Access-Control-Request-Method: GET"
+  if [[ $STATUS != 2?? ]]; then
+    fail "$check_allowed" "expected a 2xx answer to the preflight, $(last_response)"
+  else
+    expect_allowed_origin "$check_allowed" "$frontend_origin" "preflight"
+  fi
+
+  # Scenario: Status page loads the health of every service (the cross-origin request itself)
+  http_headers GET "${base_url}?marker=${get_marker}" --header "Origin: $frontend_origin"
+  if [[ $STATUS != 200 ]]; then
+    fail "$check_get" "expected 200 from $base_url, $(last_response)"
+  else
+    expect_allowed_origin "$check_get" "$frontend_origin" "GET"
+  fi
+
+  # Scenario: CORS preflight from the frontend's address (the service does not receive the request)
+  if service_log_contains "$CORS_SERVICE" "$get_marker"; then
+    get_reached=true
+  fi
+  if [[ $get_reached != true ]]; then
+    fail "$check_not_forwarded" "the access log of $CORS_SERVICE cannot be observed: the GET with marker $get_marker did not show up in it within $LOG_WAIT_SECONDS s"
+  elif docker compose logs --no-color "$CORS_SERVICE" 2> /dev/null |
+    grep --quiet --fixed-strings -- "$preflight_marker"; then
+    fail "$check_not_forwarded" "the preflight with marker $preflight_marker shows up in the access log of $CORS_SERVICE"
+  else
+    pass "$check_not_forwarded"
+  fi
+
+  # Scenario: CORS preflight from another origin
+  http_headers OPTIONS "$base_url" --header "Origin: $OTHER_ORIGIN" --header "Access-Control-Request-Method: GET"
+  mapfile -t values < <(response_header_values Access-Control-Allow-Origin)
+  if [[ $STATUS == 000 ]]; then
+    fail "$check_other" "$(last_response)"
+  elif ((${#values[@]} > 0)); then
+    fail "$check_other" "the response has Access-Control-Allow-Origin: ${values[*]}"
+  else
+    pass "$check_other"
+  fi
+}
+
 main() {
   parse_arguments "$@"
   require_curl
@@ -570,6 +712,7 @@ main() {
   check_labeled_services
   check_running_containers
   check_forwarding
+  check_cors
 
   printf 'Smoke test: %d passed, %d failed, %d skipped\n' "$passed" "$failed" "$skipped"
   ((failed == 0))

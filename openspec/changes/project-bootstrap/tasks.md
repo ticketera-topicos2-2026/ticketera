@@ -184,7 +184,7 @@
 
 ## 4. Frontend and status page (B, feature/bootstrap-frontend)
 
-- [ ] 4.1 Scaffold `frontend/`: React + TypeScript + Vite with `package-lock.json`, Dockerfile from a digest-pinned
+- [x] 4.1 Scaffold `frontend/`: React + TypeScript + Vite with `package-lock.json`, Dockerfile from a digest-pinned
   Node.js image, UID/GID build arguments, non-root user, Vite on `0.0.0.0` with the default `allowedHosts` and
   optional polling, and no component library (Tailwind CSS with shadcn/ui arrives with the first change with
   screens, D-16) (DS-13, DS-15, DS-17, DS-25). Verify: the image builds and `id -u` is not 0.

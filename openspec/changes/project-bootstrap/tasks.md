@@ -154,33 +154,33 @@
 
 ## 3. catalog (B, feature/bootstrap-catalog)
 
-- [ ] 3.1 Scaffold `services/catalog`: `pyproject.toml` and `uv.lock`, empty hexagonal packages, Dockerfile from
+- [x] 3.1 Scaffold `services/catalog`: `pyproject.toml` and `uv.lock`, empty hexagonal packages, Dockerfile from
   a digest-pinned Python image with the environment in `/opt/venv`, UID/GID build arguments, non-root user,
   `PYTHONDONTWRITEBYTECODE=1` (DS-11, DS-13, DS-14, DS-25). Verify: the image builds and `id -u` in the container
   is not 0.
-- [ ] 3.2 Write the tests of `/health` (red): 200 with exactly `status`, `service`, `database` within 1 s; 503
+- [x] 3.2 Write the tests of `/health` (red): 200 with exactly `status`, `service`, `database` within 1 s; 503
   with `unavailable` within 3 s when the database is unreachable; 200 again after recovery; HEAD with the same
   status code and no body; POST answers 405 (Req service-health: The health endpoint reports a healthy service;
   reports an unreachable database; requires no authentication; reveals no internal details; accepts only read
   requests). Verify: pytest fails.
-- [ ] 3.3 Implement `/health` with `api_route` for GET and HEAD, `root_path=/api/catalog` and the `SELECT 1` probe
+- [x] 3.3 Implement `/health` with `api_route` for GET and HEAD, `root_path=/api/catalog` and the `SELECT 1` probe
   with connect and query timeouts (DS-11). Verify: the tests of 3.2 pass.
-- [ ] 3.4 Configure Ruff and mypy for the service. Verify: lint and type check pass in the container.
-- [ ] 3.5 Add the compose entry: build `./services/catalog`, label `ticketera.health-path=/health`, labels
+- [x] 3.4 Configure Ruff and mypy for the service. Verify: lint and type check pass in the container.
+- [x] 3.5 Add the compose entry: build `./services/catalog`, label `ticketera.health-path=/health`, labels
   `ticketera.lint`, `ticketera.typecheck` and `ticketera.test` with the commands of 3.4 and 3.2 (for example
   `ruff check .`, `mypy` and `pytest`), `backend` network, depends on a healthy database, `urllib` healthcheck,
   bind mount with uvicorn reload on `0.0.0.0`, `no-new-privileges`, `cap_drop: [ALL]`; the gateway depends on a
   healthy `catalog` (DS-01, DS-12, DS-13, DS-17, DS-18, DS-19). Verify: `docker compose up --wait` reaches healthy;
   `docker compose run --rm catalog <command>` passes for the command of each `ticketera.*` check label.
-- [ ] 3.6 Add the CORS preflight checks for `/api/catalog/health` to the smoke test (red): the frontend origin is
+- [x] 3.6 Add the CORS preflight checks for `/api/catalog/health` to the smoke test (red): the frontend origin is
   allowed and `catalog` does not receive the request; another origin gets no permission (Req api-gateway: The
   frontend can call the API from the browser). Verify: the smoke test fails without the route.
-- [ ] 3.7 Add `infra/gateway/routes/catalog.conf` (Req api-gateway: Each backend service has one route; An
+- [x] 3.7 Add `infra/gateway/routes/catalog.conf` (Req api-gateway: Each backend service has one route; An
   unavailable service does not affect other routes). Verify: the smoke test passes, including the CORS checks.
-- [ ] 3.8 Check that the files the tests generate in the mounted folder belong to the host user (Req
+- [x] 3.8 Check that the files the tests generate in the mounted folder belong to the host user (Req
   local-environment: Files created in mounted folders belong to the host user). Verify: the host user deletes them
   without `sudo`.
-- [ ] 3.9 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
+- [x] 3.9 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
 
 ## 4. Frontend and status page (B, feature/bootstrap-frontend)
 

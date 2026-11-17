@@ -109,13 +109,85 @@ services:
           read -r status_line <&3 &&
           [[ $$status_line == *' 200 '* ]]
 
+  # Catalog service (change project-bootstrap, task 3.5).
+  catalog:
+    build:
+      context: ./services/catalog
+      # Host user IDs, so files created in the mounted folder belong to the host user (DS-13). Optional: the default
+      # 1000 is the first user of a WSL distribution.
+      args:
+        UID: ${HOST_UID:-1000}
+        GID: ${HOST_GID:-1000}
+    # Same server as the image's CMD, with reload on source changes (DS-17).
+    command:
+      - uvicorn
+      - catalog.api.main:app
+      - --app-dir
+      - src
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - src
+    labels:
+      # Health path checked by the smoke test through the gateway at /api/catalog/health (DS-19).
+      ticketera.health-path: /health
+      # Commands run by the quality job with "docker compose run --rm catalog <command>" (DS-18): split on
+      # whitespace, with no shell.
+      ticketera.lint: ruff check .
+      ticketera.typecheck: mypy
+      ticketera.test: pytest
+    environment:
+      # Its own database and role, created by infra/database/ (DS-02).
+      DATABASE_URL: postgresql+psycopg://catalog:${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD in .env (copy .env.example to .env)}@database:5432/catalog
+    volumes:
+      # Source code for live reload; the virtual environment stays in /opt/venv, outside the mount (DS-14).
+      - ./services/catalog:/app
+    networks:
+      - backend
+    depends_on:
+      database:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      <<: *healthcheck-defaults
+      # The image has no curl: Python's urllib requests /health, and a 503 or a refused connection raises, so the
+      # check fails (DS-12).
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)
+
+  # Sales service (change project-bootstrap, task 5.5).
   sales:
     build:
       context: ./services/sales
       args:
-        UID: ${UID:-1000}
-        GID: ${GID:-1000}
-    command: ["uvicorn", "sales.api.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+        UID: ${HOST_UID:-1000}
+        GID: ${HOST_GID:-1000}
+    command:
+      - uvicorn
+      - sales.api.main:app
+      - --app-dir
+      - src
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --reload
+      - --reload-dir
+      - src
+    labels:
+      ticketera.health-path: /health
+      ticketera.lint: ruff check .
+      ticketera.typecheck: mypy
+      ticketera.test: pytest
     environment:
       DATABASE_URL: postgresql+psycopg://sales:${SALES_DB_PASSWORD:?set SALES_DB_PASSWORD in .env (copy .env.example to .env)}@database:5432/sales
     volumes:
@@ -129,15 +201,13 @@ services:
       - no-new-privileges:true
     cap_drop:
       - ALL
-    labels:
-      ticketera.health-path: /health
-      ticketera.lint: ruff check .
-      ticketera.typecheck: mypy
-      ticketera.test: pytest
     healthcheck:
       <<: *healthcheck-defaults
-      start_period: 30s
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=4)
 
   gateway:
     image: nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8
@@ -161,6 +231,8 @@ services:
     # healthy; each service pull request adds its own entry (DS-07).
     depends_on:
       identity:
+        condition: service_healthy
+      catalog:
         condition: service_healthy
       sales:
         condition: service_healthy

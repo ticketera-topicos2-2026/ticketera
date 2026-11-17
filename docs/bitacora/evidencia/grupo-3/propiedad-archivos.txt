@@ -1,0 +1,25 @@
+# Evidencia de la tarea 3.8: los archivos creados en la carpeta montada son del usuario del host
+# Fecha: 2026-11-16 14:35:33 UTC
+# Rama: feature/bootstrap-catalog, HEAD 0528420
+# Req local-environment: Files created in mounted folders belong to the host user.
+
+$ id
+uid=1000(asus) gid=1000(asus)
+
+## 1. Los tests, el lint y la verificación de tipos no escriben en services/catalog
+$ docker compose run --rm catalog ruff check .   # exit=0
+$ docker compose run --rm catalog mypy   # exit=0
+$ docker compose run --rm catalog pytest   # exit=0
+$ find services/catalog -newer <marca anterior a los comandos>
+# (sin resultados)
+$ find services/catalog ! -user $(id -u)
+# (sin resultados)
+
+## 2. Un archivo que crea el contenedor en la carpeta montada
+$ docker compose run --rm catalog sh -c 'id; mkdir -p ownership-check && touch ownership-check/file'
+uid=1000(app) gid=1000(app) groups=1000(app)
+$ ls -ln services/catalog/ownership-check
+total 0
+-rw-r--r-- 1 1000 1000 0 Nov 16 14:36 file
+$ rm -r services/catalog/ownership-check   # sin sudo
+# exit=0

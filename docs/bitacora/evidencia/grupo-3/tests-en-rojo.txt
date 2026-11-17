@@ -1,0 +1,64 @@
+# Evidencia TDD rojo, project-bootstrap grupo 3 (tareas 3.2 y 3.6)
+# Fecha: 2026-11-16 14:33:36 UTC
+# Rama: feature/bootstrap-catalog
+# Host: curl 8.18.0, Docker 29.9.3, Docker Compose version v5.7.0
+
+## 1. Tests de /health (tarea 3.2), en el commit test(catalog) 42251e7, antes de la implementación (e241355)
+# Se corren en la imagen de catalog con el código de ese commit montado en /app.
+$ docker run --rm -v <worktree de 42251e7>/services/catalog:/app ticketera-catalog pytest -q
+tests/test_database_probe.py:8: in <module>
+    from catalog.infrastructure.database_probe import SqlAlchemyDatabaseProbe
+E   ModuleNotFoundError: No module named 'catalog.infrastructure.database_probe'
+__________________ ERROR collecting tests/test_health_api.py ___________________
+ImportError while importing test module '/app/tests/test_health_api.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/local/lib/python3.13/importlib/__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/test_health_api.py:8: in <module>
+    from catalog.api.app import create_app
+E   ModuleNotFoundError: No module named 'catalog.api.app'
+=============================== warnings summary ===============================
+../opt/venv/lib/python3.13/site-packages/starlette/testclient.py:51
+  /opt/venv/lib/python3.13/site-packages/starlette/testclient.py:51: DeprecationWarning: The anyio.abc.BlockingPortal alias is deprecated, use anyio.from_thread.BlockingPortal instead.
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+ERROR tests/test_check_health.py
+ERROR tests/test_database_probe.py
+ERROR tests/test_health_api.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!!
+1 warning, 3 errors in 1.60s
+# exit=2
+
+## 2. Prueba de humo con los chequeos de CORS (tarea 3.6), sin la ruta del gateway de catalog (tarea 3.7)
+# HEAD 0528420; infra/gateway/routes/catalog.conf movido fuera de la carpeta y el gateway reiniciado.
+$ COMPOSE_FILE=docker-compose.yml:tests/smoke/compose.echo.yml tests/smoke/smoke-test.sh --require-echo
+PASS gateway: /healthz answers 200
+PASS identity: realm discovery document
+PASS gateway: Host evil.example gets 421
+PASS route /auth/health answers 404
+PASS route /auth/health/ready answers 404
+PASS route /auth/metrics answers 404
+PASS route /api/unknown/health answers 404
+PASS route /internal/status answers 404
+FAIL service catalog: GET /api/catalog/health answers 200: expected 200 from http://localhost:18080/api/catalog/health, got 404
+PASS container catalog: main process runs as non-root
+PASS container database: main process runs as non-root
+PASS container echo: main process runs as non-root
+PASS container gateway: main process runs as non-root
+PASS container identity: main process runs as non-root
+PASS ports: only the gateway and the frontend publish ports
+PASS ports: every published port is bound to 127.0.0.1
+PASS ports: the gateway publishes GATEWAY_PORT on 127.0.0.1
+PASS forwarding: X-Forwarded-For holds one real address, not the forged one
+PASS forwarding: X-Forwarded-Host is the host used
+PASS forwarding: X-Forwarded-Proto is the scheme used
+PASS cors: preflight from FRONTEND_ORIGIN is answered and allows that origin
+FAIL cors: GET /api/catalog/health from FRONTEND_ORIGIN answers 200 and allows that origin: expected 200 from http://localhost:18080/api/catalog/health, got 404
+FAIL cors: the preflight does not reach catalog: the access log of catalog cannot be observed: the GET with marker smoke-cors-get-10860-26564828 did not show up in it within 5 s
+PASS cors: preflight from another origin gets no permission
+Smoke test: 21 passed, 3 failed, 0 skipped
+# exit=1

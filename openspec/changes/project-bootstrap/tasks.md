@@ -184,26 +184,26 @@
 
 ## 4. Frontend and status page (B, feature/bootstrap-frontend)
 
-- [ ] 4.1 Scaffold `frontend/`: React + TypeScript + Vite with `package-lock.json`, Dockerfile from a digest-pinned
+- [x] 4.1 Scaffold `frontend/`: React + TypeScript + Vite with `package-lock.json`, Dockerfile from a digest-pinned
   Node.js image, UID/GID build arguments, non-root user, Vite on `0.0.0.0` with the default `allowedHosts` and
   optional polling, and no component library (Tailwind CSS with shadcn/ui arrives with the first change with
   screens, D-16) (DS-13, DS-15, DS-17, DS-25). Verify: the image builds and `id -u` is not 0.
-- [ ] 4.2 Write the status page tests with Vitest and React Testing Library (red): all healthy; one 503; one 502;
+- [x] 4.2 Write the status page tests with Vitest and React Testing Library (red): all healthy; one 503; one 502;
   one request expiring after 5 s while the others are healthy; gateway unreachable shows every service unhealthy
   and the message (Req service-health: The status page shows the health of every backend service; Each health
   request of the status page has a time limit; The status page shows an unreachable gateway). Verify: Vitest
   fails.
-- [ ] 4.3 Implement the status page with one `AbortController` per request and the API base URL from the
+- [x] 4.3 Implement the status page with one `AbortController` per request and the API base URL from the
   environment (DS-15). Verify: the tests of 4.2 pass.
-- [ ] 4.4 Configure ESLint and `tsc --noEmit`. Verify: both pass in the container.
-- [ ] 4.5 Add the compose entry: `edge` network only, `127.0.0.1:${FRONTEND_PORT}`, `node_modules` as an anonymous
+- [x] 4.4 Configure ESLint and `tsc --noEmit`. Verify: both pass in the container.
+- [x] 4.5 Add the compose entry: `edge` network only, `127.0.0.1:${FRONTEND_PORT}`, `node_modules` as an anonymous
   volume, `wget` healthcheck, label `ticketera.health-path=/`, labels `ticketera.lint`, `ticketera.typecheck` and
   `ticketera.test` with the commands of 4.4 and 4.2 (for example `npx eslint .`, `npx tsc --noEmit` and
   `npx vitest run`), `no-new-privileges`, `cap_drop: [ALL]`; add `FRONTEND_PORT` to `.env.example` (DS-10, DS-13,
   DS-14, DS-18, DS-23). Verify: the smoke test checks the frontend on its own published port, not through the
   gateway (which answers 404 for `/`), and it answers 200; `docker compose run --rm frontend <command>` passes for
   the command of each `ticketera.*` check label.
-- [ ] 4.6 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
+- [x] 4.6 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
 
 ## 5. sales (C, feature/bootstrap-sales)
 

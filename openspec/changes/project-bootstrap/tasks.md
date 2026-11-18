@@ -228,21 +228,21 @@
 > `payments` is a Stage II context (D-25): this group adds only the skeleton with `/health`, with no payment
 > endpoints, no `PaymentProvider` port and no payment data.
 
-- [ ] 6.1 Scaffold `services/payments` as in 3.1 (DS-11, DS-13, DS-14, DS-25). Verify: the image builds and runs
+- [x] 6.1 Scaffold `services/payments` as in 3.1 (DS-11, DS-13, DS-14, DS-25). Verify: the image builds and runs
   as non-root.
-- [ ] 6.2 Write the tests of `/health` (red), as in 3.2 (Req service-health: health endpoint requirements).
+- [x] 6.2 Write the tests of `/health` (red), as in 3.2 (Req service-health: health endpoint requirements).
   Verify: pytest fails.
-- [ ] 6.3 Implement `/health` with `root_path=/api/payments` (DS-11). Verify: the tests of 6.2 pass.
-- [ ] 6.4 Configure Ruff and mypy. Verify: both pass in the container.
-- [ ] 6.5 Add the compose entry with label `ticketera.health-path=/health` and the labels `ticketera.lint`,
+- [x] 6.3 Implement `/health` with `root_path=/api/payments` (DS-11). Verify: the tests of 6.2 pass.
+- [x] 6.4 Configure Ruff and mypy. Verify: both pass in the container.
+- [x] 6.5 Add the compose entry with label `ticketera.health-path=/health` and the labels `ticketera.lint`,
   `ticketera.typecheck` and `ticketera.test`, as in 3.5; the gateway depends on a healthy `payments` (DS-01, DS-12,
   DS-13, DS-17, DS-18, DS-19). Verify: the smoke test fails until the route exists; the command of each check label
   passes with `docker compose run --rm payments`.
-- [ ] 6.6 Add `infra/gateway/routes/payments.conf` (Req api-gateway: Each backend service has one route). Verify:
+- [x] 6.6 Add `infra/gateway/routes/payments.conf` (Req api-gateway: Each backend service has one route). Verify:
   the smoke test passes.
-- [ ] 6.7 Check the ownership of files the tests generate in the mounted folder (Req local-environment: Files
+- [x] 6.7 Check the ownership of files the tests generate in the mounted folder (Req local-environment: Files
   created in mounted folders belong to the host user). Verify: the host user deletes them without `sudo`.
-- [ ] 6.8 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
+- [x] 6.8 Add the team log entry for this group, including AI usage. Verify: the entry is in this pull request.
 
 ## 7. Required checks (A, no branch)
 

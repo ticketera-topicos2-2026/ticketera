@@ -1,0 +1,1 @@
+"""Payments service, built with hexagonal architecture (D-17, D-25, ADR-0005)."""

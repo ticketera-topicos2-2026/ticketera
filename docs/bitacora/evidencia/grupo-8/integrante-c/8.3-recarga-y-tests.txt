@@ -1,0 +1,23 @@
+# 8.3 · Integrante C · 2026-11-19T09:44:37-03:00
+host: Windows 11 · Docker Desktop (WSL2 engine)
+
+## Backend (sales, uvicorn --reload)
+guardado: services/sales/src/sales/api/app.py (title="sales-recarga-8-3")
+servido por el gateway en /api/sales/openapi.json después de 2.56 s (límite: 10 s)
+revertido; vuelve a «sales» en 2.29 s
+
+## Frontend (Vite)
+guardado: frontend/src/App.tsx (eyebrow="Plataforma-recarga-8-3")
+servido por Vite en /src/App.tsx después de 0.12 s (límite: 10 s)
+revertido en 0.13 s
+Nota: En Windows/WSL2 con montaje de volúmenes, se usó VITE_USE_POLLING=true en .env (DS-17).
+
+## Tests de servicios con docker compose
+$ docker compose run --rm --no-deps sales pytest
+17 passed, 1 skipped, 1 warning in 6.33s
+
+$ docker compose run --rm --no-deps frontend npx vitest run
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+archivos nuevos de root en el clon: 0
+

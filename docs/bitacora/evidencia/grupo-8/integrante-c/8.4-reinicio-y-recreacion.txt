@@ -1,0 +1,26 @@
+# 8.4 · Integrante C · 2026-11-19T09:50:56-03:00
+host: Windows 11 · Docker Desktop (WSL2 engine)
+
+## Estado inicial y marca
+- Los 7 contenedores levantados y saludables.
+- Se inserta marca de prueba en la base de datos `sales`:
+  CREATE TABLE marca_integrante_c (id text);
+  INSERT INTO marca_integrante_c VALUES ('8.4 Integrante C');
+- Comprobación del realm ticketera: HTTP 200 (http://localhost:18080/auth/realms/ticketera)
+
+## Reinicio simple: docker compose down (sin -v) y up -d --wait
+- docker compose down: 5 s
+- docker compose up -d --wait: exit 0 en 44.6 s
+- Verificación de persistencia:
+  SELECT * FROM marca_integrante_c; -> '8.4 Integrante C' (1 row preservado)
+  Realm ticketera: HTTP 200
+
+## Recreación limpia: docker compose down -v y up -d --wait
+- docker compose down -v: borra volúmenes (ticketera_ticketera-db-data)
+- docker compose up -d --wait: exit 0 en 59.7 s (primer intento, < 1 minuto)
+- Verificación de recreación:
+  SELECT * FROM marca_integrante_c; -> ERROR: relation "marca_integrante_c" does not exist (volumen efectivamente recreado de cero)
+  Bases recreadas correctamente: catalog, keycloak, payments, sales
+  Realm ticketera reimportado y operativo: HTTP 200
+  Todos los 7 contenedores en estado Healthy en el primer intento.
+

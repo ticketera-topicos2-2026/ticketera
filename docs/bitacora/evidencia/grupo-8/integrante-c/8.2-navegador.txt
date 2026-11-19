@@ -1,0 +1,19 @@
+# 8.2 · Integrante C · 2026-11-19T09:59:53-03:00
+Navegador en Windows, origen http://localhost:15173, API Gateway http://localhost:18080
+
+## Página de estado
+- Servicios: catalog=healthy, sales=healthy, payments=healthy (los 3 en «Disponible»)
+- Mensaje «No se puede conectar con el gateway»: no aparece
+- Respuestas y CORS (Access-Control-Allow-Origin):
+  200 http://localhost:18080/api/catalog/health ACAO=http://localhost:15173
+  200 http://localhost:18080/api/sales/health ACAO=http://localhost:15173
+  200 http://localhost:18080/api/payments/health ACAO=http://localhost:15173
+- Consola de desarrollo del navegador: 0 errores de CORS.
+
+## Consola de administración de Keycloak
+- URL: http://localhost:18080/auth/admin/
+- Login exitoso con credenciales de .env:
+  Usuario: admin (KC_BOOTSTRAP_ADMIN_USERNAME)
+  Contraseña: local-keycloak-admin-password (KC_BOOTSTRAP_ADMIN_PASSWORD)
+- Redirección correcta a la consola de administración en el realm master (/auth/admin/master/console/).
+

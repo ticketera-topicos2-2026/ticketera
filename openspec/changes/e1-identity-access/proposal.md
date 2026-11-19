@@ -35,7 +35,8 @@ feature changes can protect their endpoints, and ADR-0003 left the token validat
   `Idempotency-Key` headers the frontend sends.
 - **Gateway: no tokens in logs.** The gateway never writes a token to its log, and a token in the query string is
   never accepted.
-- **Token-claims contract for services**:
+- **Token-claims contract for services**, defined in `design.md`; each feature change adds it to its own spec and
+  tests it on its endpoints, following the D-33 skeleton:
   - `sub` identifies the user, and is the `CLIENT` identity in sales.
   - Roles come from `realm_access.roles`, filtered to `ADMIN`, `EVENT_OWNER` and `CLIENT`.
   - Services decode the token payload without checking its signature, because only the gateway can reach them.
@@ -44,10 +45,14 @@ feature changes can protect their endpoints, and ADR-0003 left the token validat
   - The base with Tailwind CSS, shadcn/ui and the GoPass tokens (D-16, D-38), as a separate task group.
   - A router, sign-in through the identity service (Authorization Code with PKCE), the callback, silent token
     renewal and sign-out.
-  - Routes guarded by session (`RequireAuth`) and by role (`RequireRole`), with an access-denied page.
-  - The status page stays public.
-  - Mockups of the sign-in flow, the header with the signed-in user and the sign-out action, and the
-    access-denied page.
+  - Routes guarded by session (`RequireAuth`) and by role (`RequireRole`), with an access-denied page. The app
+    has no admin page; Vitest tests the role guard with a test-only component.
+  - A minimal "My account" page at `/account`, guarded by session, that shows the signed-in user's name and
+    platform roles.
+  - API calls to protected routes carry `Authorization: Bearer <access token>`.
+  - The status page stays public and calls the public health routes without a token.
+  - Mockups of the sign-in flow, the header with the signed-in user and the sign-out action, the "My account"
+    page and the access-denied page.
 - **Tests**:
   - Smoke-test extensions: `401` cases, public health, the echo route with a token, preflight headers, and
     identity down giving `502` while health stays `200`.
@@ -78,8 +83,9 @@ feature changes can protect their endpoints, and ADR-0003 left the token validat
 
 ### New Capabilities
 
-- `identity/access-token`: the token-claims contract services rely on: which claims identify the user and their
-  roles, how services read them, and what they must never do with a token.
+- `identity/access-token`: the claims every access token of the `ticketera` realm carries: `sub`, which
+  identifies the user, and `realm_access.roles`, which lists the user's platform roles. How services read them is
+  the token-claims contract in `design.md`, which each feature change adds to its own spec.
 - `identity/user-authentication`: how a person signs in to and out of the frontend, how the session is renewed,
   and how routes are guarded by session and by role.
 

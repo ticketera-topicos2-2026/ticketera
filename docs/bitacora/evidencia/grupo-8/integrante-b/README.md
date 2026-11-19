@@ -9,4 +9,4 @@ Clon limpio de main en 229697a, en /home/asus/onboarding-grupo-8/ticketera-clean
 | 8.2 | **Cumple**: los tres servicios en Disponible, sin errores de CORS; la consola de administración abre con las credenciales de .env. | 8.2-*.png, 8.2-navegador.txt |
 | 8.3 | **Cumple a medias**: el frontend se sirve en 3,1 s; el backend en 4,5 a 19,9 s (3 de 5 bajo 10 s), porque el proceso nuevo de Python tarda en arrancar con poca memoria. Los tests corren con docker compose (catalog 16 passed, frontend 7 passed) y no dejan archivos de root. | 8.3-recarga-y-tests.txt |
 | 8.4 | **Cumple**: un reinicio conserva la marca en la base y el usuario del realm; down -v los borra y recrea las bases y el realm. El arranque después de down -v tardó unos 14 minutos y necesitó tres up. | 8.4-reinicio-y-recreacion.txt, 8.4-primer-intento.txt |
-| 8.5 | Pendiente: lo hace Ariel con /opsx:onboard en ~/dev/openspec-sandbox. | — |
+| 8.5 | **Hecha**: ciclo completo de /opsx:onboard (change add-event-slug, de la propuesta al archivo) en ~/dev/openspec-sandbox, fuera de ticketera. | Comentario en la issue #13 |

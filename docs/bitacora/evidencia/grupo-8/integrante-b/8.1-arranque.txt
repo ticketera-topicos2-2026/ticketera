@@ -1,0 +1,103 @@
+# 8.1 · Integrante B · 2026-11-18T22:17:27+00:00
+host: Linux 6.18.58.1-microsoft-standard-WSL2 · Docker 29.9.3 · 5.7.0
+memoria de la VM de WSL: 2852 MiB · CPUs: 4
+
+$ git clone https://github.com/ticketera-topicos2-2026/ticketera.git /home/asus/onboarding-grupo-8/ticketera-clean
+commit: 229697a feat(payments): add the payments service skeleton with its health endpoints (#21)
+$ cp .env.example .env
+
+$ docker compose build
+--progress is a global compose flag, better use `docker compose --progress xx build ...
+build: 74 s
+
+$ docker compose up -d --wait --wait-timeout 300
+ Network ticketera-clean_backend Creating 
+ Network ticketera-clean_edge Creating 
+ Network ticketera-clean_backend Creating 
+ Network ticketera-clean_edge Creating 
+ Volume ticketera-clean_ticketera-db-data Creating 
+ Volume ticketera-clean_ticketera-db-data Creating 
+ Volume ticketera-clean_ticketera-db-data Created 
+ Volume ticketera-clean_ticketera-db-data Created 
+ Network ticketera-clean_backend Created 
+ Network ticketera-clean_backend Created 
+ Container ticketera-clean-database-1 Creating 
+ Network ticketera-clean_edge Created 
+ Network ticketera-clean_edge Created 
+ Container ticketera-clean-frontend-1 Creating 
+ Container ticketera-clean-database-1 Created 
+ Container ticketera-clean-payments-1 Creating 
+ Container ticketera-clean-sales-1 Creating 
+ Container ticketera-clean-catalog-1 Creating 
+ Container ticketera-clean-identity-1 Creating 
+ Container ticketera-clean-identity-1 Created 
+ Container ticketera-clean-catalog-1 Created 
+ Container ticketera-clean-payments-1 Created 
+ Container ticketera-clean-sales-1 Created 
+ Container ticketera-clean-gateway-1 Creating 
+ Container ticketera-clean-gateway-1 Created 
+ Container ticketera-clean-frontend-1 Created 
+ Container ticketera-clean-database-1 Starting 
+ Container ticketera-clean-frontend-1 Starting 
+ Container ticketera-clean-database-1 Started 
+ Container ticketera-clean-database-1 Waiting 
+ Container ticketera-clean-frontend-1 Started 
+ Container ticketera-clean-database-1 Error dependency database failed to start
+ Container ticketera-clean-catalog-1 not started: condition "service_healthy" of service "database" not met 
+ Container ticketera-clean-gateway-1 not started: condition "service_healthy" of service "database" not met 
+ Container ticketera-clean-payments-1 not started: condition "service_healthy" of service "database" not met 
+ Container ticketera-clean-identity-1 not started: condition "service_healthy" of service "database" not met 
+ Container ticketera-clean-sales-1 not started: condition "service_healthy" of service "database" not met 
+dependency failed to start: container ticketera-clean-database-1 is unhealthy
+up --wait: exit 1 en 71 s (límite de la tarea: 300 s)
+
+$ docker compose ps
+SERVICE    STATUS                      PORTS
+database   Up 35 seconds (unhealthy)   5432/tcp
+frontend   Up 32 seconds (healthy)     127.0.0.1:5173->5173/tcp
+
+## Causa del primer fallo
+database: contenedor iniciado 2026-11-18T22:19:20.762458053Z
+database-1  | 2026-11-18T22:19:55.374552330Z PostgreSQL init process complete; ready for start up.
+healthcheck sin start_period: 3 fallos (interval 10s, retries 3) antes de terminar los scripts de inicialización → unhealthy → Compose cancela las dependencias.
+
+## Segundo intento (mismo volumen, la base ya inicializada)
+$ docker compose up -d --wait --wait-timeout 300
+ Container ticketera-clean-database-1 Healthy 
+ Container ticketera-clean-sales-1 Healthy 
+ Container ticketera-clean-payments-1 Healthy 
+ Container ticketera-clean-catalog-1 Healthy 
+ Container ticketera-clean-identity-1 Error dependency identity failed to start
+ Container ticketera-clean-gateway-1 not started: condition "service_healthy" of service "identity" not met 
+dependency failed to start: container ticketera-clean-identity-1 is unhealthy
+up --wait: exit 1 en 159 s
+SERVICE    STATUS                     PORTS
+catalog    Up 2 minutes (healthy)     8000/tcp
+database   Up 4 minutes (healthy)     5432/tcp
+frontend   Up 4 minutes (healthy)     127.0.0.1:5173->5173/tcp
+identity   Up 2 minutes (unhealthy)   8080/tcp, 8443/tcp, 9000/tcp
+payments   Up 2 minutes (healthy)     8000/tcp
+sales      Up 2 minutes (healthy)     8000/tcp
+
+## Causa del segundo fallo
+identity-1  | 2026-11-18T22:26:51.431381507Z 2026-11-18 22:26:51,425 INFO  [io.quarkus] (main) Keycloak 26.8.2 on JVM (powered by Quarkus 3.40.1.1) started in 208.343s. Listening on: http://0.0.0.0:8080. Management interface listening on http://0.0.0.0:9000.
+identity: contenedor iniciado 2026-11-18T22:20:54Z; Keycloak arrancó en 208 s (importa el realm), por encima de start_period 120s + 3 reintentos. Memoria de la VM de WSL: 2852 MiB, sin .wslconfig.
+
+## Tercer intento
+$ docker compose up -d --wait --wait-timeout 300
+up --wait: exit 0 en 14 s
+SERVICE    STATUS                    PORTS
+catalog    Up 6 minutes (healthy)    8000/tcp
+database   Up 8 minutes (healthy)    5432/tcp
+frontend   Up 8 minutes (healthy)    127.0.0.1:5173->5173/tcp
+gateway    Up 11 seconds (healthy)   127.0.0.1:18080->8080/tcp
+identity   Up 6 minutes (healthy)    8080/tcp, 8443/tcp, 9000/tcp
+payments   Up 6 minutes (healthy)    8000/tcp
+sales      Up 6 minutes (healthy)    8000/tcp
+
+$ curl -s -o /dev/null -w %{http_code} http://127.0.0.1:18080/healthz
+200
+/api/catalog/health → {"status":"ok","service":"catalog","database":"ok"} (200)
+/api/sales/health → {"status":"ok","service":"sales","database":"ok"} (200)
+/api/payments/health → {"status":"ok","service":"payments","database":"ok"} (200)
+realm ticketera → http://localhost:18080/auth/realms/ticketera

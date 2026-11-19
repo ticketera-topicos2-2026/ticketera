@@ -1,0 +1,31 @@
+# 8.4 · Integrante B · 2026-11-18T23:07:51+00:00
+
+## Marcas
+  bases: catalog,keycloak,payments,sales
+  marca en catalog: 8.4 Integrante B
+  realm ticketera: 200
+  usuario de marca en el realm: 1
+
+## Reinicio simple: docker compose down (sin -v) y up
+  up --wait: exit 1 en 100 s
+catalog Up 43 seconds (health: starting)
+identity Up 54 seconds (health: starting)
+payments Up 52 seconds (unhealthy)
+sales Up 48 seconds (health: starting)
+  reintento:
+  up --wait: exit 1 en 1 s
+  bases: catalog,keycloak,payments,sales
+  marca en catalog: 8.4 Integrante B
+  realm ticketera: 000
+  usuario de marca en el realm: 0
+
+## docker compose down -v y up
+  volumen de datos: 0 (0 = borrado)
+  up --wait: exit 1 en 193 s
+identity Up 2 minutes (unhealthy)
+  reintento:
+  up --wait: exit 1 en 2 s
+  bases: catalog,keycloak,payments,sales
+  marca en catalog: no existe
+  realm ticketera: 000
+  usuario de marca en el realm: 0

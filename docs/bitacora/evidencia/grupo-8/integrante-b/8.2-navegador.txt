@@ -1,0 +1,24 @@
+# 8.2 · Integrante B · 2026-11-18T22:54:32.266Z
+Chromium chromium (Playwright), origen http://localhost:5173, API http://localhost:18080
+
+## Página de estado
+servicios: catalog=healthy, sales=healthy, payments=healthy
+mensaje «No se puede conectar con el gateway»: no
+respuestas de salud:
+  200 http://localhost:5173/src/health/checkServiceHealth.ts ACAO=http://localhost:5173
+  200 http://localhost:18080/api/catalog/health ACAO=http://localhost:5173
+  200 http://localhost:18080/api/sales/health ACAO=http://localhost:5173
+  200 http://localhost:18080/api/payments/health ACAO=http://localhost:5173
+
+## Consola de administración
+login con KC_BOOTSTRAP_ADMIN_USERNAME / KC_BOOTSTRAP_ADMIN_PASSWORD de .env → http://localhost:18080/auth/admin/master/console/
+
+## Errores y advertencias del navegador (CORS incluidos)
+requestfailed: http://localhost:18080/api/catalog/health net::ERR_ABORTED
+requestfailed: http://localhost:18080/api/sales/health net::ERR_ABORTED
+requestfailed: http://localhost:18080/api/payments/health net::ERR_ABORTED
+
+Nota: los tres ERR_ABORTED son la primera tanda de peticiones de salud, cancelada por la página al desmontarse:
+en desarrollo, StrictMode de React monta los componentes dos veces. La segunda tanda responde 200 con
+Access-Control-Allow-Origin: http://localhost:5173. No hay errores de CORS en la consola.
+La primera carga de la consola de administración tardó más de 30 s (Keycloak arma el tema en el primer pedido).

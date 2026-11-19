@@ -1,0 +1,47 @@
+# 8.4 · Integrante B · 2026-11-18T23:18:41+00:00
+
+## Sistema levantado antes de empezar
+  up --wait: exit 1 en 4 s
+identity Up 6 minutes (unhealthy)
+  sanos después de esperar: 25 s desde el primer up; segundo up:
+  up --wait: exit 0 en 16 s
+  los 7 contenedores sanos
+
+## Marcas
+  bases: catalog,keycloak,payments,sales
+  marca en catalog: 8.4 Integrante B
+  realm ticketera: 200
+  usuario de marca en el realm: 1
+
+## Reinicio simple: docker compose down (sin -v) y up
+  up --wait: exit 1 en 100 s
+identity Up 58 seconds (health: starting)
+sales Up 56 seconds (unhealthy)
+  sanos después de esperar: 212 s desde el primer up; segundo up:
+  up --wait: exit 0 en 15 s
+  los 7 contenedores sanos
+  bases: catalog,keycloak,payments,sales
+  marca en catalog: 8.4 Integrante B
+  realm ticketera: 200
+  usuario de marca en el realm: 1
+
+## docker compose down -v y up
+  volumen de datos: 0 (0 = borrado)
+  up --wait: exit 1 en 59 s
+database Up 35 seconds (unhealthy)
+  sanos después de esperar: 72 s desde el primer up; segundo up:
+  up --wait: exit 1 en 58 s
+catalog Up About a minute (unhealthy)
+identity Up 53 seconds (health: starting)
+payments Up 56 seconds (unhealthy)
+sales Up 59 seconds (health: starting)
+  bases: catalog,keycloak,payments,sales
+  marca en catalog: no existe
+  realm ticketera: 000
+  usuario de marca en el realm: 0
+  sanos después de esperar otros 726 s; tercer up:
+  up --wait: exit 0 en 17 s
+  los 7 contenedores sanos
+  realm ticketera: 200
+  usuario de marca en el realm: 0
+  roles del realm: 200

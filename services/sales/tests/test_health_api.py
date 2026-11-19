@@ -1,6 +1,7 @@
 """API tests of GET /health with a fake database probe (spec platform/service-health)."""
 
 import time
+import warnings
 
 import pytest
 from fastapi.testclient import TestClient
@@ -122,3 +123,19 @@ def test_write_methods_answer_405(method: str) -> None:
     response = client.request(method, "/health")
 
     assert response.status_code == 405
+
+
+def test_openapi_gives_each_health_method_its_own_operation_id() -> None:
+    """Found in onboarding (group 8, #25): GET and HEAD shared one route and one operation id.
+
+    Unique operation ids keep the generated OpenAPI document valid for the contract tests of D-24.
+    """
+    client = client_with(FakeDatabaseProbe(reachable=True))
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        schema = client.get("/openapi.json").json()
+
+    health = schema["paths"]["/health"]
+    operation_ids = [health[method]["operationId"] for method in ("get", "head")]
+    assert len(set(operation_ids)) == 2

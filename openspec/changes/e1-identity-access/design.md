@@ -561,15 +561,16 @@ lifespan (IA-18) adds only the time left after the other checks.
 
 1. The planning pull request (`Refs #28`) merges these artifacts. A separate pull request updates `docs/PLAN.md`
    7.3 for the parallel start of Stage I.
-2. `tasks.md` has two task groups, "Backend" and "Frontend", each with its numbered sub-tasks, and each group is
-   one branch and one implementation pull request, matching `CODEOWNERS`. Both carry `Refs #28`, and the one
-   merged last also carries `Closes #28`:
+2. `tasks.md` has two task groups, "Backend" and "Frontend and API tests", each with its numbered sub-tasks, and
+   each group is one branch and one implementation pull request, matching `CODEOWNERS`. Both carry `Refs #28`, and
+   the one merged last also carries `Closes #28`:
    - **Backend**, reviewed by B: realm, gateway, `scripts/check_realm_secrets.py`, `docker-compose.yml` (the
      frontend's `VITE_OIDC_*` variables included, so the frontend pull request does not touch it), `.env.example`,
-     smoke and realm tests, Bruno collection; ADR-0007; the `CONTRIBUTE.md` section on the test users,
-     `docker compose down -v` and the Bruno command; its sign-in steps and its team log entry.
-   - **Frontend**, reviewed by C: the GoPass base as its first sub-tasks, then the authentication screens; its
-     sign-in steps in `CONTRIBUTE.md` and its team log entry.
+     smoke and realm tests, the low-fidelity mockups; ADR-0007; the `CONTRIBUTE.md` section on the test users and
+     `docker compose down -v`; its sign-in steps and its team log entry.
+   - **Frontend and API tests**, reviewed by C: the GoPass base as its first sub-tasks, then the authentication
+     screens, the Bruno collection with its command in `CONTRIBUTE.md`, and the latency measurement; its sign-in
+     steps in `CONTRIBUTE.md` and its team log entry.
    The frontend's manual evidence needs the backend merged, or its branch running on top of the backend branch.
 3. When the backend pull request merges, a message to the team asks every member to copy the three
    `TEST_USER_<ROLE>_PASSWORD` lines from `.env.example` to `.env` (Compose stops otherwise) and to run

@@ -18,7 +18,9 @@ def get_database_probe(request: Request) -> DatabaseProbe:
 
 
 # A plain `def` runs in the thread pool, so the blocking probe never stalls the event loop.
-@router.api_route("/health", methods=["GET", "HEAD"])
+# One route per method, so each gets its own OpenAPI operation id (health_health_get, health_health_head).
+@router.get("/health")
+@router.head("/health")
 def health(probe: Annotated[DatabaseProbe, Depends(get_database_probe)]) -> JSONResponse:
     """Reports the service status and its database connectivity; needs no credentials."""
     report = check_health(SERVICE_NAME, probe)

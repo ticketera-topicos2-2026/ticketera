@@ -1,7 +1,7 @@
 import { useId } from "react";
 
 /**
- * GoPass mark (proposal D-38, pending the team's vote): a ticket with side notches and a four-point star, filled with
+ * GoPass mark (D-38): a ticket with side notches and a four-point star, filled with
  * the primary-to-secondary gradient. Decorative: the wordmark next to it carries the name.
  */
 export default function Logo({ size = 36 }: { size?: number }) {

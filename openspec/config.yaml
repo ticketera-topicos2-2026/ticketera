@@ -1,6 +1,6 @@
 # =============================================================================
 # openspec/config.yaml  -  Ticketera virtual para eventos (microservicios)
-# Versión del archivo: 0.3.0  (aprobada con el plan v0.4.0, reunión del 2026-10-27)
+# Versión del archivo: 0.4.0  (aprobada con el plan v0.5.0, reunión del 2026-11-17)
 #
 # Notas para el equipo (en español):
 # - La extensión DEBE ser .yaml (OpenSpec no lee config.yml).
@@ -88,6 +88,14 @@ context: |
   ## Stack (approved)
   - Frontend (Stage I): React + TypeScript + Vite; Tailwind CSS with
     shadcn/ui; tests with Vitest and React Testing Library.
+  - Visual identity (D-38): the UI is branded "GoPass" (repository,
+    services and domain stay "ticketera"). Palette: primary #2563EB,
+    secondary #7C3AED, background #F8FAFC, text #111827, muted text
+    #64748B, success #22C55E, warning #F59E0B, error #EF4444; gradient
+    from primary to secondary. Fonts: Plus Jakarta Sans (headings) and
+    Inter (body), self-hosted with @fontsource. The palette and fonts are
+    the Tailwind tokens. Screens use sample data and freely licensed
+    photos, never real artists or festivals.
   - Backend: Python + FastAPI + Pydantic; SQLAlchemy 2 + Alembic; uv for
     dependencies; Ruff (lint and format); mypy (type check).
   - Tests: pytest, pytest-cov; integration tests against real PostgreSQL.
@@ -110,6 +118,8 @@ context: |
   - OpenSpec artifacts, code, identifiers and commit messages in English.
   - PLAN.md, CONTRIBUTE.md and the team log (bitácora) in Spanish.
   - Conventional Commits; branches named feature/<change-or-topic>.
+  - Every OpenSpec change has an issue: Refs #n in its planning pull
+    request, Closes #n in its implementation (D-37).
   - Clean Code (R. C. Martin): descriptive names, small single-purpose
     functions, no duplication, explicit error handling.
   - Security aligned with OWASP ASVS and OWASP API Security Top 10.

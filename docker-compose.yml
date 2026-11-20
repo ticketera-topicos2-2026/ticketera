@@ -131,6 +131,8 @@ services:
       - 0.0.0.0
       - --port
       - "8000"
+      # The request log middleware writes the only line per request (e1-request-log, RL-10).
+      - --no-access-log
       - --reload
       - --reload-dir
       - src

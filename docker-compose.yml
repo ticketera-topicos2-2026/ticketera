@@ -124,6 +124,8 @@ services:
     # Applies the schema migrations, then runs the same server as the image's CMD with reload on source changes
     # (e1-event-catalog, D-33; DS-17).
     command:
+      # bin/run starts Uvicorn with --no-access-log: the request log middleware writes the only line per
+      # request (e1-request-log, RL-10).
       - bin/run
     labels:
       # Health path checked by the smoke test through the gateway at /api/catalog/health (DS-19).

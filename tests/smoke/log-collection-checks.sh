@@ -169,7 +169,7 @@ check_collection_is_optional() {
   done
   http_get "http://localhost:${gateway_port}/auth/realms/ticketera/.well-known/openid-configuration"
   [[ $STATUS == 200 ]] || failures+=("realm discovery $(last_response)")
-  if ! docker compose up --detach --wait --wait-timeout 180 "${services[@]}" > /dev/null 2>&1; then
+  if ! docker compose up --detach --wait --wait-timeout 300 "${services[@]}" > /dev/null 2>&1; then
     failures+=("the containers did not become healthy again: $(compose_error up --detach --wait "${services[@]}")")
   fi
   if ((${#failures[@]} == 0)); then

@@ -50,9 +50,10 @@ preventing cross-customer key collisions or data leaks.
 ### Requirement: Concurrent identical requests with the same key
 
 When two concurrent requests from the same customer arrive simultaneously with the same new `Idempotency-Key`,
-the `sales` service SHALL serialize them via PostgreSQL row locks on `idempotency_keys`: the second transaction
-waits for the first to commit, reads the confirmed response, and returns the identical `201 Created` replay
-without polling or re-executing business logic.
+the `sales` service SHALL serialize them via PostgreSQL row locks on `idempotency_keys`: the key is inserted first
+in the database transaction. The second transaction waits for the first to commit, detects the conflicting key,
+reads the finalized response in `READ COMMITTED`, and returns the identical `201 Created` replay without polling,
+without touching seats, and rolling back its own uncommitted transaction to avoid creating duplicate orders.
 
 #### Scenario: Simultaneous double-click with identical key
 

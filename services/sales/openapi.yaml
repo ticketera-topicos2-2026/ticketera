@@ -26,6 +26,8 @@ paths:
       summary: Initialize seat inventory for an event
       description: Administrative capability to load seats and prices for an event. Requires ADMIN role.
       operationId: initialize_inventory
+      security:
+        - bearerAuth: []
       parameters:
         - name: event_id
           in: path
@@ -54,6 +56,8 @@ paths:
       summary: Query available seats for an event
       description: Retrieves available seats for a given event. Requires CLIENT or ADMIN role.
       operationId: get_available_seats
+      security:
+        - bearerAuth: []
       parameters:
         - name: event_id
           in: path
@@ -78,11 +82,15 @@ paths:
                   $ref: '#/components/schemas/SeatResponse'
         '401':
           description: Unauthenticated.
+        '403':
+          description: Forbidden role.
   /events/{event_id}/orders:
     post:
       summary: Idempotent ticket purchase
       description: Atomically purchases seats and issues confirmed tickets. Requires CLIENT role and Idempotency-Key.
       operationId: purchase_tickets
+      security:
+        - bearerAuth: []
       parameters:
         - name: event_id
           in: path
@@ -123,6 +131,8 @@ paths:
       summary: Get order details
       description: Retrieves order details and tickets. Restricted to the owning customer (BOLA) or ADMIN.
       operationId: get_order
+      security:
+        - bearerAuth: []
       parameters:
         - name: order_id
           in: path
@@ -141,6 +151,12 @@ paths:
         '404':
           description: Order not found or owned by another customer.
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Perimeter JWT forwarded by NGINX Gateway with validated sub and realm_access.roles claims.
   schemas:
     SeatItem:
       type: object
@@ -182,6 +198,7 @@ components:
         seat_ids:
           type: array
           minItems: 1
+          uniqueItems: true
           items:
             type: string
     TicketResponse:

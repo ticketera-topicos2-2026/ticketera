@@ -56,17 +56,21 @@ idempotency tracking.
 *ADR: `docs/adr/` (numbered upon merge).*
 
 ### 4. Customer-Scoped Idempotency and PostgreSQL Native Blocking
-To prevent cross-customer key collision and BOLA data leaks, and handle concurrent collisions:
-- The table `idempotency_keys` uses `PRIMARY KEY (customer_id, key)`.
+To prevent cross-customer key collision and BOLA data leaks, and handle concurrent collisions safely:
+- The table `idempotency_keys` uses `PRIMARY KEY (customer_id, key)`. Columns `response_status` and `response_body` are nullable during initial key reservation.
 - `request_hash` is computed from `SHA256(event_id + ":" + sorted(seat_ids))`.
-- When a request arrives:
-  1. `INSERT INTO idempotency_keys (customer_id, key, request_hash, response_status, response_body) VALUES (:customer_id, :key, :hash, 201, :response) ON CONFLICT (customer_id, key) DO NOTHING;`
-  2. If 0 rows were inserted (another transaction holds the lock or already committed): PostgreSQL automatically
-     waits on row-level lock until the in-flight transaction finishes. Once committed, a `SELECT` reads the finalized
-     row. If `request_hash` matches, it returns the cached `201 Created` replay immediately. If `request_hash` differs,
-     it returns `422 Unprocessable Entity`.
-  3. If the in-flight transaction rolled back (e.g. `409 Conflict`), the lock is released, allowing a subsequent attempt
-     to insert cleanly. Zero polling is required.
+- When a purchase request arrives:
+  1. Reserve the key FIRST before locking or modifying seats:
+     `INSERT INTO idempotency_keys (customer_id, key, request_hash, created_at) VALUES (:customer_id, :key, :hash, NOW()) ON CONFLICT (customer_id, key) DO NOTHING;`
+  2. If 0 rows were inserted (another transaction holds the uncommitted lock or already committed):
+     PostgreSQL row-level lock automatically pauses this statement until the in-flight transaction completes.
+     Once unblocked, a `SELECT request_hash, response_status, response_body FROM idempotency_keys WHERE customer_id = :customer_id AND key = :key;` reads the confirmed state in `READ COMMITTED`:
+     - If `request_hash` matches: execute `ROLLBACK;` and return the stored replay response (`201 Created`).
+     - If `request_hash` differs: execute `ROLLBACK;` and return `422 Unprocessable Entity`.
+  3. If the in-flight transaction rolled back (e.g. `409 Conflict`), its row disappears, so this transaction's `INSERT` succeeds and proceeds normally.
+  4. Once seats are verified, locked, and marked `SOLD`, and order + tickets are created:
+     `UPDATE idempotency_keys SET response_status = 201, response_body = :response_json WHERE customer_id = :customer_id AND key = :key;`
+     `COMMIT;` and return `201 Created`. Zero application polling is required.
 
 ### 5. BOLA (Broken Object Level Authorization) Protection (OWASP API1)
 `GET /api/sales/orders/{order_id}` verifies that the requesting user (`sub` claim) matches `customer_id` stored on
@@ -138,10 +142,27 @@ Documented canonically in `services/sales/openapi.yaml`. Summary:
 BEGIN;
 SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
--- 1. Validate seat_ids input (not empty, no duplicates)
+-- 1. Reserve the idempotency key BEFORE touching seats
+INSERT INTO idempotency_keys (customer_id, key, request_hash, created_at)
+VALUES (:customer_id, :key, :request_hash, NOW())
+ON CONFLICT (customer_id, key) DO NOTHING;
+
+-- If 0 rows inserted: PostgreSQL waited until concurrent transaction completed.
+--   SELECT request_hash, response_status, response_body 
+--   FROM idempotency_keys 
+--   WHERE customer_id = :customer_id AND key = :key;
+--
+--   If request_hash == :request_hash:
+--     ROLLBACK;
+--     return cached response (201 Created with order and tickets).
+--   Else:
+--     ROLLBACK;
+--     return 422 Unprocessable Entity.
+
+-- 2. Validate seat_ids input (not empty, no duplicates)
 -- If invalid: ROLLBACK; return 422 Unprocessable Entity.
 
--- 2. Lock selected seats in strict order to eliminate deadlock risk
+-- 3. Lock selected seats in strict order to eliminate deadlock risk
 SELECT seat_id, status, price_centavos 
 FROM seats 
 WHERE event_id = :event_id AND seat_id IN (:seat_ids) 
@@ -152,29 +173,20 @@ FOR UPDATE;
 -- If any seat is not AVAILABLE or missing:
 --   ROLLBACK; return 409 Conflict.
 
--- 3. Transition seats to SOLD
+-- 4. Transition seats to SOLD and create Order + Tickets
 UPDATE seats SET status = 'SOLD' 
 WHERE event_id = :event_id AND seat_id IN (:seat_ids);
 
--- 4. Create Order and Tickets
 INSERT INTO orders (order_id, customer_id, event_id, total_amount, currency, status, created_at)
 VALUES (:order_id, :customer_id, :event_id, :total, 'ARS', 'CONFIRMED', NOW());
 
 INSERT INTO tickets (ticket_id, order_id, event_id, seat_id, ticket_code)
 VALUES ...;
 
--- 5. Insert Idempotency Key with conflict handling
-INSERT INTO idempotency_keys (customer_id, key, request_hash, response_status, response_body, created_at)
-VALUES (:customer_id, :key, :request_hash, 201, :response_json, NOW())
-ON CONFLICT (customer_id, key) DO NOTHING;
-
--- If inserted: COMMIT; return 201 Created.
--- If conflict (0 rows inserted):
---   A concurrent transaction is in-flight or committed.
---   PostgreSQL waits until the concurrent transaction finishes.
---   Once finished, SELECT response_status, response_body, request_hash FROM idempotency_keys WHERE customer_id = :customer_id AND key = :key;
---   If request_hash == :request_hash: COMMIT; return cached 201 response.
---   Else: ROLLBACK; return 422 Unprocessable Entity.
+-- 5. Update idempotency record with confirmed response status and body
+UPDATE idempotency_keys 
+SET response_status = 201, response_body = :response_json 
+WHERE customer_id = :customer_id AND key = :key;
 
 COMMIT;
 ```
@@ -190,31 +202,31 @@ sequenceDiagram
     participant DB as PostgreSQL (sales_db)
 
     Client->>Gateway: POST /api/sales/events/evt-1/orders (Bearer JWT + Idempotency-Key)
-    Gateway->>Gateway: Validate Bearer token & extract sub (customer_id)
-    Gateway->>Sales: Forward request with Idempotency-Key and sub
+    Gateway->>Sales: Forward request with Bearer JWT and Idempotency-Key
+    Sales->>Sales: Decode JWT payload (extract sub as customer_id and roles)
     Sales->>DB: BEGIN Transaction (READ COMMITTED)
-    Sales->>DB: SELECT seats WHERE event_id = evt-1 AND seat_id IN (...) ORDER BY seat_id FOR UPDATE
-    alt Any seat unavailable or missing
-        DB-->>Sales: Seat unavailable
+    Sales->>DB: INSERT INTO idempotency_keys ON CONFLICT (customer_id, key) DO NOTHING
+    alt Conflict on key (0 rows inserted: in-flight or already completed)
+        Note over Sales,DB: DB waits for concurrent transaction to finish
+        Sales->>DB: SELECT cached response from idempotency_keys
         Sales->>DB: ROLLBACK
-        Sales-->>Client: 409 Conflict ("Seat A-1 is already sold")
-    else All seats available
-        Sales->>DB: UPDATE seats SET status = 'SOLD'
-        Sales->>DB: INSERT INTO orders & tickets
-        Sales->>DB: INSERT INTO idempotency_keys ON CONFLICT DO NOTHING
-        alt Insert successful
+        alt Hash matches
+            Sales-->>Client: 201 Created (Replay of confirmed order)
+        else Hash differs
+            Sales-->>Client: 422 Unprocessable Entity (Payload mismatch)
+        end
+    else Key reserved successfully (1 row inserted)
+        Sales->>DB: SELECT seats WHERE event_id = evt-1 AND seat_id IN (...) ORDER BY seat_id FOR UPDATE
+        alt Any seat unavailable or missing
+            DB-->>Sales: Seat unavailable
+            Sales->>DB: ROLLBACK
+            Sales-->>Client: 409 Conflict ("Seat A-1 is already sold")
+        else All seats available
+            Sales->>DB: UPDATE seats SET status = 'SOLD'
+            Sales->>DB: INSERT INTO orders & tickets
+            Sales->>DB: UPDATE idempotency_keys SET response_status = 201, response_body = :json
             Sales->>DB: COMMIT
             Sales-->>Client: 201 Created (Order confirmed + tickets)
-        else Conflict on key (concurrent identical request)
-            Note over Sales,DB: DB waits for concurrent transaction to commit
-            Sales->>DB: SELECT cached response from idempotency_keys
-            alt Hash matches
-                Sales->>DB: COMMIT
-                Sales-->>Client: 201 Created (Replay of confirmed order)
-            else Hash differs
-                Sales->>DB: ROLLBACK
-                Sales-->>Client: 422 Unprocessable Entity
-            end
         end
     end
 ```

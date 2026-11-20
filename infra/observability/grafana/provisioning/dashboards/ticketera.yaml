@@ -1,0 +1,12 @@
+# Dashboard provider of Grafana (change e1-request-log, design RL-14, RL-15): loads the dashboards in
+# infra/observability/grafana/dashboards/, mounted read-only, so they live in the repository and need no volume.
+apiVersion: 1
+
+providers:
+  - name: ticketera
+    folder: Ticketera
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

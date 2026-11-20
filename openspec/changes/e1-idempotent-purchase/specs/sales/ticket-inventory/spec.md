@@ -41,17 +41,22 @@ in Argentine Centavos (`ARS`), and an initial status of `AVAILABLE`.
 
 ### Requirement: Query available inventory
 
-The `sales` service SHALL allow clients to list all seats currently in `AVAILABLE` status for a given `event_id`.
+The `sales` service SHALL allow authenticated clients to list all seats currently in `AVAILABLE` status for a given `event_id`.
 
 #### Scenario: Query seats for an event with available seats
 
-- **WHEN** a client sends `GET /api/sales/events/evt-100/seats?status=AVAILABLE`
+- **WHEN** an authenticated client with `CLIENT` or `ADMIN` role sends `GET /api/sales/events/evt-100/seats?status=AVAILABLE`
 - **THEN** the response is `200 OK` containing the list of available seats with their identifiers, categories,
   and prices in centavos
 
+#### Scenario: Unauthenticated query rejected
+
+- **WHEN** an unauthenticated request sends `GET /api/sales/events/evt-100/seats`
+- **THEN** the response is `401 Unauthorized`
+
 #### Scenario: Query seats for an event with no available seats
 
-- **WHEN** all seats for an event are in `SOLD` status and a client queries available seats
+- **WHEN** all seats for an event are in `SOLD` status and an authenticated client queries available seats
 - **THEN** the response is `200 OK` with an empty seat list
 
 ### Requirement: Autonomous inventory persistence

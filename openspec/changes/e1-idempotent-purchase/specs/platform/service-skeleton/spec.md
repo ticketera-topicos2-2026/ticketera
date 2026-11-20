@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Establishes the reference hexagonal architecture structure and Alembic migration conventions (D-33) that all
-backend microservices follow.
+Establishes the reference hexagonal architecture structure, layer linting rules, and Alembic migration conventions
+(D-33) that all backend microservices follow.
 
 ## ADDED Requirements
 
@@ -24,6 +24,16 @@ Every backend service SHALL organize its source code into four distinct layers u
 - **THEN** `domain/` imports nothing outside domain; `application/` imports only from `domain/`; `infrastructure/`
   and `api/` import from `application/` and `domain/`, but neither `domain/` nor `application/` imports from
   `infrastructure/` or `api/`
+
+### Requirement: Architectural layer linting with import-linter
+
+The project's CI `quality` job SHALL run an `import-linter` contract verifying that layer boundaries and inward
+dependency directions are strictly preserved across all services.
+
+#### Scenario: Illegal outward import rejected by CI
+
+- **WHEN** a file in `sales/domain/` imports from `sales/application/` or `sales/infrastructure/`
+- **THEN** `import-linter` fails with a non-zero exit code during the `quality` check
 
 ### Requirement: Database schema migrations with Alembic
 

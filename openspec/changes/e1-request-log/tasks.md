@@ -17,25 +17,32 @@
 
 ## 1. Gateway: correlation id and JSON access log (B, feature/e1-request-log-gateway) [P1]
 
-- [ ] 1.1 Write `tests/platform/gateway-log.schema.json` (fields, types, `additionalProperties: false`) and
+- [x] 1.1 Write `tests/platform/gateway-log.schema.json` (fields, types, `additionalProperties: false`) and
   `tests/platform/request-log.schema.json` (same for service lines), with `unittest` tests that a valid example
-  passes and examples with an extra field, a missing field, a string status or a 31-character correlation id fail
-  (Req api-gateway: The gateway writes one JSON access log line per request; Req request-log: The request log line
+  passes and examples with an extra field, a missing field, a string status or a 31-character correlation id fail;
+  the lines are checked by `scripts/check_log_lines.py`, standard library only like the other platform checks,
+  which supports the subset of JSON Schema the two schemas use and rejects any other keyword
+  (Req api-gateway: The gateway access log line has a fixed set of fields; Req request-log: The request log line
   has a fixed set of fields). Verify: `python -I -B -m unittest discover -s tests/platform` runs the new tests.
-- [ ] 1.2 Create `tests/smoke/request-log-checks.sh`, sourced by `smoke-test.sh`, and write the gateway checks
+- [x] 1.2 Create `tests/smoke/request-log-checks.sh`, sourced by `smoke-test.sh`, and write the gateway checks
   (red): `X-Correlation-ID` of 32 hex on `200`, `401`, `404` and `502` answers; different ids on two requests and
   on 50 concurrent ones; a forged header replaced; one gateway line per request valid against
   `gateway-log.schema.json` for `200`, `401`, `404`, `421` and `502`; no line for `/healthz`; a path with `%22`
   and `%0A` gives one valid line; a query-string token in no line (Req request-correlation: The gateway gives
   every request a correlation id - all scenarios; The correlation id is never taken from the client - both
-  scenarios; Req api-gateway: both requirements, all scenarios). Verify: the checks fail on the current gateway.
-- [ ] 1.3 In `infra/gateway/templates/default.conf.template`: `log_format ticketera_json escape=json` with the
-  fields of the spec, `access_log /dev/stdout ticketera_json` in both servers, `add_header X-Correlation-ID
+  scenarios; Req api-gateway: both requirements, all scenarios). The `502` comes from the test-only route
+  `tests/smoke/gateway/unavailable.conf` to a closed port of the echo service, because stopping a real service
+  would change its address (DS-07); the `401` checks are skipped until the access check of #30 is merged. Verify:
+  the checks fail on the current gateway.
+- [x] 1.3 In `infra/gateway/templates/default.conf.template`: `log_format ticketera_json escape=json` with the
+  fields of the spec, `access_log /var/log/nginx/access.log ticketera_json` (the image links it to standard
+  output) in both servers, `add_header X-Correlation-ID
   $request_id always` at server level, and the IA-08 rule kept in the comment; in
   `snippets/forwarded-headers.conf`, `proxy_set_header X-Correlation-ID $request_id` (RL-01, RL-02, RL-09).
   Verify: the checks of 1.2 pass; the smoke test passes.
-- [ ] 1.4 Check that the identity service receives the correlation id: with a temporary test-only echo route or
-  the existing echo route of the smoke test, the received header equals the response header (Req
+- [x] 1.4 Check that the identity service receives the correlation id: through the existing echo route of the
+  smoke test, which includes the same forwarding snippet as every route, `/auth/` included, the received header
+  equals the response header (Req
   request-correlation: The gateway forwards the correlation id to the service - both scenarios). Verify: the check
   passes in the smoke test.
 

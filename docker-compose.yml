@@ -59,6 +59,9 @@ services:
       # Over TCP, so the database is healthy only after the init scripts finish: the temporary server that runs them
       # listens only on the Unix socket. -U and -d avoid a "role does not exist" log line on every check.
       test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$$POSTGRES_USER\" -d postgres"]
+      # The init scripts of a first start (empty volume) took 35 s on a WSL VM with about 3 GiB; without a start
+      # period the database became unhealthy before they finished and "up --wait" failed (#24).
+      start_period: 60s
 
   identity:
     image: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0

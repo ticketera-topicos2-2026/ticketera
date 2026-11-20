@@ -29,8 +29,12 @@ readonly REQUEST_TIMEOUT_SECONDS=10
 readonly REQUIRED_CURL_MAJOR=8
 readonly REQUIRED_CURL_MINOR=1
 readonly HEALTH_PATH_LABEL="ticketera.health-path"
-# Services allowed to publish ports (Req local-environment: Only the gateway and the frontend publish ports).
-readonly PUBLISHING_SERVICES=" gateway frontend "
+# Services allowed to publish ports (Req local-environment: Only the gateway and the frontend publish ports, which
+# e1-request-log extends to Grafana).
+readonly PUBLISHING_SERVICES=" gateway frontend grafana "
+# Containers allowed to run as root: only the log collector, which reads the Docker socket (e1-request-log, design
+# RL-12, an exception to DS-13 recorded in its ADR). It runs with no capabilities and publishes no port.
+readonly ROOT_ALLOWED_SERVICES=" alloy "
 # Test-only echo service and gateway route (tests/smoke/compose.echo.yml), and the forged values the forwarding
 # checks send; 203.0.113.7 is a documentation address (RFC 5737).
 readonly ECHO_SERVICE="echo"
@@ -373,6 +377,8 @@ check_non_root() {
   done <<< "$processes"
   if [[ -z $uid ]]; then
     fail "$check" "its main process (PID $pid) is not listed by docker top"
+  elif [[ $uid == 0 && $ROOT_ALLOWED_SERVICES == *" $service "* ]]; then
+    pass "container $service: main process runs as root by the recorded exception (RL-12)"
   elif [[ $uid == 0 ]]; then
     fail "$check" "its main process runs as UID 0 (root)"
   else
@@ -384,7 +390,7 @@ check_running_containers() {
   local containers container_id service pid ports binding host_address check
   local -a bindings publishing_services=() exposed_bindings=()
   local gateway_binding_found=false expected_gateway_address="127.0.0.1:${gateway_port}"
-  local check_publishers="ports: only the gateway and the frontend publish ports"
+  local check_publishers="ports: only the gateway, the frontend and Grafana publish ports"
   local check_local="ports: every published port is bound to 127.0.0.1"
   local check_gateway="ports: the gateway publishes GATEWAY_PORT on 127.0.0.1"
 
@@ -677,6 +683,8 @@ check_cors() {
 # Correlation id and gateway access log checks (change e1-request-log).
 # shellcheck source=tests/smoke/request-log-checks.sh
 source tests/smoke/request-log-checks.sh
+# shellcheck source=tests/smoke/log-collection-checks.sh
+source tests/smoke/log-collection-checks.sh
 
 main() {
   parse_arguments "$@"
@@ -725,6 +733,9 @@ main() {
   check_correlation_ids
   check_gateway_access_log
   check_service_request_logs
+  check_log_collection
+  # Last: it stops and starts the log collection containers.
+  check_collection_is_optional
 
   printf 'Smoke test: %d passed, %d failed, %d skipped\n' "$passed" "$failed" "$skipped"
   ((failed == 0))

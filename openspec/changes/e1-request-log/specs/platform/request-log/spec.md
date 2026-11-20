@@ -97,8 +97,8 @@ NOT be logged as `user_id`.
 ### Requirement: The duration covers the whole handling of the request
 
 The `duration_seconds` field SHALL measure the time from the moment the service receives the request, before
-authentication, until the response status is sent, so that it includes authentication, the endpoint and the
-serialization of the response.
+authentication, until the whole response has been sent, so that it includes authentication, the endpoint and
+the serialization and sending of the response.
 
 #### Scenario: Slow endpoint
 

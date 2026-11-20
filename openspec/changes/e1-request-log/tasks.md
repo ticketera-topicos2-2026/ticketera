@@ -48,7 +48,7 @@
 
 ## 2. Request log middleware in catalog and payments (B, feature/e1-request-log-services) [P1]
 
-- [ ] 2.1 Write `services/catalog/tests/unit/test_request_log.py` (red) against a minimal Starlette app wrapped by
+- [x] 2.1 Write `services/catalog/tests/unit/test_request_log.py` (red) against a minimal Starlette app wrapped by
   `RequestLogMiddleware` with an in-memory writer: exact field set and types; `route` template and `null` on
   `404`; status `500` and the exception re-raised; `401` with `null` user and `403` with the `sub` stored in
   `request.state.user_id`; `X-User-Id` ignored; `422` logged; a 200 ms endpoint gives `0.2 <= duration < 0.4`;
@@ -57,20 +57,24 @@
   server writes no other access log"; Req request-correlation: Services accept only a well-formed correlation id
   - both scenarios; RL-03, RL-05, RL-06, RL-07). Verify: the tests fail (module missing) with
   `docker compose run --rm catalog pytest`.
-- [ ] 2.2 Implement `services/catalog/src/catalog/api/request_log.py` and add it in `api/app.py` (RL-04, RL-05,
-  RL-08, RL-10). Verify: the tests of 2.1 pass; `ruff check .` and `mypy` pass in the container.
-- [ ] 2.3 Write `services/catalog/tests/acceptance/test_request_log_api.py` (red): the real app through
-  `TestClient` writes one line per request to stdout, valid against `tests/platform/request-log.schema.json`;
-  a request with a bearer token, a `Cookie` header, `?access_token=...` and a JSON body with a name and an email
-  writes none of those values (Req request-log: The request log never contains sensitive data - all scenarios;
-  The request log line has a fixed set of fields - Scenario: Same schema in every service). Verify: the tests fail
-  before 2.2 is wired with the real writer, pass after.
-- [ ] 2.4 Add `--no-access-log` to the `catalog` command in `docker-compose.yml` and to the image's `CMD`; add the
-  smoke checks (red first): no Uvicorn access line in `docker compose logs catalog`, and the `catalog` line of a
-  request has the same correlation id as the gateway line (Req request-log: The server writes no other access log;
-  Req request-correlation: The same correlation id ties the gateway line to the service line). Verify: the smoke
-  test passes.
-- [ ] 2.5 Repeat 2.1 to 2.4 for `payments` (copy of the module, `service_name="payments"`, same tests). Verify: the
+- [x] 2.2 Implement `services/catalog/src/catalog/api/request_log.py` (RL-04, RL-05, RL-08, RL-10). Verify: the
+  tests of 2.1 pass; `ruff check .` and `mypy` pass in the container.
+- [x] 2.3 Write `services/catalog/tests/acceptance/test_request_log_api.py` (red), then add the middleware in
+  `api/app.py`: the real app through `TestClient` writes one line per request to stdout with exactly the fixed
+  fields; a request with a bearer token, a `Cookie` header, `?access_token=...` and a JSON body with a name and an
+  email writes none of those values (Req request-log: The request log never contains sensitive data - all
+  scenarios). The shared schema lives outside the service's build context and mount, so the smoke test of 2.4
+  checks the real lines against it (Scenario: Same schema in every service). Verify: the tests fail before the
+  middleware is added to the app, pass after.
+- [x] 2.4 Add `--no-access-log` to the `catalog` command in `docker-compose.yml` and to the image's `CMD`; add the
+  smoke checks (red first): no Uvicorn access line in `docker compose logs catalog`; the `catalog` line of a
+  request through the gateway is valid against `tests/platform/request-log.schema.json` and has the same
+  correlation id as the gateway line; `check_cors` follows the preflight and the GET by their correlation ids
+  instead of query-string markers, which the request log no longer shows (Req request-log: The server writes no
+  other access log; The request log line has a fixed set of fields - Scenario: Same schema in every service; Req
+  request-correlation: The same correlation id ties the gateway line to the service line). Verify: the smoke test
+  passes.
+- [x] 2.5 Repeat 2.1 to 2.4 for `payments` (copy of the module, `service_name="payments"`, same tests). Verify: the
   same tests pass in `payments`; the smoke test passes.
 
 ## 3. Request log middleware in sales (B, feature/e1-request-log-sales) [P1, after #32's implementation]

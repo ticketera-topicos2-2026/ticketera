@@ -17,7 +17,16 @@ from pydantic import BaseModel
 from catalog.api.request_log import RequestLogMiddleware
 
 SERVICE_NAME = "catalog"
-FIELDS = {"timestamp", "service", "correlation_id", "method", "route", "status", "duration_seconds", "user_id"}
+FIELDS = {
+    "timestamp",
+    "service",
+    "correlation_id",
+    "method",
+    "route",
+    "status",
+    "duration_seconds",
+    "user_id",
+}
 GATEWAY_ID = "3f2a9c0d4b5e6f708192a3b4c5d6e7f8"
 TOKEN_SUB = "5b0c1d2e-3f40-4a5b-8c6d-7e8f9a0b1c2d"
 SLOW_ENDPOINT_SECONDS = 0.2
@@ -53,7 +62,7 @@ def build_app() -> FastAPI:
     def purchase(body: Purchase) -> dict[str, int]:
         return {"quantity": body.quantity}
 
-    # Stands in for an authentication adapter (design RL-06): it stores the accepted sub, or rejects the token.
+    # Stands in for an authentication adapter (RL-06): it stores the accepted sub, or rejects the token.
     @app.get("/admin-only")
     def admin_only(request: Request) -> None:
         sub = request.headers.get("x-test-sub")
@@ -76,7 +85,9 @@ def logged_app(lines: list[dict[str, Any]]) -> FastAPI:
     return app
 
 
-def request_once(path: str, method: str = "GET", **kwargs: Any) -> tuple[httpx.Response, list[dict[str, Any]]]:
+def request_once(
+    path: str, method: str = "GET", **kwargs: Any
+) -> tuple[httpx.Response, list[dict[str, Any]]]:
     lines: list[dict[str, Any]] = []
     client = TestClient(logged_app(lines), raise_server_exceptions=False)
     response = client.request(method, path, **kwargs)
@@ -110,7 +121,10 @@ def test_successful_request_writes_one_line_with_the_fixed_fields() -> None:
 
 
 def test_route_template_is_logged_instead_of_the_path() -> None:
-    """Req: The request log line has a fixed set of fields. Scenario: Route template instead of the requested path."""
+    """Req: The request log line has a fixed set of fields.
+
+    Scenario: Route template instead of the requested path.
+    """
     _, lines = request_once("/events/7f3c9a/orders/a12b44")
 
     line = only_line(lines)
@@ -130,7 +144,10 @@ def test_path_that_matches_no_route_logs_a_null_route() -> None:
 
 
 def test_unhandled_error_is_logged_as_500_and_still_answered() -> None:
-    """Req: Every backend service writes one log line per request. Scenario: Unhandled error in an endpoint."""
+    """Req: Every backend service writes one log line per request.
+
+    Scenario: Unhandled error in an endpoint.
+    """
     response, lines = request_once("/boom")
 
     assert response.status_code == 500
@@ -146,9 +163,11 @@ def test_validation_error_is_logged_with_its_status() -> None:
 
 
 def test_rejected_token_logs_401_without_a_user() -> None:
-    """Req: Every backend service writes one log line per request. Scenario: Token whose payload cannot be decoded.
+    """Req: Every backend service writes one log line per request.
 
-    Also Req: The duration covers the whole handling of the request. Scenario: Rejected authentication is timed too.
+    Scenario: Token whose payload cannot be decoded.
+    Also Req: The duration covers the whole handling of the request.
+    Scenario: Rejected authentication is timed too.
     """
     response, lines = request_once("/admin-only")
 
@@ -179,7 +198,9 @@ def test_logged_user_is_the_sub_stored_by_authentication_not_a_forged_header() -
 
 def test_endpoint_without_authentication_logs_no_user_even_with_a_forged_header() -> None:
     """Req: The logged user is the token's sub. Scenario: Public endpoint."""
-    _, lines = request_once("/ok", headers={"Authorization": "Bearer abc.def.ghi", "X-User-Id": "someone-else"})
+    _, lines = request_once(
+        "/ok", headers={"Authorization": "Bearer abc.def.ghi", "X-User-Id": "someone-else"}
+    )
 
     assert only_line(lines)["user_id"] is None
 
@@ -200,7 +221,10 @@ def test_missing_correlation_id_is_logged_as_null() -> None:
 
 
 def test_malformed_correlation_ids_are_logged_as_null() -> None:
-    """Req: Services accept only a well-formed correlation id. Scenario: Malformed header reaching a service."""
+    """Req: Services accept only a well-formed correlation id.
+
+    Scenario: Malformed header reaching a service.
+    """
     malformed = ['abc"}\\n{"status":200', GATEWAY_ID.upper(), GATEWAY_ID + "0", GATEWAY_ID[:-1]]
     for value in malformed:
         _, lines = request_once("/ok", headers={"X-Correlation-ID": value})

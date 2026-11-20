@@ -112,8 +112,8 @@ process or tooling decision recorded only in `docs/PLAN.md` section 5.
   after `docker compose down -v`.
 - Healthcheck values: `interval: 10s`, `timeout: 5s`, `retries: 3`. Docker starts each check `interval` after the
   previous one completes, so the worst case from failure to unhealthy is 3 × (10 s + 5 s) = 45 s, inside the
-  60-second requirement. `start_period` is 30 s for the backends and the frontend and 120 s for the identity
-  service.
+  60-second requirement. `start_period` is 30 s for the backends and the frontend, 60 s for the database (its
+  init scripts run on a first start, #24) and 120 s for the identity service.
 - Reload within 10 seconds requires the code inside the WSL 2 file system (D-12); `CONTRIBUTE.md` requires cloning
   under the Linux home directory, never under `/mnt/c`. Polling (`WATCHFILES_FORCE_POLLING`, Vite
   `server.watch.usePolling`) is available through `.env` as a fallback.

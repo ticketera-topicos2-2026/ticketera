@@ -3,20 +3,31 @@
 ## Purpose
 
 Defines the inventory management capability in `sales`, enabling `ADMIN` users to initialize seat inventory for
-events and clients to query seat availability.
+events and clients to query seat availability, with strict role enforcement and catalog autonomy.
 
 ## ADDED Requirements
 
 ### Requirement: Initialize event seat inventory
 
-The `sales` service SHALL provide an administrative endpoint to initialize seat inventory for an `event_id`,
-recording each seat's identifier, section or category, base price, and an initial status of `AVAILABLE`.
+The `sales` service SHALL provide an administrative endpoint `POST /api/sales/events/{event_id}/inventory` to
+initialize seat inventory for an `event_id`, recording each seat's identifier, section or category, base price
+in Argentine Centavos (`ARS`), and an initial status of `AVAILABLE`.
 
 #### Scenario: Admin loads seat inventory for an event
 
-- **WHEN** an administrator posts a valid inventory payload with 100 seats for an event `evt-100` to
+- **WHEN** an authenticated user with `ADMIN` role posts a valid inventory payload with 100 seats for event `evt-100` to
   `POST /api/sales/events/evt-100/inventory`
 - **THEN** the response is `201 Created` and all 100 seats are stored with status `AVAILABLE`
+
+#### Scenario: Non-admin user cannot initialize inventory
+
+- **WHEN** an authenticated user with `CLIENT` role sends `POST /api/sales/events/evt-100/inventory`
+- **THEN** the response is `403 Forbidden` and no inventory is modified
+
+#### Scenario: Unauthenticated request to initialize inventory
+
+- **WHEN** a request without a bearer token sends `POST /api/sales/events/evt-100/inventory`
+- **THEN** the response is `401 Unauthorized`
 
 #### Scenario: Duplicate inventory initialization rejected
 
@@ -36,11 +47,11 @@ The `sales` service SHALL allow clients to list all seats currently in `AVAILABL
 
 - **WHEN** a client sends `GET /api/sales/events/evt-100/seats?status=AVAILABLE`
 - **THEN** the response is `200 OK` containing the list of available seats with their identifiers, categories,
-  and prices
+  and prices in centavos
 
 #### Scenario: Query seats for an event with no available seats
 
-- **WHEN** all seats for an event are in `SOLD` or `RESERVED` status and a client queries available seats
+- **WHEN** all seats for an event are in `SOLD` status and a client queries available seats
 - **THEN** the response is `200 OK` with an empty seat list
 
 ### Requirement: Autonomous inventory persistence
@@ -51,5 +62,5 @@ without querying or joining tables from `catalog_db`.
 #### Scenario: Sales operates when catalog is unavailable
 
 - **WHEN** the `catalog` service is stopped or unreachable
-- **THEN** `sales` continues to serve inventory queries and seat reservations for existing initialized events
+- **THEN** `sales` continues to serve inventory queries and seat purchases for existing initialized events
   with `200 OK`

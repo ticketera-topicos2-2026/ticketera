@@ -7,7 +7,9 @@ from uuid import uuid4
 from fastapi import FastAPI
 
 from catalog.api.errors import install_error_handlers
+from catalog.api.health import SERVICE_NAME
 from catalog.api.health import router as health_router
+from catalog.api.request_log import RequestLogMiddleware
 from catalog.api.routes import manage_router, public_router
 from catalog.application.events import CatalogService
 from catalog.application.health import DatabaseProbe
@@ -35,4 +37,7 @@ def create_app(
     app.include_router(health_router)
     app.include_router(public_router)
     app.include_router(manage_router)
+    # Added last, so it wraps routing, dependencies and exception handlers: it times the whole request
+    # and sees every status (e1-request-log, RL-05).
+    app.add_middleware(RequestLogMiddleware, service_name=SERVICE_NAME)
     return app

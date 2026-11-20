@@ -19,7 +19,8 @@
 # inside a Python container pinned by digest (DS-25); only its standard output is read as data (see run_python).
 #
 # Change project-bootstrap, task group 2 (design: platform/continuous-integration, platform/api-gateway), and the
-# CORS checks of task 3.6.
+# CORS checks of task 3.6. The correlation id and gateway access log checks of e1-request-log are in
+# tests/smoke/request-log-checks.sh.
 
 set -uo pipefail
 
@@ -669,6 +670,10 @@ check_cors() {
   fi
 }
 
+# Correlation id and gateway access log checks (change e1-request-log).
+# shellcheck source=tests/smoke/request-log-checks.sh
+source tests/smoke/request-log-checks.sh
+
 main() {
   parse_arguments "$@"
   require_curl
@@ -713,6 +718,8 @@ main() {
   check_running_containers
   check_forwarding
   check_cors
+  check_correlation_ids
+  check_gateway_access_log
 
   printf 'Smoke test: %d passed, %d failed, %d skipped\n' "$passed" "$failed" "$skipped"
   ((failed == 0))

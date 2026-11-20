@@ -17,6 +17,11 @@ readonly CONCURRENT_REQUESTS=50
 readonly UNAVAILABLE_PATH="/smoke-test/unavailable/"
 readonly ACCESS_CHECK_PATH="/api/sales/example"
 readonly GATEWAY_LOG_SCHEMA="tests/platform/gateway-log.schema.json"
+readonly SERVICE_LOG_SCHEMA="tests/platform/request-log.schema.json"
+# Backend services that already write the request log (task group 2); sales joins in task group 3.
+readonly REQUEST_LOG_SERVICES="catalog payments"
+# A Uvicorn access line: client address, then the quoted request line and the status code.
+readonly UVICORN_ACCESS_LINE='"[A-Z]+ [^"]* HTTP/[0-9.]+" [0-9]{3}'
 
 # Requests whose gateway lines check_gateway_access_log verifies: "<description>|<correlation id>|<status>".
 logged_requests=()
@@ -192,9 +197,15 @@ check_logged_values_markers() {
 
 # Prints the gateway log lines that contain a text, waiting up to LOG_WAIT_SECONDS for at least one to appear.
 gateway_log_lines_with() {
-  local text=$1 attempt lines
+  compose_log_lines_with gateway "$1"
+}
+
+# Prints the log lines of a Compose service that contain a text, waiting up to LOG_WAIT_SECONDS for at least one.
+# Usage: compose_log_lines_with <service> <text>
+compose_log_lines_with() {
+  local service=$1 text=$2 attempt lines
   for ((attempt = 0; attempt <= LOG_WAIT_SECONDS; attempt++)); do
-    lines=$(docker compose logs --no-color --no-log-prefix gateway 2> /dev/null | grep --fixed-strings -- "$text")
+    lines=$(docker compose logs --no-color --no-log-prefix "$service" 2> /dev/null | grep --fixed-strings -- "$text")
     if [[ -n $lines ]]; then
       printf '%s\n' "$lines"
       return 0
@@ -268,4 +279,58 @@ check_gateway_access_log() {
   else
     pass "$check"
   fi
+}
+
+# Req request-log: The request log line has a fixed set of fields - Scenarios: Fields of a request log line; Same
+# schema in every service
+# Req request-log: The server writes no other access log - Scenario: One line per request
+# Req request-correlation: The same correlation id ties the gateway line to the service line - Scenario: Request
+# followed from the gateway to the service
+check_service_request_logs() {
+  local service id lines count report check check_tie check_uvicorn log
+
+  if [[ -n $gateway_port_problem ]]; then
+    fail "service request log: lines of every service" "$gateway_port_problem"
+    return
+  fi
+
+  for service in $REQUEST_LOG_SERVICES; do
+    check="service request log: $service writes one valid line for a request through the gateway"
+    check_tie="service request log: the $service line and the gateway line share the correlation id"
+    check_uvicorn="service request log: $service writes no Uvicorn access line"
+
+    http_headers GET "http://localhost:${gateway_port}/api/${service}/health"
+    id=$(last_correlation_id)
+    if [[ $STATUS != 200 || ! $id =~ $CORRELATION_ID_PATTERN ]]; then
+      fail "$check" "expected 200 with a correlation id from /api/${service}/health, $(last_response)"
+      fail "$check_tie" "no request to follow"
+    elif ! lines=$(compose_log_lines_with "$service" "$id"); then
+      fail "$check" "no $service log line carries the correlation id $id within $LOG_WAIT_SECONDS s"
+      fail "$check_tie" "no $service line to compare"
+    else
+      count=$(grep -c . <<< "$lines")
+      if ((count != 1)); then
+        fail "$check" "$count $service log lines carry the correlation id $id"
+      elif ! report=$(check_against_schema "$SERVICE_LOG_SCHEMA" <<< "$lines"); then
+        fail "$check" "the line does not match $SERVICE_LOG_SCHEMA: $report"
+      elif [[ $lines != *'"route":"/health"'* || $lines != *'"status":200'* ]]; then
+        fail "$check" "the line does not record route /health and status 200: $lines"
+      else
+        pass "$check"
+      fi
+      if [[ $(gateway_log_lines_with "$id" | grep -c .) == 1 ]]; then
+        pass "$check_tie"
+      else
+        fail "$check_tie" "expected exactly one gateway line with the correlation id $id"
+      fi
+    fi
+
+    # The log is read first: with pipefail, grep --quiet ending the pipe early would make it fail when it matches.
+    log=$(docker compose logs --no-color --no-log-prefix "$service" 2> /dev/null)
+    if grep --quiet --extended-regexp -- "$UVICORN_ACCESS_LINE" <<< "$log"; then
+      fail "$check_uvicorn" "the $service log has Uvicorn access lines (start Uvicorn with --no-access-log)"
+    else
+      pass "$check_uvicorn"
+    fi
+  done
 }

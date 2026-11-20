@@ -582,8 +582,11 @@ expect_allowed_origin() {
 # Usage: service_log_contains <service> <text>
 service_log_contains() {
   local service=$1 text=$2 attempt
+  local log
   for ((attempt = 0; attempt <= LOG_WAIT_SECONDS; attempt++)); do
-    if docker compose logs --no-color "$service" 2> /dev/null | grep --quiet --fixed-strings -- "$text"; then
+    # Read first: with pipefail, grep --quiet ending the pipe early could make a match look like a failure.
+    log=$(docker compose logs --no-color "$service" 2> /dev/null)
+    if grep --quiet --fixed-strings -- "$text" <<< "$log"; then
       return 0
     fi
     if ((attempt < LOG_WAIT_SECONDS)); then
@@ -596,16 +599,16 @@ service_log_contains() {
 # Req api-gateway: The frontend can call the API from the browser - Scenarios: CORS preflight from the frontend's
 # address; CORS preflight from another origin; Status page loads the health of every service (DS-09)
 # The gateway answers every preflight under /api/ itself, so the two preflight scenarios hold even without the route
-# of the service; the cross-origin GET and the access-log control need the route. Each request carries a unique
-# marker in its query string, which the access log of the service shows only when the request reached it: the GET
-# marker must appear, which proves the log is observed, and the preflight marker must not.
+# of the service; the cross-origin GET and the access-log control need the route. Each answer carries the correlation
+# id of its request (e1-request-log), which the request log of the service shows only when the request reached it:
+# the GET id must appear, which proves the log is observed, and the preflight id must not.
 check_cors() {
   local check_allowed="cors: preflight from FRONTEND_ORIGIN is answered and allows that origin"
   local check_not_forwarded="cors: the preflight does not reach $CORS_SERVICE"
   local check_other="cors: preflight from another origin gets no permission"
   local check_get="cors: GET $CORS_PATH from FRONTEND_ORIGIN answers 200 and allows that origin"
   local -a checks=("$check_allowed" "$check_not_forwarded" "$check_other" "$check_get") values
-  local check frontend_origin base_url preflight_marker get_marker get_reached=false
+  local check frontend_origin base_url preflight_id get_id get_reached=false
   local problem=""
 
   if [[ -n $gateway_port_problem ]]; then
@@ -625,12 +628,11 @@ check_cors() {
   fi
 
   base_url="http://localhost:${gateway_port}${CORS_PATH}"
-  preflight_marker="smoke-cors-preflight-$$-${RANDOM}${RANDOM}"
-  get_marker="smoke-cors-get-$$-${RANDOM}${RANDOM}"
 
   # Scenario: CORS preflight from the frontend's address
-  http_headers OPTIONS "${base_url}?marker=${preflight_marker}" --header "Origin: $frontend_origin" \
+  http_headers OPTIONS "$base_url" --header "Origin: $frontend_origin" \
     --header "Access-Control-Request-Method: GET"
+  preflight_id=$(last_correlation_id)
   if [[ $STATUS != 2?? ]]; then
     fail "$check_allowed" "expected a 2xx answer to the preflight, $(last_response)"
   else
@@ -638,7 +640,8 @@ check_cors() {
   fi
 
   # Scenario: Status page loads the health of every service (the cross-origin request itself)
-  http_headers GET "${base_url}?marker=${get_marker}" --header "Origin: $frontend_origin"
+  http_headers GET "$base_url" --header "Origin: $frontend_origin"
+  get_id=$(last_correlation_id)
   if [[ $STATUS != 200 ]]; then
     fail "$check_get" "expected 200 from $base_url, $(last_response)"
   else
@@ -646,14 +649,15 @@ check_cors() {
   fi
 
   # Scenario: CORS preflight from the frontend's address (the service does not receive the request)
-  if service_log_contains "$CORS_SERVICE" "$get_marker"; then
+  if [[ -n $get_id ]] && service_log_contains "$CORS_SERVICE" "$get_id"; then
     get_reached=true
   fi
-  if [[ $get_reached != true ]]; then
-    fail "$check_not_forwarded" "the access log of $CORS_SERVICE cannot be observed: the GET with marker $get_marker did not show up in it within $LOG_WAIT_SECONDS s"
-  elif docker compose logs --no-color "$CORS_SERVICE" 2> /dev/null |
-    grep --quiet --fixed-strings -- "$preflight_marker"; then
-    fail "$check_not_forwarded" "the preflight with marker $preflight_marker shows up in the access log of $CORS_SERVICE"
+  if [[ -z $preflight_id ]]; then
+    fail "$check_not_forwarded" "the preflight answer has no single $CORRELATION_HEADER"
+  elif [[ $get_reached != true ]]; then
+    fail "$check_not_forwarded" "the request log of $CORS_SERVICE cannot be observed: the GET with correlation id '$get_id' did not show up in it within $LOG_WAIT_SECONDS s"
+  elif grep --quiet --fixed-strings -- "$preflight_id" <<< "$(docker compose logs --no-color "$CORS_SERVICE" 2> /dev/null)"; then
+    fail "$check_not_forwarded" "the preflight with correlation id $preflight_id shows up in the request log of $CORS_SERVICE"
   else
     pass "$check_not_forwarded"
   fi
@@ -720,6 +724,7 @@ main() {
   check_cors
   check_correlation_ids
   check_gateway_access_log
+  check_service_request_logs
 
   printf 'Smoke test: %d passed, %d failed, %d skipped\n' "$passed" "$failed" "$skipped"
   ((failed == 0))

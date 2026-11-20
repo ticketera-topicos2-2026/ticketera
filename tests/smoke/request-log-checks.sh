@@ -165,7 +165,8 @@ check_forged_correlation_id() {
   elif [[ ! $id =~ $CORRELATION_ID_PATTERN ]]; then
     fail "$check_forwarded" "the echo response has no single well-formed $CORRELATION_HEADER"
   else
-    expect_echoed_header "$check_forwarded" "$CORRELATION_HEADER" "$id"
+    # traefik/whoami is written in Go, which prints header names in canonical form: X-Correlation-Id.
+    expect_echoed_header "$check_forwarded" "X-Correlation-Id" "$id"
   fi
 }
 

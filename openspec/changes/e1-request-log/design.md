@@ -65,12 +65,13 @@ change; IA-xx are the decisions of `e1-identity-access` and DS-xx those of `proj
 | RL-08 | Allow-list of fields, built from scratch for each line; never `request.headers` or `scope` dumps | D-23, OWASP ASVS V7 | Deny-list of sensitive fields (a new header or field leaks until someone adds it) |
 | RL-09 | `duration_seconds` with millisecond precision in services and gateway | — | `duration_ms` (NGINX can only print `$request_time` in seconds, and the gateway and services must share units) |
 | RL-10 | Uvicorn runs with `--no-access-log`; the middleware writes to stdout with a lock, one `write` per line | — | Keeping both lines (twice the volume, and the Uvicorn line carries the query string) |
-| RL-11 | Alloy + Loki + Grafana in the default `docker compose up`, with memory limits (Loki 320 MiB, Grafana 256 MiB, Alloy 128 MiB) and no `depends_on` from application containers | D-23, RB-09 | A Compose profile (a single `docker compose up` would no longer start the whole system, against RB-09); no limits (#24) |
-| RL-12 | Alloy reads container logs with `discovery.docker` and `loki.source.docker` through the Docker socket mounted read-only, filtered to this Compose project | D-23 | Loki Docker logging driver (a plugin installed on each member's Docker, outside the repository); a socket proxy (one more image to pin and run for a local environment; listed as the upgrade path in the ADR) |
+| RL-11 | Alloy + Loki + Grafana in the default `docker compose up`, with memory limits (Loki 256 MiB, Grafana 384 MiB, Alloy 128 MiB) and no `depends_on` from application containers | D-23, RB-09 | A Compose profile (a single `docker compose up` would no longer start the whole system, against RB-09); no limits (#24) |
+| RL-12 | Alloy reads container logs with `discovery.docker` and `loki.source.docker` through the Docker socket mounted read-only, as root without capabilities, filtered to this Compose project; an exception to DS-13 | D-23 | Loki Docker logging driver (a plugin installed on each member's Docker, outside the repository); a socket proxy (one more image to pin and run, and it mounts the socket too; listed as the upgrade path in the ADR); GELF logging driver of each service sending over UDP to Alloy on `127.0.0.1` (keeps DS-13 and works on Docker Desktop, but adds a `logging` block to every service, a fourth published port and an untested service label; the team chose the socket) |
 | RL-13 | Loki stream labels: only `service` (Compose service name); the JSON fields are parsed at query time with `| json` | — | Labels per status or route (high cardinality, which Loki discourages) |
 | RL-14 | Retention 7 days with the compactor; data in the named volume `ticketera-loki-data`; Grafana keeps no volume, its data source and dashboard come from provisioning files | D-23 | Unbounded retention (disk grows without limit on member machines); a Grafana volume (state outside the repository) |
 | RL-15 | Grafana on `127.0.0.1:${GRAFANA_PORT}`, admin user and password from `.env` with `${VAR:?}`, anonymous access and sign-up off | D-23, DS-10, DS-16 | Grafana behind the gateway (it would need its own access rules inside the API's server block) |
 | RL-16 | Three networks: the existing `edge` and `backend`, plus `observability` for Alloy, Loki and Grafana | DS-23 | Joining Loki to `backend` (services do not talk to Loki, so nothing needs that path) |
+| RL-17 | Loki image extended with the static BusyBox binary for its healthcheck; its quality labels run `loki -verify-config` | DS-12, DS-18, DS-25 | No healthcheck for Loki (breaks "Every container reports its health"); changing the `quality` job to skip images without labels (a CI change owned by A, and DS-18); an image mount of BusyBox (needs a newer Engine and Compose than the CI runner guarantees) |
 
 [adr-d23]: /docs/adr/README.md
 [adr-0004]: /docs/adr/adr-0004-contenedor-y-base-logica-por-servicio.md
@@ -136,6 +137,17 @@ collection stack, its access and its retention.
   `com.docker.compose.service` to the label `service` and drops every other label; `loki.source.docker` sends to
   `loki.write` at `http://loki:3100/loki/api/v1/push`. The socket is mounted with `:ro`; Alloy runs with
   `cap_drop: ALL` and `no-new-privileges`, publishes no port, and joins only `observability`.
+- **Exception to DS-13 (RL-12).** DS-13 of `project-bootstrap` says that no container mounts
+  `/var/run/docker.sock`, and the smoke test checks that every container runs as a non-root user. Alloy breaks
+  both: reading the socket needs its owner, root. The team chose to keep the socket and record the exception
+  instead of collecting through the GELF logging driver (alternative below). The exception is limited to Alloy:
+  `user: "0:0"` written explicitly, no capabilities (so root cannot override file permissions), no published port,
+  only the `observability` network; the smoke test allows root only for the services in `ROOT_ALLOWED_SERVICES`
+  (`alloy`). The non-root requirement of `local-environment` covers the containers built by the project, which
+  Alloy is not, so no spec changes; DS-13 is amended by this design and the ADR of D-23, which A and C approve in
+  the review. Without capabilities root cannot enter the image's `/var/lib/alloy` (owned by the image's `alloy`
+  user, mode 770), so the read positions live in the volume `ticketera-alloy-data` at `/alloy-data`, a mount
+  point Docker creates owned by root.
 - **Loki (RL-14).** `infra/observability/loki/config.yaml`: single binary, filesystem storage under
   `/loki` in the volume `ticketera-loki-data`, `limits_config.retention_period: 168h`, compactor with
   `retention_enabled: true`, authentication off (single tenant, reachable only from `observability`).
@@ -145,14 +157,21 @@ collection stack, its access and its retention.
   status class, and p50, p95 and p99 of `duration_seconds` with `quantile_over_time ... | unwrap
   duration_seconds`. `GF_AUTH_ANONYMOUS_ENABLED=false`, `GF_USERS_ALLOW_SIGN_UP=false`, admin user and password
   from `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD`.
-- **Images and healthchecks.** `grafana/loki`, `grafana/alloy` and `grafana/grafana`, each pinned by index digest
-  with its tag as documentation (DS-25), using the newest stable release when the task runs. Each healthcheck
-  uses a tool the image has, checked when the task runs as the bootstrap did (DS-12): Loki `/ready`, Alloy
-  `/-/ready` on its internal HTTP port, Grafana `/api/health`; Loki gets a `start_period`, because its ring takes
-  some seconds after a cold start (lesson of #24).
-- **Memory (RL-11).** `mem_limit` of 320 MiB, 128 MiB and 256 MiB (704 MiB in total, below the 768 MiB of the
-  spec). If a limit is too low in practice, the implementation raises it within the total and records it in the
-  team log.
+- **Images and healthchecks.** `grafana/loki:3.7.10`, `grafana/alloy:v1.22.0` and `grafana/grafana:13.3.1`, each
+  pinned by index digest with its tag as documentation (DS-25). Each healthcheck uses a tool the image has, as the
+  bootstrap did (DS-12): Alloy has `bash`, so it requests `/-/ready` over `/dev/tcp`, as Keycloak does; Grafana
+  has `wget` for `/api/health`. Loki's image is distroless (no shell, no HTTP client, no health subcommand), so it
+  is extended (RL-17). Loki gets a `start_period` of 60 s and Grafana of 120 s, because Grafana's first start runs
+  the migrations of its internal store. Grafana also runs with `GF_PLUGINS_PREINSTALL_DISABLED=true`: otherwise it
+  downloads plugins from the internet on every start.
+- **Loki image (RL-17).** `infra/observability/loki/Dockerfile` copies the static BusyBox binary into the official
+  image, both pinned by digest; the healthcheck calls `busybox wget` on `/ready`. Because the image is built by the
+  project, the `quality` job requires its `ticketera.lint`, `ticketera.typecheck` and `ticketera.test` labels
+  (DS-18): Loki has no code of the project, so the three run `loki -verify-config` on the configuration.
+- **Memory (RL-11).** `mem_limit` of 256 MiB (Loki), 128 MiB (Alloy) and 384 MiB (Grafana), 768 MiB in total,
+  the limit of the spec. Measured on a running system: Loki about 100 MiB, Alloy about 90 MiB, Grafana about
+  210 MiB, near its first limit of 256 MiB, which made its restart slower than its health window; Grafana got the
+  memory Loki did not use.
 
 ## API Contracts
 
@@ -208,7 +227,7 @@ sequenceDiagram
 | Information disclosure | Anyone on the network reads the logs in Grafana | Grafana only on `127.0.0.1`, credentials from `.env`, anonymous access off (RL-15); Loki publishes no port |
 | Denial of service | Log volume fills the disk | 7-day retention (RL-14); one line per request (RL-10) |
 | Denial of service | The observability stack exhausts memory on small machines | Memory limits; no application container depends on it (RL-11) |
-| Elevation of privilege | The Docker socket gives Alloy control of the Docker host | Mounted read-only, `cap_drop: ALL`, no published port, only the `observability` network (RL-12). Read-only does not restrict the Docker API, so the risk is accepted for a local development environment and recorded in the ADR, with a socket proxy as the upgrade path |
+| Elevation of privilege | The Docker socket gives Alloy, which runs as root, control of the Docker host | Mounted read-only, `cap_drop: ALL`, `no-new-privileges`, no published port, only the `observability` network, and the only container allowed to run as root (RL-12). Read-only does not restrict the Docker API, so the risk is accepted for a local development environment as an exception to DS-13, recorded in the ADR, with a socket proxy or the GELF driver as the upgrade path |
 
 ## Test Strategy
 

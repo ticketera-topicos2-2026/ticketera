@@ -95,10 +95,16 @@ collection container SHALL have a memory limit, and the three together SHALL be 
 ### Requirement: The log collector has read-only access to the container runtime
 
 The log collector SHALL read container logs through the Docker socket mounted read-only, SHALL publish no port,
-and SHALL share a network only with Loki.
+and SHALL share a network only with Loki. It MAY run as root, which the socket requires, and SHALL then hold no
+Linux capability; no other container of the system SHALL run as root.
 
 #### Scenario: Collector mounts and networks
 
 - **WHEN** a team member inspects the log collector container
 - **THEN** the Docker socket is mounted read-only, no port is published, and its only network is the one it
   shares with Loki
+
+#### Scenario: Collector runs as root without capabilities
+
+- **WHEN** a team member checks the user and capabilities of the main process of every container
+- **THEN** only the log collector runs as root, and it has every capability dropped

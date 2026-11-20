@@ -89,28 +89,36 @@
 
 ## 4. Log collection: Alloy, Loki and Grafana (B, feature/e1-request-log-collection)
 
-- [ ] 4.1 Write the smoke checks (red): `loki`, `alloy` and `grafana` healthy; a Loki query for a correlation id
+- [x] 4.1 Write the smoke checks (red), in `tests/smoke/log-collection-checks.sh`: `loki`, `alloy` and `grafana` healthy; a Loki query for a correlation id
   returns the gateway line and the service line within 15 s; a query on `service="sales"` returns only `sales`
   lines; Grafana answers `401` to `/api/search` without credentials and lists the Loki data source and the
   request log dashboard with the `.env` credentials; Grafana published only on `127.0.0.1` and Loki not
   published; each of the three has a memory limit, summing to 768 MiB or less; with the three stopped, every
   gateway route answers as before (Req log-collection: every requirement except "Log retention is bounded" -
-  Scenario: Clean reset; Req local-environment: both requirements, all scenarios). Verify: the checks fail.
-- [ ] 4.2 Add `infra/observability/loki/config.yaml` with 7-day retention (RL-14) and a `unittest` in
+  Scenario: Clean reset; Req local-environment: both requirements, all scenarios). Loki is queried through
+  Grafana's data source proxy, because it publishes no port. The non-root check allows root only for `alloy`
+  (RL-12; Req log-collection: The log collector has read-only access to the container runtime - Scenario:
+  Collector runs as root without capabilities). Verify: the checks fail.
+- [x] 4.2 Add `infra/observability/loki/config.yaml` with 7-day retention (RL-14) and a `unittest` in
   `tests/platform/` that reads it and asserts `retention_enabled` and `retention_period: 168h` (Req
   log-collection: Log retention is bounded - Scenario: Retention setting). Verify: the test passes.
 - [ ] 4.3 Add `infra/observability/alloy/config.alloy` (RL-12, RL-13) and the Grafana provisioning: Loki data
   source and `dashboards/request-log.json` with requests per service, per status class and p50/p95/p99 of
-  `duration_seconds` (Req log-collection: Grafana opens with the request log ready to use). Verify: the dashboard
-  loads by hand with traffic; recorded in the team log.
-- [ ] 4.4 Add `loki`, `alloy` and `grafana` to `docker-compose.yml`: images pinned by index digest, healthchecks
-  with tools each image has (DS-12), `mem_limit`, `cap_drop: ALL`, `no-new-privileges`, the `observability`
-  network, the read-only Docker socket for Alloy, the volume `ticketera-loki-data`, Grafana on
+  `duration_seconds`, and a logs panel filtered by a correlation id (Req log-collection: Grafana opens with the
+  request log ready to use). Done; pending: the dashboard checked by hand with traffic and recorded in the team
+  log. Verify: the dashboard loads by hand with traffic; recorded in the team log.
+- [ ] 4.4 Add `loki` (image of RL-17), `alloy` and `grafana` to `docker-compose.yml`: images pinned by index
+  digest, healthchecks with tools each image has (DS-12), `mem_limit`, `cap_drop: ALL`, `no-new-privileges`, the
+  `observability` network, the read-only Docker socket for Alloy as root (RL-12), the volumes
+  `ticketera-loki-data` and `ticketera-alloy-data`, Grafana on
   `127.0.0.1:${GRAFANA_PORT}` with `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD` as `${VAR:?}`; add the three
   variables with placeholders to `.env.example`; no application container gets a `depends_on` on them
   (RL-11, RL-15, RL-16). Verify: the checks of 4.1 pass; `docker compose config` without
   `GRAFANA_ADMIN_PASSWORD` fails and names it (Req log-collection: Grafana requires the credentials from local
   configuration - Scenario: Missing password); `down -v` and `up` leave Loki empty (Scenario: Clean reset).
+  Done: the checks pass locally and the missing password stops Compose naming it; pending: the clean reset by
+  hand, and a stable smoke run in CI (on a machine with 6 GiB of RAM the repeated stop and start of the three
+  containers left WSL without memory).
 - [ ] 4.5 Measure the smoke-test duration and the memory of the three containers in CI and on a member's machine;
   record both in the team log; the CI still finishes within 15 minutes (Req continuous-integration of
   `project-bootstrap`: The CI finishes within 15 minutes). Verify: numbers recorded.

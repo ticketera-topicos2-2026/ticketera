@@ -111,7 +111,8 @@ def test_venue_needs_a_name_and_a_city() -> None:
 def test_more_than_20_zones_are_rejected() -> None:
     """Req: Event data is validated."""
     zones = tuple(
-        Zone(code=f"Z{n}", name=f"Zona {n}", modality=TicketModality.UNNUMBERED, capacity=10) for n in range(21)
+        Zone(code=f"Z{n}", name=f"Zona {n}", modality=TicketModality.UNNUMBERED, capacity=10)
+        for n in range(21)
     )
 
     assert invalid_fields(zones=zones) == {"zones"}

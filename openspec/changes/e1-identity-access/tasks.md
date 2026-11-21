@@ -22,7 +22,7 @@
   field) and a placeholder with a default (fails); `literal-user-credentials.json` keeps failing (Req
   continuous-integration: The quality check rejects literal secrets in the realm definition - Scenario: Realm
   definition with a placeholder; IA-12). Verify: the placeholder fixture fails with today's script.
-- [ ] 1.2 [P1] Make `scripts/check_realm_secrets.py` read each object of a `credentials` list field by field:
+- [x] 1.2 [P1] Make `scripts/check_realm_secrets.py` read each object of a `credentials` list field by field:
   `value` must be exactly a placeholder, and any key other than `type`, `value`, `temporary` and `userLabel` is a
   literal (IA-12). Verify: the tests of 1.1 and the existing ones pass with
   `python -I -B -m unittest discover -s tests/platform`; the check passes on the current realm.

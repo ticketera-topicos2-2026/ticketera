@@ -6,6 +6,11 @@ The check inspects JSON keys, never values: every field whose key names a secret
 `${NAME}`, an empty value, or a list of those. Values are never searched, because `client-secret` is a legitimate
 value of `clientAuthenticatorType`.
 
+Each object of a `credentials` list, such as a user's password, is read field by field (IA-12): its `value` must be
+exactly a `${NAME}` placeholder, and any field other than `type`, `value`, `temporary` and `userLabel`, such as the
+`secretData` and `credentialData` of an exported password hash, is a literal secret. Requirement:
+identity-provisioning, "The realm definition contains no secrets".
+
 Usage: check_realm_secrets.py <realm.json> [<realm.json> ...]
 
 Exit status: 0 when no file holds a literal secret; 1 when at least one does, with one line
@@ -18,7 +23,8 @@ Only the standard library is used. Run it from the repository root in the digest
       python:3.13-alpine@sha256:1e1f6334529d1fb26a2ef619d7cffb30a7c7d7cc1cc7338ebee283a58d1aeaca \\
       python -I -B scripts/check_realm_secrets.py infra/keycloak/ticketera-realm.json
 
-Change project-bootstrap, task 2.5 (tests: tests/platform/test_check_realm_secrets.py, task 2.4).
+Change project-bootstrap, task 2.5 (tests: tests/platform/test_check_realm_secrets.py, task 2.4); credentials read
+field by field: change e1-identity-access, task 1.2 (tests: task 1.1).
 """
 
 import json
@@ -36,6 +42,10 @@ USAGE = "usage: check_realm_secrets.py <realm.json> [<realm.json> ...]"
 # Keys whose values are secrets, compared without case: client and identity provider secrets, key material, user
 # credentials and passwords such as that of the SMTP server.
 SECRET_KEYS = frozenset({"secret", "clientsecret", "privatekey", "credentials", "password"})
+CREDENTIALS_KEY = "credentials"
+# Fields of a credential object that hold no secret, compared exactly; `value` must also be a placeholder.
+CREDENTIAL_VALUE_FIELD = "value"
+CREDENTIAL_NON_SECRET_FIELDS = frozenset({"type", CREDENTIAL_VALUE_FIELD, "temporary", "userLabel"})
 PLACEHOLDER = re.compile(r"\$\{[A-Za-z_][A-Za-z0-9_]*\}")
 IDENTIFIER = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
@@ -49,6 +59,11 @@ def is_secret_key(key: str) -> bool:
     return key.casefold() in SECRET_KEYS
 
 
+def is_placeholder(value: object) -> bool:
+    """Tells whether a value is exactly a ${NAME} placeholder, with no default value and no text around it."""
+    return isinstance(value, str) and PLACEHOLDER.fullmatch(value) is not None
+
+
 def holds_no_literal(value: object) -> bool:
     """Tells whether the value of a secret field holds no literal: null, an empty string, a placeholder that is
     exactly ${NAME}, or a list of those. A default value (${NAME:default}) or text around the placeholder is a
@@ -56,7 +71,7 @@ def holds_no_literal(value: object) -> bool:
     if value is None:
         return True
     if isinstance(value, str):
-        return value == "" or PLACEHOLDER.fullmatch(value) is not None
+        return value == "" or is_placeholder(value)
     if isinstance(value, list):
         return all(holds_no_literal(item) for item in value)
     return False
@@ -69,13 +84,38 @@ def field_path(parent: str, key: str) -> str:
     return f"{parent}.{key}" if parent else key
 
 
+def literal_credential_paths(credential: dict[str, object], path: str) -> Iterator[str]:
+    """Yields the path of every field of one credential object that holds a literal: a `value` that is not exactly
+    a ${NAME} placeholder, and any field other than type, value, temporary and userLabel."""
+    for key, child in credential.items():
+        child_path = field_path(path, key)
+        if key not in CREDENTIAL_NON_SECRET_FIELDS:
+            yield child_path
+        elif key == CREDENTIAL_VALUE_FIELD and not is_placeholder(child):
+            yield child_path
+
+
+def literal_secret_field_paths(key: str, value: object, path: str) -> Iterator[str]:
+    """Yields the paths of a secret field that hold a literal: each object of a `credentials` list is read field by
+    field, and any other value of a secret field must hold no literal as a whole."""
+    if key.casefold() == CREDENTIALS_KEY and isinstance(value, list):
+        for index, item in enumerate(value):
+            item_path = f"{path}[{index}]"
+            if isinstance(item, dict):
+                yield from literal_credential_paths(item, item_path)
+            elif not holds_no_literal(item):
+                yield item_path
+    elif not holds_no_literal(value):
+        yield path
+
+
 def literal_secret_paths(value: object, path: str = "") -> Iterator[str]:
     """Yields the path of every secret field, at any depth of a JSON value, that holds a literal."""
     if isinstance(value, dict):
         for key, child in value.items():
             child_path = field_path(path, key)
-            if is_secret_key(key) and not holds_no_literal(child):
-                yield child_path
+            if is_secret_key(key):
+                yield from literal_secret_field_paths(key, child, child_path)
             else:
                 yield from literal_secret_paths(child, child_path)
     elif isinstance(value, list):

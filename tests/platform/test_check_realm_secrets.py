@@ -1,7 +1,9 @@
-"""Tests of the realm secret check, scripts/check_realm_secrets.py (project-bootstrap, task 2.4).
+"""Tests of the realm secret check, scripts/check_realm_secrets.py (project-bootstrap, task 2.4; user credentials
+read field by field: e1-identity-access, task 1.1).
 
 Requirement verified: continuous-integration, "The quality check rejects literal secrets in the realm
-definition". The check inspects JSON keys, not values (DS-20), and only a value that is exactly ${NAME} is a
+definition"; for user credentials also identity-provisioning, "The realm definition contains no secrets"
+(e1-identity-access). The check inspects JSON keys, not values (DS-20), and only a value that is exactly ${NAME} is a
 placeholder. Each test calls the script as a command, as the quality job does, on a small realm fixture from
 fixtures/realm/, and asserts the exit status and, for a rejected realm, that the output names the field.
 
@@ -109,12 +111,52 @@ class RealmSecretCheckTest(unittest.TestCase):
         )
 
     def test_literal_user_credentials_are_rejected(self) -> None:
-        """Scenario: Realm definition with a literal client secret, applied to credentials, a secret field named in
-        the requirement.
+        """Scenario: Realm definition with a literal client secret.
+        Req: The quality check rejects literal secrets in the realm definition (continuous-integration).
 
-        Req: The quality check rejects literal secrets in the realm definition.
+        Scenario: Test user passwords in the realm definition.
+        Req: The realm definition contains no secrets (identity-provisioning).
+
+        Case: the value of a user credential is a literal password, and the output names that field (IA-12).
         """
-        self.assert_rejected("literal-user-credentials.json", "users[0].credentials")
+        self.assert_rejected("literal-user-credentials.json", "users[0].credentials[0].value")
+
+    def test_user_credential_placeholder_is_accepted(self) -> None:
+        """Scenario: Realm definition with a placeholder.
+        Req: The quality check rejects literal secrets in the realm definition (continuous-integration).
+
+        Scenario: Test user passwords in the realm definition.
+        Req: The realm definition contains no secrets (identity-provisioning).
+
+        Case: the value of a user credential is exactly ${TEST_USER_CLIENT_PASSWORD}, next to the non-secret fields
+        type, temporary and userLabel (IA-12).
+        """
+        self.assert_accepted("placeholder-user-credentials.json")
+
+    def test_exported_password_hash_is_rejected(self) -> None:
+        """Scenario: Realm definition with a literal client secret.
+        Req: The quality check rejects literal secrets in the realm definition (continuous-integration).
+
+        Scenario: Test user passwords in the realm definition.
+        Req: The realm definition contains no secrets (identity-provisioning).
+
+        Case: a user credential exported with its hash; secretData and credentialData are literals, and the output
+        names each field (IA-12).
+        """
+        self.assert_rejected("exported-hash-user-credentials.json", "users[0].credentials[0].secretData")
+        self.assert_rejected("exported-hash-user-credentials.json", "users[0].credentials[0].credentialData")
+
+    def test_user_credential_placeholder_with_default_value_is_rejected(self) -> None:
+        """Scenario: Realm definition with a literal client secret.
+        Req: The quality check rejects literal secrets in the realm definition (continuous-integration).
+
+        Scenario: Test user passwords in the realm definition.
+        Req: The realm definition contains no secrets (identity-provisioning).
+
+        Case: the value of a user credential is ${TEST_USER_CLIENT_PASSWORD:example-literal-password}; the default
+        value is a literal, and the output names that field (IA-12).
+        """
+        self.assert_rejected("placeholder-with-default-user-credentials.json", "users[0].credentials[0].value")
 
     def test_literal_smtp_password_is_rejected(self) -> None:
         """Scenario: Realm definition with a literal client secret, applied to password, a field that holds a

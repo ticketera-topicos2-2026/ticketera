@@ -17,7 +17,7 @@
 
 ## 1. Backend (A, feature/e1-identity-access-backend)
 
-- [ ] 1.1 [P1] Write the realm secret check tests (red): new fixtures for a user credential whose `value` is a
+- [x] 1.1 [P1] Write the realm secret check tests (red): new fixtures for a user credential whose `value` is a
   `${NAME}` placeholder (passes), an exported hash with `secretData` and `credentialData` (fails, naming the
   field) and a placeholder with a default (fails); `literal-user-credentials.json` keeps failing (Req
   continuous-integration: The quality check rejects literal secrets in the realm definition - Scenario: Realm

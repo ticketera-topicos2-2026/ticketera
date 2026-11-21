@@ -11,10 +11,12 @@ Verifies:
 """
 
 from dataclasses import dataclass
+from typing import Any
+
 import pytest
 
-from sales.domain.models import Money, Seat, SeatStatus, Order, Ticket
-from sales.domain.exceptions import SeatNotAvailableError, DuplicateSeatError, EmptyOrderError
+from sales.domain.exceptions import SeatNotAvailableError
+from sales.domain.models import Money, Order, Seat, SeatStatus, Ticket
 
 
 class FakeInventoryRepository:
@@ -29,7 +31,8 @@ class FakeInventoryRepository:
 
     def find_by_event(self, event_id: str, status: SeatStatus | None = None) -> list[Seat]:
         return [
-            s for s in self.seats.values()
+            s
+            for s in self.seats.values()
             if s.event_id == event_id and (status is None or s.status == status)
         ]
 
@@ -66,7 +69,7 @@ class IdempotencyRecord:
     key: str
     request_hash: str
     response_status: int | None = None
-    response_body: dict | None = None
+    response_body: dict[str, object] | None = None
 
 
 class FakeIdempotencyStore:
@@ -85,10 +88,10 @@ class FakeIdempotencyStore:
         )
         return True
 
-    def get(self, customer_id: str, key: str) -> IdempotencyRecord | None:
+    def get(self, customer_id: str, key: str) -> Any:
         return self.records.get((customer_id, key))
 
-    def update_response(self, customer_id: str, key: str, status: int, body: dict) -> None:
+    def update_response(self, customer_id: str, key: str, status: int, body: dict[str, Any]) -> None:
         rec = self.records.get((customer_id, key))
         if rec:
             rec.response_status = status
@@ -100,8 +103,8 @@ class FakeIdempotencyStore:
 
 def test_initialize_inventory_use_case() -> None:
     """Requirement: ticket-inventory. Admin initializes seats with ARS prices."""
-    from sales.application.inventory import InitializeInventoryCommand, InitializeInventoryUseCase
     from sales.application.dtos import SeatInitDTO
+    from sales.application.inventory import InitializeInventoryCommand, InitializeInventoryUseCase
 
     repo = FakeInventoryRepository()
     use_case = InitializeInventoryUseCase(repo)
@@ -120,9 +123,9 @@ def test_initialize_inventory_use_case() -> None:
 
 def test_initialize_inventory_rejects_reinitialization() -> None:
     """Requirement: ticket-inventory. Conflict if event inventory already initialized."""
-    from sales.application.inventory import InitializeInventoryCommand, InitializeInventoryUseCase
     from sales.application.dtos import SeatInitDTO
     from sales.application.exceptions import InventoryAlreadyInitializedError
+    from sales.application.inventory import InitializeInventoryCommand, InitializeInventoryUseCase
 
     repo = FakeInventoryRepository()
     use_case = InitializeInventoryUseCase(repo)
@@ -139,11 +142,13 @@ def test_get_available_seats_use_case() -> None:
     from sales.application.inventory import GetAvailableSeatsUseCase
 
     repo = FakeInventoryRepository()
-    repo.save_all([
-        Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.AVAILABLE),
-        Seat("evt-1", "A-2", "VIP", Money(50000), SeatStatus.SOLD),
-        Seat("evt-2", "B-1", "General", Money(20000), SeatStatus.AVAILABLE),
-    ])
+    repo.save_all(
+        [
+            Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.AVAILABLE),
+            Seat("evt-1", "A-2", "VIP", Money(50000), SeatStatus.SOLD),
+            Seat("evt-2", "B-1", "General", Money(20000), SeatStatus.AVAILABLE),
+        ]
+    )
 
     use_case = GetAvailableSeatsUseCase(repo)
     available_evt1 = use_case.execute(event_id="evt-1", status=SeatStatus.AVAILABLE)
@@ -157,10 +162,12 @@ def test_purchase_tickets_successful_execution() -> None:
     from sales.application.orders import PurchaseTicketsCommand, PurchaseTicketsUseCase
 
     inventory_repo = FakeInventoryRepository()
-    inventory_repo.save_all([
-        Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.AVAILABLE),
-        Seat("evt-1", "A-2", "VIP", Money(50000), SeatStatus.AVAILABLE),
-    ])
+    inventory_repo.save_all(
+        [
+            Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.AVAILABLE),
+            Seat("evt-1", "A-2", "VIP", Money(50000), SeatStatus.AVAILABLE),
+        ]
+    )
     order_repo = FakeOrderRepository()
     idempotency_store = FakeIdempotencyStore()
 
@@ -189,9 +196,11 @@ def test_purchase_tickets_replay_on_identical_key() -> None:
     from sales.application.orders import PurchaseTicketsCommand, PurchaseTicketsUseCase
 
     inventory_repo = FakeInventoryRepository()
-    inventory_repo.save_all([
-        Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.AVAILABLE),
-    ])
+    inventory_repo.save_all(
+        [
+            Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.AVAILABLE),
+        ]
+    )
     order_repo = FakeOrderRepository()
     idempotency_store = FakeIdempotencyStore()
 
@@ -217,14 +226,16 @@ def test_purchase_tickets_replay_on_identical_key() -> None:
 
 def test_purchase_tickets_rejects_payload_mismatch_with_same_key() -> None:
     """Requirement: idempotency. Key reuse with different seats raises 422 mismatch."""
-    from sales.application.orders import PurchaseTicketsCommand, PurchaseTicketsUseCase
     from sales.application.exceptions import IdempotencyKeyMismatchError
+    from sales.application.orders import PurchaseTicketsCommand, PurchaseTicketsUseCase
 
     inventory_repo = FakeInventoryRepository()
-    inventory_repo.save_all([
-        Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.AVAILABLE),
-        Seat("evt-1", "A-2", "VIP", Money(50000), SeatStatus.AVAILABLE),
-    ])
+    inventory_repo.save_all(
+        [
+            Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.AVAILABLE),
+            Seat("evt-1", "A-2", "VIP", Money(50000), SeatStatus.AVAILABLE),
+        ]
+    )
     order_repo = FakeOrderRepository()
     idempotency_store = FakeIdempotencyStore()
 
@@ -251,12 +262,13 @@ def test_purchase_tickets_rejects_payload_mismatch_with_same_key() -> None:
 def test_purchase_tickets_rejects_unavailable_seat() -> None:
     """Requirement: ticket-purchase. Returns conflict when seat is already SOLD."""
     from sales.application.orders import PurchaseTicketsCommand, PurchaseTicketsUseCase
-    from sales.domain.exceptions import SeatNotAvailableError
 
     inventory_repo = FakeInventoryRepository()
-    inventory_repo.save_all([
-        Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.SOLD),
-    ])
+    inventory_repo.save_all(
+        [
+            Seat("evt-1", "A-1", "VIP", Money(50000), SeatStatus.SOLD),
+        ]
+    )
     order_repo = FakeOrderRepository()
     idempotency_store = FakeIdempotencyStore()
 
@@ -277,8 +289,8 @@ def test_purchase_tickets_rejects_unavailable_seat() -> None:
 
 def test_get_order_with_bola_authorization() -> None:
     """Requirement: ticket-purchase & BOLA. Customer can only access own order unless ADMIN."""
-    from sales.application.orders import GetOrderUseCase
     from sales.application.exceptions import OrderNotFoundError
+    from sales.application.orders import GetOrderUseCase
 
     order_repo = FakeOrderRepository()
     t1 = Ticket(ticket_id="t1", order_id="ord-1", event_id="evt-1", seat_id="A-1", code="C-1")

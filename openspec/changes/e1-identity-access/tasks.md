@@ -26,7 +26,7 @@
   `value` must be exactly a placeholder, and any key other than `type`, `value`, `temporary` and `userLabel` is a
   literal (IA-12). Verify: the tests of 1.1 and the existing ones pass with
   `python -I -B -m unittest discover -s tests/platform`; the check passes on the current realm.
-- [ ] 1.3 [P1] Write `tests/platform/test_realm_definition.py` (red, `unittest`): the frontend client is public,
+- [x] 1.3 [P1] Write `tests/platform/test_realm_definition.py` (red, `unittest`): the frontend client is public,
   code flow only, PKCE `S256`, exact redirect URIs `${FRONTEND_ORIGIN}/signin-callback` and
   `${FRONTEND_ORIGIN}/silent-callback`, web origin `${FRONTEND_ORIGIN}`, post-logout URI `${FRONTEND_ORIGIN}/`, no
   direct grants, no lightweight tokens, realm roles mapped to the ID token; `ticketera-api-tests` is public, direct

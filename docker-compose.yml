@@ -188,7 +188,7 @@ services:
       - src
     labels:
       ticketera.health-path: /health
-      ticketera.lint: ruff check .
+      ticketera.lint: bin/lint
       ticketera.typecheck: mypy
       ticketera.test: pytest
     environment:

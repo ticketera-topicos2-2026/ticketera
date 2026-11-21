@@ -1,0 +1,31 @@
+meta {
+  name: 5. Purchase Conflict / Already Sold
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/events/{{eventId}}/orders
+  body: json
+  auth: bearer
+}
+
+headers {
+  Idempotency-Key: 22222222-3333-4444-5555-666666666666
+}
+
+auth:bearer {
+  token: {{clientToken}}
+}
+
+body:json {
+  {
+    "seat_ids": [
+      "SEAT-1"
+    ]
+  }
+}
+
+assert {
+  res.status: eq 409
+}

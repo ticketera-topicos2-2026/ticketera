@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="mockup-height" content="1250">
+  <title>GoPass · Catálogo público (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="gopass.css">
+</head>
+<body>
+  <!-- Ruta /events. Visitante sin sesión: el catálogo es público (spec catalog/event-browsing). -->
+  <header class="header">
+    <div class="brand">GoPass</div>
+    <nav class="nav"><a class="active" href="#">Eventos</a></nav>
+    <button class="btn primary">Iniciar sesión</button>
+  </header>
+
+  <main class="page">
+    <div class="title-row">
+      <div>
+        <h1>Eventos</h1>
+        <p class="muted">Conciertos, teatro, deportes y más, ordenados por fecha.</p>
+      </div>
+    </div>
+
+    <section class="card pad" style="display:flex; gap:16px; align-items:flex-end; margin-bottom:28px;">
+      <div class="field" style="width:240px;">
+        <label>Tipo</label>
+        <div class="input">Todos <span class="muted">▾</span></div>
+      </div>
+      <div class="field" style="width:240px;">
+        <label>Mes</label>
+        <div class="input">Diciembre 2026 <span class="muted">▾</span></div>
+      </div>
+      <button class="btn primary">Filtrar</button>
+      <span class="grow"></span>
+      <span class="muted small">24 eventos publicados</span>
+    </section>
+
+    <section class="grid-3">
+      <article class="card event-card">
+        <div class="cover"><span class="chip">Concierto</span></div>
+        <div class="body">
+          <h3>Noche de Tango en el Puerto</h3>
+          <div class="meta">
+            <span>Orquesta Típica Malvón</span>
+            <span>Sáb 12 dic · 21:00</span>
+            <span>Teatro del Lago · Rosario</span>
+          </div>
+          <div class="chips"><span class="chip">Numerada · Platea</span><span class="chip">Numerada · Pullman</span></div>
+        </div>
+      </article>
+
+      <article class="card event-card">
+        <div class="cover c2"><span class="chip">Teatro</span></div>
+        <div class="body">
+          <h3>La casa de los relojes</h3>
+          <div class="meta">
+            <span>Compañía Faro Teatro</span>
+            <span>Lun 14 dic · 20:30</span>
+            <span>Sala Andamio · Córdoba</span>
+          </div>
+          <div class="chips"><span class="chip">Numerada · Sala</span></div>
+        </div>
+      </article>
+
+      <article class="card event-card">
+        <div class="cover c3"><span class="chip">Conferencia</span></div>
+        <div class="body">
+          <h3>Jornada de Arquitectura de Software</h3>
+          <div class="meta">
+            <span>Comunidad DevSur</span>
+            <span>Mié 16 dic · 09:00</span>
+            <span>Centro de Convenciones Norte · Mendoza</span>
+          </div>
+          <div class="chips"><span class="chip violet">No numerada · General</span></div>
+        </div>
+      </article>
+
+      <article class="card event-card">
+        <div class="cover c4"><span class="chip">Festival</span></div>
+        <div class="body">
+          <h3>Festival Río Abierto 2026</h3>
+          <div class="meta">
+            <span>Productora Ciudad Sonora</span>
+            <span>Sáb 19 dic · 16:00</span>
+            <span>Predio Costanera · Santa Fe</span>
+          </div>
+          <div class="chips"><span class="chip violet">No numerada · Campo</span></div>
+        </div>
+      </article>
+
+      <article class="card event-card">
+        <div class="cover c5"><span class="chip">Deportes</span></div>
+        <div class="body">
+          <h3>Clásico regional: Halcones vs. Pumas</h3>
+          <div class="meta">
+            <span>Liga del Litoral</span>
+            <span>Dom 20 dic · 18:00</span>
+            <span>Estadio Las Moras · Paraná</span>
+          </div>
+          <div class="chips"><span class="chip">Numerada · Platea</span><span class="chip violet">No numerada · Tribuna</span></div>
+        </div>
+      </article>
+
+      <article class="card event-card">
+        <div class="cover c6"><span class="chip">Concierto</span></div>
+        <div class="body">
+          <h3>Coro de Fin de Año</h3>
+          <div class="meta">
+            <span>Asociación Coral Aurora</span>
+            <span>Dom 27 dic · 20:00</span>
+            <span>Auditorio Aurora · Mar del Plata</span>
+          </div>
+          <div class="chips"><span class="chip">Numerada · Platea</span></div>
+        </div>
+      </article>
+    </section>
+
+    <footer style="display:flex; justify-content:space-between; align-items:center; margin-top:28px;">
+      <span class="muted small">Mostrando 1–6 de 24</span>
+      <div style="display:flex; gap:8px;">
+        <button class="btn">Anterior</button>
+        <button class="btn primary">1</button><button class="btn">2</button><button class="btn">3</button><button class="btn">4</button>
+        <button class="btn">Siguiente</button>
+      </div>
+    </footer>
+  </main>
+
+  <aside class="note"><b>Mockup</b> · GET /api/catalog/events?type&amp;starts_from&amp;starts_to&amp;limit&amp;offset · solo eventos publicados, sin dueño · datos ficticios</aside>
+</body>
+</html>

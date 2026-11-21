@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="mockup-height" content="1190">
+  <title>GoPass · Detalle del evento (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="gopass.css">
+  <style>
+    .hero { height: 260px; border-radius: var(--radius); padding: 32px; color: #fff; display: flex; flex-direction: column; justify-content: flex-end; }
+    .hero h1 { color: #fff; font-size: 40px; margin: 10px 0 8px; }
+    .hero .chip { background: rgba(255,255,255,0.92); align-self: flex-start; }
+    .zone { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .zone:last-of-type { border-bottom: 0; }
+    .seats { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); }
+    .people { display: flex; gap: 12px; flex-wrap: wrap; }
+    .person { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border: 1px solid var(--border); border-radius: 999px; }
+    .person .avatar { width: 30px; height: 30px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <!-- Ruta /events/:eventId. Visitante sin sesión (spec catalog/event-browsing: The public catalog shows a published event). -->
+  <header class="header">
+    <div class="brand">GoPass</div>
+    <nav class="nav"><a class="active" href="#">Eventos</a></nav>
+    <button class="btn primary">Iniciar sesión</button>
+  </header>
+
+  <main class="page">
+    <p class="small muted" style="margin-bottom:16px;"><a class="link" href="#">Eventos</a> / Noche de Tango en el Puerto</p>
+
+    <section class="hero cover" style="height:260px; border-radius:var(--radius);">
+      <span class="chip" style="position:static;">Concierto</span>
+      <h1 style="position:relative; z-index:1;">Noche de Tango en el Puerto</h1>
+      <p style="position:relative; z-index:1; font-size:17px;">Sábado 12 de diciembre de 2026 · 21:00 · Teatro del Lago, Rosario</p>
+    </section>
+
+    <div class="row" style="margin-top:28px;">
+      <section class="grow stack">
+        <div class="card pad stack">
+          <h2>Sobre el evento</h2>
+          <p>Una noche dedicada al tango de orquesta, con un repertorio de clásicos y composiciones nuevas, a orillas del
+            río. Dos horas de música en vivo, con intervalo.</p>
+          <p class="muted">Organiza <b style="color:var(--text);">Orquesta Típica Malvón</b></p>
+        </div>
+
+        <div class="card pad stack">
+          <h2>Quienes participan</h2>
+          <div class="people">
+            <span class="person"><span class="avatar">OM</span>Orquesta Típica Malvón</span>
+            <span class="person"><span class="avatar">LR</span>Lucía Ríos · voz</span>
+            <span class="person"><span class="avatar">TV</span>Tomás Vera · bandoneón</span>
+          </div>
+        </div>
+
+        <div class="card pad stack">
+          <h2>Sede</h2>
+          <p><b>Teatro del Lago</b><br><span class="muted">Av. de la Costa 1200 · Rosario</span></p>
+        </div>
+      </section>
+
+      <aside class="card pad" style="width:440px;">
+        <h2 style="margin-bottom:6px;">Zonas</h2>
+        <p class="muted small" style="margin-bottom:8px;">Los precios y la disponibilidad se ven al elegir asientos.</p>
+
+        <div class="zone">
+          <div>
+            <h3>Platea</h3>
+            <p class="seats">PLATEA-1 … PLATEA-320</p>
+          </div>
+          <div style="text-align:right;">
+            <span class="chip">Numerada</span>
+            <p class="small muted" style="margin-top:4px;">320 asientos</p>
+          </div>
+        </div>
+        <div class="zone">
+          <div>
+            <h3>Pullman</h3>
+            <p class="seats">PULLMAN-1 … PULLMAN-180</p>
+          </div>
+          <div style="text-align:right;">
+            <span class="chip">Numerada</span>
+            <p class="small muted" style="margin-top:4px;">180 asientos</p>
+          </div>
+        </div>
+
+        <button class="btn primary" style="width:100%; justify-content:center; margin-top:20px;">Elegir asientos</button>
+        <p class="hint" style="text-align:center; margin-top:8px;">Para comprar tenés que iniciar sesión.</p>
+      </aside>
+    </div>
+  </main>
+
+  <aside class="note"><b>Mockup</b> · GET /api/catalog/events/{id} · ids de asiento &lt;zona&gt;-&lt;n&gt;, los mismos que carga sales · «Elegir asientos» lleva a la compra de e1-idempotent-purchase</aside>
+</body>
+</html>

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="mockup-height" content="970">
+  <title>GoPass · Mis eventos (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="gopass.css">
+</head>
+<body>
+  <!-- Ruta /manage/events. EVENT_OWNER con sesión: ve solo sus eventos, en los dos estados (spec catalog/event-management). -->
+  <header class="header">
+    <div class="brand">GoPass</div>
+    <nav class="nav"><a href="#">Eventos</a><a class="active" href="#">Mis eventos</a></nav>
+    <div class="user">
+      <div style="text-align:right;"><div style="font-weight:600;">Sofía Ortega</div><span class="role">EVENT_OWNER</span></div>
+      <div class="avatar">SO</div>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="title-row">
+      <div>
+        <h1>Mis eventos</h1>
+        <p class="muted">Creá borradores, completalos y publicalos cuando estén listos.</p>
+      </div>
+      <button class="btn primary">+ Nuevo evento</button>
+    </div>
+
+    <section class="card">
+      <table>
+        <thead>
+          <tr><th>Evento</th><th>Fecha</th><th>Zonas</th><th>Estado</th><th style="text-align:right;">Acciones</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><b>Noche de Tango en el Puerto</b><div class="small muted">Concierto · Teatro del Lago, Rosario</div></td>
+            <td>12 dic 2026 · 21:00</td>
+            <td><span class="chip">Numerada × 2</span></td>
+            <td><span class="badge published">Publicado</span></td>
+            <td style="text-align:right;"><a class="link" href="#">Ver en el catálogo</a></td>
+          </tr>
+          <tr>
+            <td><b>Tango en el Patio</b><div class="small muted">Concierto · Centro Cultural El Patio, Rosario</div></td>
+            <td>9 ene 2027 · 20:00</td>
+            <td><span class="chip">Numerada</span> <span class="chip violet">No numerada</span></td>
+            <td><span class="badge draft">Borrador</span></td>
+            <td style="text-align:right;"><a class="link" href="#">Editar</a></td>
+          </tr>
+          <tr>
+            <td><b>Milonga de Verano</b><div class="small muted">Festival · Plaza del Río, Rosario</div></td>
+            <td>15 nov 2026 · 19:00</td>
+            <td><span class="chip gray">Sin zonas</span></td>
+            <td><span class="badge draft">Borrador</span></td>
+            <td style="text-align:right;"><a class="link" href="#">Editar</a></td>
+          </tr>
+          <tr>
+            <td><b>Clínica de Bandoneón</b><div class="small muted">Conferencia · Escuela de Música Sur, Rosario</div></td>
+            <td>3 dic 2026 · 10:00</td>
+            <td><span class="chip violet">No numerada</span></td>
+            <td><span class="badge published">Publicado</span></td>
+            <td style="text-align:right;"><a class="link" href="#">Ver en el catálogo</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <p class="muted small" style="margin-top:16px;">Un evento publicado no se puede editar en esta etapa. Un CLIENT no ve esta página.</p>
+  </main>
+
+  <aside class="note"><b>Mockup</b> · GET /api/catalog/manage/events · EVENT_OWNER: sus eventos; ADMIN: todos, con la columna «Dueño»</aside>
+</body>
+</html>

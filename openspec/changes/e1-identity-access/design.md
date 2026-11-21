@@ -168,6 +168,10 @@ it is written, and this link is updated if they change.
   declarative user profile requires `email`, `firstName` and `lastName`; without them, or with
   `emailVerified: false`, the first sign-in shows an update-profile form and the password grant fails with
   "Account is not fully set up". Usernames are not secret and are documented in `CONTRIBUTE.md`.
+  Because each test user lists its `realmRoles`, Keycloak does not grant it `default-roles-ticketera`, so it holds
+  no `account` role and the Keycloak account console (`/auth/realms/ticketera/account`) fails after sign-in (its
+  profile request gets `401`); the project does not use that console, whose job the frontend's "My account" page
+  does.
 - **Variables.** `.env.example` gains `TEST_USER_ADMIN_PASSWORD`, `TEST_USER_EVENT_OWNER_PASSWORD` and
   `TEST_USER_CLIENT_PASSWORD` with placeholder values in the style of the existing ones. The identity service
   receives them and `FRONTEND_ORIGIN` with `${VAR:?message}` (DS-16), so startup stops and names a missing value.

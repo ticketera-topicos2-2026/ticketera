@@ -1,5 +1,7 @@
 """Pure in-memory test double of UnitOfWork for unit tests."""
 
+from typing import Any
+
 from sales.application.ports import (
     IdempotencyStore,
     InventoryRepository,
@@ -22,14 +24,20 @@ class InMemoryUnitOfWork(UnitOfWork):
         self.idempotency_store = idempotency_store
         self.committed = False
         self.rolled_back = False
+        self._inventory_snapshot: dict[Any, Any] | None = None
+        self._orders_snapshot: dict[Any, Any] | None = None
+        self._idempotency_snapshot: dict[Any, Any] | None = None
 
     def __enter__(self) -> "InMemoryUnitOfWork":
-        if hasattr(self.inventory_repo, "seats"):
-            self._inventory_snapshot = dict(self.inventory_repo.seats)
-        if hasattr(self.order_repo, "orders"):
-            self._orders_snapshot = dict(self.order_repo.orders)
-        if hasattr(self.idempotency_store, "records"):
-            self._idempotency_snapshot = dict(self.idempotency_store.records)
+        inv: Any = self.inventory_repo
+        ord_: Any = self.order_repo
+        idem: Any = self.idempotency_store
+        if hasattr(inv, "seats"):
+            self._inventory_snapshot = dict(inv.seats)
+        if hasattr(ord_, "orders"):
+            self._orders_snapshot = dict(ord_.orders)
+        if hasattr(idem, "records"):
+            self._idempotency_snapshot = dict(idem.records)
         return self
 
     def __exit__(self, exc_type: object, exc_val: object, exc_tb: object) -> None:
@@ -41,9 +49,12 @@ class InMemoryUnitOfWork(UnitOfWork):
 
     def rollback(self) -> None:
         self.rolled_back = True
-        if hasattr(self, "_inventory_snapshot"):
-            self.inventory_repo.seats = dict(self._inventory_snapshot)
-        if hasattr(self, "_orders_snapshot"):
-            self.order_repo.orders = dict(self._orders_snapshot)
-        if hasattr(self, "_idempotency_snapshot"):
-            self.idempotency_store.records = dict(self._idempotency_snapshot)
+        inv: Any = self.inventory_repo
+        ord_: Any = self.order_repo
+        idem: Any = self.idempotency_store
+        if self._inventory_snapshot is not None:
+            inv.seats = dict(self._inventory_snapshot)
+        if self._orders_snapshot is not None:
+            ord_.orders = dict(self._orders_snapshot)
+        if self._idempotency_snapshot is not None:
+            idem.records = dict(self._idempotency_snapshot)

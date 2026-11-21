@@ -68,7 +68,7 @@
   roles mapper, `ticketera-api-tests`, `admin-cli` without direct grants, `displayName`, `registrationAllowed`, the
   three test users with complete profiles and `${TEST_USER_<ROLE>_PASSWORD}` placeholders (IA-10, IA-11, IA-18).
   Verify: the tests of 1.3 and the realm secret check pass.
-- [ ] 1.7 [P1] Pass `FRONTEND_ORIGIN` and the three `TEST_USER_<ROLE>_PASSWORD` variables to the identity service
+- [x] 1.7 [P1] Pass `FRONTEND_ORIGIN` and the three `TEST_USER_<ROLE>_PASSWORD` variables to the identity service
   with `${VAR:?message}`, set `KC_PROXY_HEADERS=xforwarded`, add the placeholders to `.env.example`, and give the
   frontend `VITE_OIDC_AUTHORITY` and `VITE_OIDC_CLIENT_ID` (IA-09, IA-11). Verify: after `docker compose down -v`
   and `up --wait`, the checks of 1.4 and 1.5 pass.

@@ -15,7 +15,7 @@ def test_upgrade_creates_the_catalog_tables_and_downgrade_removes_them(engine: E
     assert EXPECTED_TABLES.isdisjoint(inspect(engine).get_table_names())
 
     command.upgrade(alembic_config(), "head")
-    assert EXPECTED_TABLES <= set(inspect(engine).get_table_names())
+    assert set(inspect(engine).get_table_names()) >= EXPECTED_TABLES
 
 
 def test_schema_keeps_its_keys_checks_and_indexes(engine: Engine) -> None:
@@ -31,4 +31,5 @@ def test_schema_keeps_its_keys_checks_and_indexes(engine: Engine) -> None:
     assert {"ck_events_status", "ck_event_zones_modality"} <= checks
     indexes = {index["name"] for index in inspector.get_indexes("events")}
     assert {"ix_events_status_starts_at", "ix_events_type_starts_at", "ix_events_owner_created_at"} <= indexes
-    assert "ix_event_participants_name" in {index["name"] for index in inspector.get_indexes("event_participants")}
+    participant_indexes = {index["name"] for index in inspector.get_indexes("event_participants")}
+    assert "ix_event_participants_name" in participant_indexes

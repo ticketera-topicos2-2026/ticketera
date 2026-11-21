@@ -3,7 +3,8 @@
 # The image's entrypoint renders this template into /etc/nginx/conf.d/default.conf, replacing the image's default
 # server; each ${NAME} that names an environment variable is replaced with its value.
 #
-# Change project-bootstrap, task group 2 (design: platform/api-gateway).
+# Change project-bootstrap, task group 2 (design: platform/api-gateway); the access check: change e1-identity-access,
+# task 1.10 (IA-01 to IA-04, IA-09).
 
 # Hides the NGINX version in the Server header and in error pages, those of the 421 default server included: the
 # version is an internal detail that helps an attacker look up known vulnerabilities (design, Security Threat
@@ -36,6 +37,30 @@ map "$request_method:$is_api_request" $is_api_preflight {
     "OPTIONS:1" 1;
 }
 
+# Public requests skip the access check (IA-03; Req api-gateway: Public paths skip the access check): only GET and
+# HEAD of /api/<service>/health, with or without a query string. The decision is taken in the /_auth subrequest,
+# where $uri is /_auth, so it reads $request_method, always the main request's, and $request_uri, the raw URI that
+# the subrequest shares with the main request. The pattern allows no dot, percent sign or empty segment, so whenever
+# the raw URI matches, the path NGINX routes on is that same health path; any other spelling stays protected.
+map "$request_method:$request_uri" $is_public_request {
+    default 0;
+    "~^(GET|HEAD):/api/[a-z0-9-]+/health(\?.*)?$" 1;
+}
+
+# An Authorization header that holds a bearer token as RFC 6750 defines it, with the scheme in any case (IA-04).
+map $http_authorization $has_bearer_token {
+    default 0;
+    "~*^Bearer +[A-Za-z0-9._~+/-]+=*$" 1;
+}
+
+# The challenge of a 401 that has none yet (IA-04): the 401 the gateway answers for a request without a bearer
+# token. When the identity service rejects a token, auth_request already copies its challenge (Bearer, with the
+# error), and a service that answers 401 sends its own, so every 401 carries exactly one WWW-Authenticate header.
+map "$status:$sent_http_www_authenticate" $bearer_challenge {
+    default "";
+    "401:" Bearer;
+}
+
 # Any other Host gets 421 without being forwarded, which defeats DNS rebinding (Req api-gateway: The gateway serves
 # only the expected host names).
 server {
@@ -53,6 +78,15 @@ server {
     # inheriting these, so route files never use add_header.
     add_header Access-Control-Allow-Origin $cors_allow_origin always;
     add_header Vary $cors_vary always;
+    add_header WWW-Authenticate $bearer_challenge always;
+
+    # Access check (IA-01; Req api-gateway: Requests forwarded on paths that are not public require a valid access
+    # token): every location inherits it, those of routes added later included, and forwards a request only when the
+    # /_auth subrequest answers 2xx; a 401 or a 403 of the subrequest is answered to the client as 401 (see /_auth).
+    # Requests the gateway answers itself in the rewrite phase (the preflight, /healthz, the 404 of location / and
+    # the /auth/health and /auth/metrics blocks) end before the access phase, so they need no token. location /auth/
+    # turns it off (identity.conf).
+    auth_request /_auth;
 
     # Answered before any location is chosen, so the preflight never reaches a service.
     if ($is_api_preflight) {
@@ -64,6 +98,40 @@ server {
         access_log off;
         default_type text/plain;
         return 200 "ok\n";
+    }
+
+    # The subrequest of the access check (IA-02, IA-04). It is internal, so no client can request it, and NGINX runs
+    # no access check for a subrequest. Public requests are allowed and a request without a bearer token is refused
+    # here, without asking the identity service; any other asks userinfo by its internal name, which works because
+    # KC_HOSTNAME fixes the issuer. userinfo receives the client's Authorization header unchanged and nothing of the
+    # request itself: the subrequest has no query string and its URI is replaced, the body is not passed, the
+    # method is GET (NGINX makes every subrequest a GET; proxy_method states it explicitly), and Content-Type and
+    # Cookie are cleared. NGINX keeps no cache of the result: every request is checked.
+    location = /_auth {
+        internal;
+        if ($is_public_request) {
+            return 204;
+        }
+        if ($has_bearer_token = 0) {
+            return 401;
+        }
+        proxy_pass http://identity:8080/auth/realms/ticketera/protocol/openid-connect/userinfo;
+        proxy_method GET;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header Content-Type "";
+        proxy_set_header Cookie "";
+        include snippets/forwarded-headers.conf;
+        # Every 4xx of userinfo, such as the 403 for a token without the openid scope, becomes 401, so that a
+        # rejected token never looks like a role denial (IA-04; Req api-gateway: A token rejected by the identity
+        # service is answered 401).
+        proxy_intercept_errors on;
+        error_page 400 401 402 403 404 405 406 407 408 409 410 411 412 413 414 415 416 417 421 422 423 424 425 426
+            428 429 431 451 = @access_token_rejected;
+    }
+
+    location @access_token_rejected {
+        return 401;
     }
 
     # One route file per service, infra/gateway/routes/<service>.conf, mounted at routes/platform; test-only routes

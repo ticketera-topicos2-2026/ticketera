@@ -97,11 +97,13 @@
   get `401`; `/api/smoke-latency/example` without a token gets `401` (Req api-gateway: Public paths skip the access
   check - all scenarios; Requests forwarded on paths that are not public require a valid access token - Scenario:
   Route added later; IA-03, IA-17). Verify: the `401` checks fail before 1.10.
-- [ ] 1.10 [P1] Implement the access check in the gateway template: `auth_request /_auth` at server level; the
+- [x] 1.10 [P1] Implement the access check in the gateway template: `auth_request /_auth` at server level; the
   internal `/_auth` location with the public map on `$request_method` and `$request_uri`, the local `401`, every
   `userinfo` 4xx mapped to `401`, no body, `GET`, cleared `Content-Type` and `Cookie`, the forwarding snippet;
-  `auth_request off` in `location /auth/` of `identity.conf` (IA-01 to IA-04, IA-09). Verify: the checks of 1.8
-  (except the expired token, which needs 1.6 too) and 1.9 pass; the bootstrap checks of `smoke-test.sh` still pass.
+  `auth_request off` in `location /auth/` of `identity.conf`; exactly one `WWW-Authenticate` challenge on every
+  `401`; and a check in `identity-checks.sh` that a valid token with `PUT` (with a body) and `DELETE` through the
+  echo route gets `200` (IA-01 to IA-04, IA-09). Verify: the checks of 1.8 (except the expired token, which needs
+  1.6 too) and 1.9 pass; the bootstrap checks of `smoke-test.sh` still pass.
 - [ ] 1.11 [P1] Write the identity-unavailable tests at the end of `identity-checks.sh` (red): with the identity
   service stopped, a protected request with a token gets `502` in under 5 s and does not reach the service; the
   discovery document gets `502` in under 5 s; `Basic` and no-token requests still get `401`; `/api/sales/health`

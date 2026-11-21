@@ -14,8 +14,8 @@
 # wrong password. So each check asserts the answer of an existing client, and the wrong-password check needs the
 # right password to work first. The markers below come from the pages of Keycloak 26.8 and its login theme.
 #
-# Change e1-identity-access, tasks 1.4, 1.5, 1.8 and 1.9 (design: Test Strategy, platform/identity-provisioning,
-# identity/access-token, platform/api-gateway).
+# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9 and 1.10 (design: Test Strategy,
+# platform/identity-provisioning, identity/access-token, platform/api-gateway).
 
 readonly REALM_PATH="/auth/realms/ticketera"
 readonly MASTER_REALM_PATH="/auth/realms/master"
@@ -1081,6 +1081,32 @@ check_token_forwarded() {
   fi
 }
 
+# Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenario: Valid
+# token of any platform role, with methods other than GET. userinfo must be asked with GET and without the body
+# whatever the request (IA-02), or the identity service would reject it and the request would not be forwarded.
+# NGINX already makes every subrequest a GET, so this guards against a change of the access check, not today's
+# configuration.
+check_token_with_other_methods() {
+  local check=$1 token method
+  local -a body_arguments
+  if ! token=$(api_test_token CLIENT); then
+    fail "$check" "$token"
+    return
+  fi
+  for method in PUT DELETE; do
+    body_arguments=()
+    if [[ $method == PUT ]]; then
+      body_arguments=(--header "Content-Type: application/json" --data '{"probe":1}')
+    fi
+    headers_with_token "$method" "http://localhost:${gateway_port}${ECHO_PATH}" "$token" "${body_arguments[@]}"
+    if [[ $STATUS != 200 ]]; then
+      fail "$check" "$method with a valid token: expected 200 from the echo route, $(last_response)"
+      return
+    fi
+  done
+  pass "$check"
+}
+
 # Starts a GET request of the echo route in the background, with a bearer token on curl's standard input, and saves
 # the answer in a file.
 # Usage: echo_request_in_background <token> <file>
@@ -1246,6 +1272,7 @@ check_identity_access() {
   local check_query="identity: a token only in the query string gets 401 with a Bearer challenge"
   local check_two="identity: two Authorization headers get 400"
   local check_concurrent="identity: concurrent requests of two users through the echo route carry their own tokens"
+  local check_methods="identity: a valid token with PUT (with a body) and DELETE through the echo route gets 200"
   for path in "${NOT_PUBLIC_PATHS[@]}"; do
     not_public_checks+=("identity: $path without a token is not public and gets 401")
   done
@@ -1253,7 +1280,7 @@ check_identity_access() {
     role_checks+=("identity: the token of $(test_username "$role") reaches the echo service unchanged")
   done
   echo_checks=("$check_none" "$check_basic" "$check_malformed" "$check_tampered" "$check_signed_out"
-    "$check_no_openid" "$check_query" "$check_two" "${role_checks[@]}" "$check_concurrent")
+    "$check_no_openid" "$check_query" "$check_two" "${role_checks[@]}" "$check_methods" "$check_concurrent")
 
   if [[ -n $identity_problem ]]; then
     fail_each "$identity_problem" "$check_userinfo" "$check_sales" "$check_unknown" "${not_public_checks[@]}" \
@@ -1282,6 +1309,7 @@ check_identity_access() {
   for index in "${!PLATFORM_ROLES[@]}"; do
     check_token_forwarded "${role_checks[index]}" "${PLATFORM_ROLES[index]}"
   done
+  check_token_with_other_methods "$check_methods"
   check_concurrent_users "$check_concurrent"
 }
 

@@ -50,7 +50,7 @@
   The built-in admin client of the realm allows no password grant - both scenarios; Users cannot register
   themselves - both scenarios; The sign-in page carries the GoPass name; IA-17). Verify: the checks fail against
   the current realm.
-- [ ] 1.5 [P1] Write the user and token checks in `identity-checks.sh` (red): each test user gets a token with the
+- [x] 1.5 [P1] Write the user and token checks in `identity-checks.sh` (red): each test user gets a token with the
   password from `.env` and holds only its role (which also proves no extra first sign-in step); wrong password
   gives `invalid_grant`; `sub` non-empty, equal after sign-in, sign-out (form `POST` to the logout endpoint with
   the refresh token) and sign-in, and different between `CLIENT` and `EVENT_OWNER`; the `sub` of an example access

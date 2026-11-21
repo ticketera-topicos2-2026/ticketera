@@ -40,7 +40,9 @@ ADMIN = AuthenticatedUser(sub="admin-sub", roles=frozenset({"ADMIN"}))
 FIRST_PAGE = Page(limit=20, offset=0)
 
 
-def details(title: str = "Noche de Tango", days: int = 30, event_type: EventType = EventType.CONCERT) -> EventDetails:
+def details(
+    title: str = "Noche de Tango", days: int = 30, event_type: EventType = EventType.CONCERT
+) -> EventDetails:
     return EventDetails(
         title=title,
         description="Tango de orquesta.",
@@ -61,7 +63,9 @@ def new_event(owner: str = OWNER.sub, created_at: datetime = NOW, **detail_chang
 
 
 def service(session_factory: sessionmaker[Session]) -> CatalogService:
-    return CatalogService(uow_factory=lambda: SqlAlchemyUnitOfWork(session_factory), clock=lambda: NOW, new_id=uuid4)
+    return CatalogService(
+        uow_factory=lambda: SqlAlchemyUnitOfWork(session_factory), clock=lambda: NOW, new_id=uuid4
+    )
 
 
 def save(session_factory: sessionmaker[Session], *events: Event) -> None:
@@ -111,7 +115,9 @@ def test_published_event_is_never_updated(session_factory: sessionmaker[Session]
 
     with session_factory() as session:
         stale_edit = replace(published, details=details(title="Otro"), version=published.version + 1)
-        assert SqlAlchemyEventRepository(session).update(stale_edit, expected_version=published.version) is False
+        assert (
+            SqlAlchemyEventRepository(session).update(stale_edit, expected_version=published.version) is False
+        )
 
 
 def run_concurrently(*actions: Callable[[], object]) -> list[object]:
@@ -176,8 +182,11 @@ def test_publish_and_edit_at_the_same_time_never_edit_a_published_event(
 
 
 def test_public_query_filters_orders_and_paginates(session_factory: sessionmaker[Session]) -> None:
-    """Req: The public catalog is filtered and paginated. Scenarios: Filter by type and date range; Second page.
-    Req: The public catalog lists only published events. Scenario: Draft not listed."""
+    """Req: The public catalog is filtered and paginated.
+
+    Scenarios: Filter by type and date range; Second page. Also Req: The public catalog lists only
+    published events. Scenario: Draft not listed.
+    """
     published = [new_event(title=f"C{days}", days=days).publish(now=NOW)[0] for days in (40, 10, 20)]
     play, _ = new_event(title="Obra", days=15, event_type=EventType.THEATER).publish(now=NOW)
     past, _ = new_event(title="Pasado", days=1).publish(now=NOW)
@@ -188,7 +197,9 @@ def test_public_query_filters_orders_and_paginates(session_factory: sessionmaker
     with session_factory() as session:
         repository = SqlAlchemyEventRepository(session)
         everything = repository.list_published(PublicFilters(), now=later_now, page=FIRST_PAGE)
-        concerts = repository.list_published(PublicFilters(type=EventType.CONCERT), now=later_now, page=FIRST_PAGE)
+        concerts = repository.list_published(
+            PublicFilters(type=EventType.CONCERT), now=later_now, page=FIRST_PAGE
+        )
         window = repository.list_published(
             PublicFilters(starts_from=NOW + timedelta(days=12), starts_to=NOW + timedelta(days=25)),
             now=later_now,
@@ -271,7 +282,9 @@ def test_two_users_with_the_same_key_create_two_events(session_factory: sessionm
     assert catalog.list_managed(ADMIN, FIRST_PAGE).total == 2
 
 
-def test_concurrent_requests_with_the_same_key_create_one_event(session_factory: sessionmaker[Session]) -> None:
+def test_concurrent_requests_with_the_same_key_create_one_event(
+    session_factory: sessionmaker[Session],
+) -> None:
     """Req: Event creation is idempotent. Scenario: Concurrent requests with the same key."""
     catalog = service(session_factory)
     key = uuid4()

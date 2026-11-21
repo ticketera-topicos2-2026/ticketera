@@ -34,6 +34,13 @@ def db_session() -> Generator[Session]:
     transaction = connection.begin()
     session = Session(bind=connection)
 
+    # Ensure migrations are applied on fresh databases
+    from alembic import command
+    from alembic.config import Config
+
+    config = Config("alembic.ini")
+    command.upgrade(config, "head")
+
     # Clean sales tables before test
     session.execute(text("DELETE FROM idempotency_keys"))
     session.execute(text("DELETE FROM tickets"))

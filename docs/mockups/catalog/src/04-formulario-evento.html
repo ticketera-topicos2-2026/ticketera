@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="mockup-height" content="1700">
+  <title>GoPass · Formulario del evento (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="gopass.css">
+  <style>
+    .zone-row { display: grid; grid-template-columns: 120px 1fr 250px 170px 40px; gap: 12px; align-items: end; padding: 16px; border: 1px solid var(--border); border-radius: 12px; }
+    .segmented { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; height: 42px; }
+    .segmented span { flex: 1; display: grid; place-items: center; font-size: 13px; font-weight: 600; color: var(--muted); }
+    .segmented span.on { background: #eff6ff; color: var(--primary); }
+    .preview { grid-column: 1 / -1; font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); }
+    .remove { height: 42px; display: grid; place-items: center; color: var(--muted); font-size: 20px; }
+    .tag { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px 6px 12px; border-radius: 999px; background: #f1f5f9; font-size: 13px; font-weight: 500; }
+    .tag i { font-style: normal; color: var(--muted); }
+    .side { width: 340px; position: sticky; top: 24px; }
+  </style>
+</head>
+<body>
+  <!-- Ruta /manage/events/:eventId. Edición de un borrador por su dueño (spec catalog/event-management). -->
+  <header class="header">
+    <div class="brand">GoPass</div>
+    <nav class="nav"><a href="#">Eventos</a><a class="active" href="#">Mis eventos</a></nav>
+    <div class="user">
+      <div style="text-align:right;"><div style="font-weight:600;">Sofía Ortega</div><span class="role">EVENT_OWNER</span></div>
+      <div class="avatar">SO</div>
+    </div>
+  </header>
+
+  <main class="page">
+    <p class="small muted" style="margin-bottom:16px;"><a class="link" href="#">Mis eventos</a> / Tango en el Patio</p>
+    <div class="title-row"><h1>Editar borrador</h1></div>
+
+    <div class="row">
+      <div class="grow stack">
+        <section class="card pad stack">
+          <h2>Datos generales</h2>
+          <div class="field"><label>Título</label><div class="input">Tango en el Patio</div></div>
+          <div class="grid-2">
+            <div class="field"><label>Tipo</label><div class="input">Concierto <span class="muted">▾</span></div></div>
+            <div class="field"><label>Organiza</label><div class="input">Orquesta Típica Malvón</div></div>
+          </div>
+          <div class="grid-2">
+            <div class="field"><label>Fecha y hora de inicio</label><div class="input">09/01/2027 · 20:00</div></div>
+            <div class="field"><label>Zona horaria</label><div class="input">UTC−03:00 · Argentina <span class="muted">▾</span></div></div>
+          </div>
+          <div class="field"><label>Descripción</label><div class="input area">Tango de orquesta al aire libre en el patio del centro cultural…</div><span class="hint">Hasta 5000 caracteres.</span></div>
+        </section>
+
+        <section class="card pad stack">
+          <h2>Sede</h2>
+          <div class="grid-2">
+            <div class="field"><label>Nombre</label><div class="input">Centro Cultural El Patio</div></div>
+            <div class="field"><label>Ciudad</label><div class="input">Rosario</div></div>
+          </div>
+          <div class="field"><label>Dirección (opcional)</label><div class="input">Calle de los Naranjos 455</div></div>
+        </section>
+
+        <section class="card pad stack">
+          <h2>Quienes participan</h2>
+          <p class="hint" style="margin-top:4px;">Artistas, oradores o equipos que actúan en el evento. Hasta 50.</p>
+          <div class="chips">
+            <span class="tag">Orquesta Típica Malvón <i>✕</i></span>
+            <span class="tag">Lucía Ríos <i>✕</i></span>
+            <span class="tag">Tomás Vera <i>✕</i></span>
+          </div>
+          <div style="display:flex; gap:12px;"><div class="input grow muted">Nombre de quien participa</div><button class="btn">Agregar</button></div>
+        </section>
+
+        <section class="card pad stack">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Zonas</h2><button class="btn">+ Agregar zona</button>
+          </div>
+          <p class="hint" style="margin-top:4px;">Una zona numerada tiene asientos; una no numerada, capacidad. Hasta 20 zonas; el código no se repite.</p>
+
+          <div class="zone-row">
+            <div class="field"><label>Código</label><div class="input">PLATEA</div></div>
+            <div class="field"><label>Nombre</label><div class="input">Platea</div></div>
+            <div class="field"><label>Modalidad</label><div class="segmented"><span class="on">Numerada</span><span>No numerada</span></div></div>
+            <div class="field"><label>Asientos</label><div class="input">120</div></div>
+            <div class="remove">✕</div>
+            <div class="preview">Asientos: PLATEA-1, PLATEA-2, … PLATEA-120</div>
+          </div>
+
+          <div class="zone-row">
+            <div class="field"><label>Código</label><div class="input">PATIO</div></div>
+            <div class="field"><label>Nombre</label><div class="input">Patio de pie</div></div>
+            <div class="field"><label>Modalidad</label><div class="segmented"><span>Numerada</span><span class="on">No numerada</span></div></div>
+            <div class="field"><label>Capacidad</label><div class="input">400</div></div>
+            <div class="remove">✕</div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="card pad side stack">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3>Estado</h3><span class="badge draft">Borrador</span>
+        </div>
+        <p class="small muted">Versión 3 · guardado hace 2 minutos</p>
+        <button class="btn" style="width:100%; justify-content:center;">Guardar borrador</button>
+        <button class="btn primary" style="width:100%; justify-content:center;">Publicar</button>
+        <p class="hint">Para publicar hacen falta al menos una zona y una fecha futura. Después de publicarlo, el evento ya no se puede editar.</p>
+      </aside>
+    </div>
+  </main>
+
+  <aside class="note"><b>Mockup</b> · PUT /api/catalog/manage/events/{id} con «version»; POST …/publish · datos ficticios</aside>
+</body>
+</html>

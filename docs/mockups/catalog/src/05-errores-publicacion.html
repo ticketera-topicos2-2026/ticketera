@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="mockup-height" content="1390">
+  <title>GoPass · Errores al publicar (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="gopass.css">
+  <style>
+    .empty { border: 2px dashed #fecaca; background: #fef2f2; border-radius: 12px; padding: 28px; text-align: center; }
+    .side { width: 340px; position: sticky; top: 24px; }
+  </style>
+</head>
+<body>
+  <!-- Ruta /manage/events/:eventId. La publicación falla con 422 (sin zonas, fecha pasada) y una edición falla con 409
+       (versión vieja): spec catalog/event-management, A draft is published once it is complete y A draft is edited
+       with its current version. -->
+  <header class="header">
+    <div class="brand">GoPass</div>
+    <nav class="nav"><a href="#">Eventos</a><a class="active" href="#">Mis eventos</a></nav>
+    <div class="user">
+      <div style="text-align:right;"><div style="font-weight:600;">Sofía Ortega</div><span class="role">EVENT_OWNER</span></div>
+      <div class="avatar">SO</div>
+    </div>
+  </header>
+
+  <main class="page">
+    <p class="small muted" style="margin-bottom:16px;"><a class="link" href="#">Mis eventos</a> / Milonga de Verano</p>
+    <div class="title-row"><h1>Editar borrador</h1></div>
+
+    <div class="alert error" style="margin-bottom:24px;">
+      <span class="icon">!</span>
+      <div>
+        <b>No se pudo publicar el evento</b>
+        <ul>
+          <li>Necesita al menos una zona.</li>
+          <li>La fecha de inicio ya pasó: elegí una fecha futura.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="grow stack">
+        <section class="card pad stack">
+          <h2>Datos generales</h2>
+          <div class="field"><label>Título</label><div class="input">Milonga de Verano</div></div>
+          <div class="grid-2">
+            <div class="field"><label>Tipo</label><div class="input">Festival <span class="muted">▾</span></div></div>
+            <div class="field"><label>Organiza</label><div class="input">Orquesta Típica Malvón</div></div>
+          </div>
+          <div class="grid-2">
+            <div class="field">
+              <label>Fecha y hora de inicio</label>
+              <div class="input invalid">15/11/2026 · 19:00</div>
+              <span class="error-text">La fecha de inicio ya pasó.</span>
+            </div>
+            <div class="field"><label>Zona horaria</label><div class="input">UTC−03:00 · Argentina <span class="muted">▾</span></div></div>
+          </div>
+        </section>
+
+        <section class="card pad stack">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Zonas</h2><button class="btn">+ Agregar zona</button>
+          </div>
+          <div class="empty">
+            <h3 style="color:var(--error);">Este evento todavía no tiene zonas</h3>
+            <p class="muted small" style="margin-top:6px;">Agregá una zona numerada (con asientos) o no numerada (con capacidad) para poder publicarlo.</p>
+          </div>
+        </section>
+
+        <div class="alert warning">
+          <span class="icon">!</span>
+          <div>
+            <b>Otro caso: alguien más cambió este evento</b>
+            <p class="small" style="margin-top:4px;">Mientras editabas, se guardó una versión más nueva (por ejemplo, desde una cuenta ADMIN). Tus
+              cambios no se guardaron para no pisar los otros. Recargá el evento para ver la última versión.</p>
+            <button class="btn" style="margin-top:12px;">Recargar evento</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="card pad side stack">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <h3>Estado</h3><span class="badge draft">Borrador</span>
+        </div>
+        <p class="small muted">Versión 5</p>
+        <button class="btn" style="width:100%; justify-content:center;">Guardar borrador</button>
+        <button class="btn primary" style="width:100%; justify-content:center;">Publicar</button>
+        <p class="hint">El evento sigue en borrador hasta que se corrijan los problemas.</p>
+      </aside>
+    </div>
+  </main>
+
+  <aside class="note"><b>Mockup</b> · 422 de POST …/publish con los motivos; 409 de PUT con una versión vieja</aside>
+</body>
+</html>

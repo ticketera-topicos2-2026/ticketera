@@ -8,3 +8,4 @@ class SeatInitDTO:
     seat_id: str
     category: str
     price_centavos: int
+

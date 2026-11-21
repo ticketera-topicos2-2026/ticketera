@@ -4,7 +4,7 @@ Verifies tables created per design.md & tasks.md:
 - `seats`: PK (event_id, seat_id), status (AVAILABLE, SOLD), price_centavos, currency.
 - `orders`: PK order_id, customer_id, event_id, total_amount, currency, status, created_at.
 - `tickets`: PK ticket_id, order_id FK, event_id, seat_id, ticket_code, UNIQUE(event_id, seat_id).
-- `idempotency_keys`: PK (customer_id, key), request_hash, response_status (nullable), response_body (nullable), created_at.
+- `idempotency_keys`: PK (customer_id, key), request_hash, response_status, response_body, created_at.
 """
 
 from alembic.config import Config

@@ -15,3 +15,4 @@ class OrderNotFoundError(ApplicationError):
 
 class IdempotencyKeyMismatchError(ApplicationError):
     """Raised when the same idempotency key is submitted with a different request payload."""
+

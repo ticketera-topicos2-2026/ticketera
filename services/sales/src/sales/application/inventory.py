@@ -47,3 +47,4 @@ class GetAvailableSeatsUseCase:
 
     def execute(self, event_id: str, status: SeatStatus | None = SeatStatus.AVAILABLE) -> list[Seat]:
         return self.inventory_repo.find_by_event(event_id=event_id, status=status)
+

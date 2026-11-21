@@ -254,3 +254,33 @@ def test_concurrent_idempotent_double_click_same_key(db_session: Session) -> Non
         assert orders_count == 1
         assert tickets_count == 1
         assert keys_count == 1
+
+
+def test_repeated_reads_do_not_exhaust_connection_pool(db_session: Session) -> None:
+    """Verifies that consecutive reads inside Unit of Work close sessions and do not exhaust pool."""
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        pytest.skip("DATABASE_URL not set")
+
+    from sales.application.inventory import GetAvailableSeatsUseCase
+    from sales.infrastructure.repositories import PostgresInventoryRepository
+    from sales.infrastructure.uow import SqlAlchemyUnitOfWork
+
+    engine = create_engine(database_url, pool_size=5, max_overflow=10)
+    session_factory = sessionmaker(bind=engine)
+
+    # Initialize a seat
+    repo = PostgresInventoryRepository(db_session)
+    seat = Seat("evt-pool-1", "P-1", "General", Money(25000), SeatStatus.AVAILABLE)
+    repo.save_all([seat])
+    db_session.commit()
+
+    # Execute 25 consecutive reads (exceeding pool_size=5 + max_overflow=10 = 15 connections)
+    for _ in range(25):
+        with SqlAlchemyUnitOfWork(session_factory) as uow:
+            use_case = GetAvailableSeatsUseCase(uow.inventory_repo)
+            seats = use_case.execute("evt-pool-1", SeatStatus.AVAILABLE)
+            assert len(seats) == 1
+            assert seats[0].seat_id == "P-1"
+
+    engine.dispose()

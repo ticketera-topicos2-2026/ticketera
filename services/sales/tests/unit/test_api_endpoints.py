@@ -120,8 +120,6 @@ def client() -> TestClient:
     app = create_app(
         database_probe=FakeDatabaseProbe(),
         uow_factory=lambda: InMemoryUnitOfWork(inv_repo, ord_repo, idem_store),
-        inventory_repo_factory=lambda: inv_repo,
-        order_repo_factory=lambda: ord_repo,
     )
     return TestClient(app)
 

@@ -67,9 +67,9 @@ def get_available_seats(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     seat_status: Annotated[SeatStatus | None, Query(alias="status")] = SeatStatus.AVAILABLE,
 ) -> list[SeatResponse]:
-    repo = request.app.state.inventory_repo_factory()
-    use_case = GetAvailableSeatsUseCase(repo)
-    seats = use_case.execute(event_id=event_id, status=seat_status)
+    with request.app.state.uow_factory() as uow:
+        use_case = GetAvailableSeatsUseCase(uow.inventory_repo)
+        seats = use_case.execute(event_id=event_id, status=seat_status)
     return [
         SeatResponse(
             seat_id=s.seat_id,
@@ -165,20 +165,20 @@ def get_order(
     request: Request,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> OrderResponse:
-    repo = request.app.state.order_repo_factory()
-    use_case = GetOrderUseCase(repo)
-    try:
-        order = use_case.execute(
-            order_id=order_id,
-            requesting_user_id=current_user.customer_id,
-            is_admin=current_user.has_role("ADMIN"),
-        )
-    except OrderNotFoundError as exc:
-        # BOLA protection: 404 instead of 403
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Order not found",
-        ) from exc
+    with request.app.state.uow_factory() as uow:
+        use_case = GetOrderUseCase(uow.order_repo)
+        try:
+            order = use_case.execute(
+                order_id=order_id,
+                requesting_user_id=current_user.customer_id,
+                is_admin=current_user.has_role("ADMIN"),
+            )
+        except OrderNotFoundError as exc:
+            # BOLA protection: 404 instead of 403
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Order not found",
+            ) from exc
 
     return OrderResponse(
         order_id=order.order_id,

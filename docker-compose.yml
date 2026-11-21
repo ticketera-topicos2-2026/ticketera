@@ -150,6 +150,9 @@ services:
       - ALL
     healthcheck:
       <<: *healthcheck-defaults
+      # bin/run applies the migrations before Uvicorn starts; on a loaded machine that took longer than the 45 s
+      # the default timing tolerates (e1-event-catalog).
+      start_period: 60s
       # The image has no curl: Python's urllib requests /health, and a 503 or a refused connection raises, so the
       # check fails (DS-12).
       test:

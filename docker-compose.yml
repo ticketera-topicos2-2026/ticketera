@@ -121,25 +121,16 @@ services:
       args:
         UID: ${HOST_UID:-1000}
         GID: ${HOST_GID:-1000}
-    # Same server as the image's CMD, with reload on source changes (DS-17).
+    # Applies the schema migrations, then runs the same server as the image's CMD with reload on source changes
+    # (e1-event-catalog, D-33; DS-17).
     command:
-      - uvicorn
-      - catalog.api.main:app
-      - --app-dir
-      - src
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --reload
-      - --reload-dir
-      - src
+      - bin/run
     labels:
       # Health path checked by the smoke test through the gateway at /api/catalog/health (DS-19).
       ticketera.health-path: /health
       # Commands run by the quality job with "docker compose run --rm catalog <command>" (DS-18): split on
-      # whitespace, with no shell.
-      ticketera.lint: ruff check .
+      # whitespace, with no shell. bin/lint also checks the hexagonal layers with import-linter (D-33).
+      ticketera.lint: bin/lint
       ticketera.typecheck: mypy
       ticketera.test: pytest
     environment:
@@ -159,6 +150,9 @@ services:
       - ALL
     healthcheck:
       <<: *healthcheck-defaults
+      # bin/run applies the migrations before Uvicorn starts; on a loaded machine that took longer than the 45 s
+      # the default timing tolerates (e1-event-catalog).
+      start_period: 60s
       # The image has no curl: Python's urllib requests /health, and a 503 or a refused connection raises, so the
       # check fails (DS-12).
       test:

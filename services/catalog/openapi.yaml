@@ -1,0 +1,240 @@
+openapi: 3.1.0
+info:
+  title: Catalog Service
+  version: 0.1.0
+  description: >-
+    Catalog bounded context of the GoPass platform: events with their zones and ticket modalities (change
+    e1-event-catalog). The gateway publishes it under /api/catalog. The public paths need no token and ignore any
+    token; the management paths need a bearer token validated by the gateway (EC-02).
+paths:
+  /health:
+    get:
+      operationId: health_health_get
+      summary: Service health
+      responses:
+        '200': {description: The service and its database are reachable.}
+        '503': {description: The database is unreachable.}
+    head:
+      operationId: health_health_head
+      summary: Service health, headers only
+      responses:
+        '200': {description: The service and its database are reachable.}
+        '503': {description: The database is unreachable.}
+  /events:
+    get:
+      operationId: list_published_events
+      summary: Public catalog of published upcoming events, earliest first
+      parameters:
+        - {name: type, in: query, required: false, schema: {$ref: '#/components/schemas/EventType'}}
+        - {name: starts_from, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: starts_to, in: query, required: false, schema: {type: string, format: date-time}}
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: offset, in: query, required: false, schema: {type: integer, minimum: 0, default: 0}}
+      responses:
+        '200':
+          description: A page of published events.
+          content: {application/json: {schema: {$ref: '#/components/schemas/PublicEventPage'}}}
+        '422': {description: Invalid filter or pagination value.}
+    head:
+      operationId: head_published_events
+      summary: Public catalog, headers only
+      responses:
+        '200': {description: A page of published events.}
+  /events/{event_id}:
+    get:
+      operationId: get_published_event
+      summary: A published event with the seat ids of its numbered zones
+      parameters:
+        - {name: event_id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: The published event.
+          content: {application/json: {schema: {$ref: '#/components/schemas/PublicEvent'}}}
+        '404': {description: No published event has this id (drafts included).}
+    head:
+      operationId: head_published_event
+      summary: A published event, headers only
+      parameters:
+        - {name: event_id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: The published event.}
+        '404': {description: No published event has this id.}
+  /manage/events:
+    post:
+      operationId: create_event
+      summary: Creates a draft owned by the user (EVENT_OWNER or ADMIN)
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: Idempotency-Key, in: header, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/EventInput'}}}
+      responses:
+        '201':
+          description: The draft, or the one created before with the same key.
+          content: {application/json: {schema: {$ref: '#/components/schemas/ManagedEvent'}}}
+        '400': {description: Missing or malformed Idempotency-Key.}
+        '401': {description: No valid bearer token.}
+        '403': {description: The user is neither EVENT_OWNER nor ADMIN.}
+        '422': {description: Invalid event, or the key was used with a different body.}
+    get:
+      operationId: list_managed_events
+      summary: The user's events (EVENT_OWNER) or every event (ADMIN), newest first
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - {name: offset, in: query, required: false, schema: {type: integer, minimum: 0, default: 0}}
+      responses:
+        '200':
+          description: A page of events in both states.
+          content: {application/json: {schema: {$ref: '#/components/schemas/ManagedEventPage'}}}
+        '401': {description: No valid bearer token.}
+        '403': {description: The user is neither EVENT_OWNER nor ADMIN.}
+  /manage/events/{event_id}:
+    get:
+      operationId: get_managed_event
+      summary: An event the user manages
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: event_id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: The event.
+          content: {application/json: {schema: {$ref: '#/components/schemas/ManagedEvent'}}}
+        '401': {description: No valid bearer token.}
+        '403': {description: The user is neither EVENT_OWNER nor ADMIN.}
+        '404': {description: Unknown event, or another owner's (EC-04).}
+    put:
+      operationId: replace_event
+      summary: Replaces a draft at its current version
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: event_id, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/EventReplacement'}}}
+      responses:
+        '200':
+          description: The draft at its new version.
+          content: {application/json: {schema: {$ref: '#/components/schemas/ManagedEvent'}}}
+        '401': {description: No valid bearer token.}
+        '403': {description: The user is neither EVENT_OWNER nor ADMIN.}
+        '404': {description: Unknown event, or another owner's.}
+        '409': {description: Stale version, or the event is published.}
+        '422': {description: Invalid event.}
+  /manage/events/{event_id}/publish:
+    post:
+      operationId: publish_event
+      summary: Publishes a complete draft; publishing again changes nothing
+      security: [{bearerAuth: []}]
+      parameters:
+        - {name: event_id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200':
+          description: The published event.
+          content: {application/json: {schema: {$ref: '#/components/schemas/ManagedEvent'}}}
+        '401': {description: No valid bearer token.}
+        '403': {description: The user is neither EVENT_OWNER nor ADMIN.}
+        '404': {description: Unknown event, or another owner's.}
+        '422': {description: No zone, or a start in the past.}
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer, bearerFormat: JWT}
+  schemas:
+    EventType:
+      type: string
+      enum: [CONCERT, THEATER, SPORTS, CONFERENCE, FESTIVAL, OTHER]
+    TicketModality:
+      type: string
+      enum: [NUMBERED, UNNUMBERED]
+    EventStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED]
+    ParticipantInput:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties: {name: {type: string}}
+    VenueInput:
+      type: object
+      additionalProperties: false
+      required: [name, city]
+      properties:
+        name: {type: string}
+        city: {type: string}
+        address: {type: [string, 'null']}
+    ZoneInput:
+      type: object
+      additionalProperties: false
+      required: [code, name, modality]
+      properties:
+        code: {type: string, pattern: '^[A-Z0-9]{1,8}$'}
+        name: {type: string}
+        modality: {$ref: '#/components/schemas/TicketModality'}
+        seat_count: {type: [integer, 'null']}
+        capacity: {type: [integer, 'null']}
+    EventInput:
+      type: object
+      additionalProperties: false
+      required: [title, type, organizer_name, starts_at, venue]
+      properties:
+        title: {type: string}
+        description: {type: string, default: ''}
+        type: {$ref: '#/components/schemas/EventType'}
+        organizer_name: {type: string}
+        participants: {type: array, items: {$ref: '#/components/schemas/ParticipantInput'}, default: []}
+        starts_at: {type: string, format: date-time}
+        venue: {$ref: '#/components/schemas/VenueInput'}
+        zones: {type: array, items: {$ref: '#/components/schemas/ZoneInput'}, default: []}
+    EventReplacement:
+      description: EventInput plus the version the client read.
+      allOf:
+        - {$ref: '#/components/schemas/EventInput'}
+        - type: object
+          required: [version]
+          properties: {version: {type: integer, minimum: 1}}
+    ZoneSummary:
+      type: object
+      required: [code, name, modality, seat_count, capacity]
+      properties:
+        code: {type: string}
+        name: {type: string}
+        modality: {$ref: '#/components/schemas/TicketModality'}
+        seat_count: {type: [integer, 'null']}
+        capacity: {type: [integer, 'null']}
+    ZoneDetail:
+      description: ZoneSummary plus the seat ids `<code>-<n>` of a numbered zone (EC-07).
+      allOf:
+        - {$ref: '#/components/schemas/ZoneSummary'}
+        - type: object
+          required: [seat_ids]
+          properties: {seat_ids: {type: array, items: {type: string}}}
+    PublicEventSummary:
+      description: A published event without its owner; zones without seat ids.
+      type: object
+      required: [id, title, description, type, organizer_name, participants, starts_at, venue, zones, published_at]
+    PublicEvent:
+      description: PublicEventSummary with ZoneDetail zones.
+      type: object
+    ManagedEventSummary:
+      description: PublicEventSummary plus owner_id, status, version and created_at.
+      type: object
+    ManagedEvent:
+      description: ManagedEventSummary with ZoneDetail zones.
+      type: object
+    PublicEventPage:
+      type: object
+      required: [items, limit, offset, total]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/PublicEventSummary'}}
+        limit: {type: integer}
+        offset: {type: integer}
+        total: {type: integer}
+    ManagedEventPage:
+      type: object
+      required: [items, limit, offset, total]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/ManagedEventSummary'}}
+        limit: {type: integer}
+        offset: {type: integer}
+        total: {type: integer}

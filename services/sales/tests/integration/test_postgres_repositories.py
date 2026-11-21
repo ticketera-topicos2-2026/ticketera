@@ -14,16 +14,17 @@ Verifies:
 """
 
 import os
+from collections.abc import Generator
+
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
 
-from sales.domain.models import Money, Seat, SeatStatus, Order, Ticket
-from sales.domain.exceptions import SeatNotAvailableError
+from sales.domain.models import Money, Order, Seat, SeatStatus, Ticket
 
 
 @pytest.fixture
-def db_session() -> Session:
+def db_session() -> Generator[Session]:
     database_url = os.environ.get("DATABASE_URL")
     if not database_url:
         pytest.skip("DATABASE_URL not set; skipping PostgreSQL integration tests")

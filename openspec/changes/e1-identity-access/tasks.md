@@ -90,7 +90,7 @@
   service is answered 401; A request with more than one Authorization header is rejected; Tokens are accepted only
   in the Authorization header; Public paths skip the access check - Scenario: Path that only starts like a health
   path; IA-03). Verify: every check that depends on the access check fails.
-- [ ] 1.9 [P1] Add the test-only route `tests/smoke/gateway/latency.conf` (`/api/smoke-latency/` to the echo
+- [x] 1.9 [P1] Add the test-only route `tests/smoke/gateway/latency.conf` (`/api/smoke-latency/` to the echo
   service, declaring nothing about access) and write the public path tests (red): `GET` and `HEAD` on health
   without a token; health with `Bearer x` answers as without a token; the realm discovery document without a token
   gets `200`; `POST /api/sales/health`, `GET /api/sales/health/` and `GET /api/sales/health/extra` without a token

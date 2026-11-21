@@ -269,6 +269,8 @@ expect_status() {
 # Req api-gateway: The identity service is served under /auth - Scenario: Discovery document of the ticketera realm
 # Req continuous-integration: The smoke-test check verifies the running system through the gateway - Scenario: The
 # realm is missing
+# Req api-gateway: Public paths skip the access check - Scenario: Identity service path without a token (the request
+# carries no token; e1-identity-access, task 1.9)
 check_realm_discovery() {
   local check="identity: realm discovery document" path="/auth/realms/ticketera/.well-known/openid-configuration"
   local expected_issuer="http://localhost:${gateway_port}/auth/realms/ticketera" issuer

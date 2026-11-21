@@ -14,7 +14,7 @@
 # wrong password. So each check asserts the answer of an existing client, and the wrong-password check needs the
 # right password to work first. The markers below come from the pages of Keycloak 26.8 and its login theme.
 #
-# Change e1-identity-access, tasks 1.4, 1.5 and 1.8 (design: Test Strategy, platform/identity-provisioning,
+# Change e1-identity-access, tasks 1.4, 1.5, 1.8 and 1.9 (design: Test Strategy, platform/identity-provisioning,
 # identity/access-token, platform/api-gateway).
 
 readonly REALM_PATH="/auth/realms/ticketera"
@@ -31,6 +31,8 @@ readonly USERINFO_PATH="$REALM_PATH/protocol/openid-connect/userinfo"
 readonly SALES_EXAMPLE_PATH="/api/sales/example"
 readonly SALES_NOT_FOUND_BODY='{"detail":"Not Found"}'
 readonly UNKNOWN_EXAMPLE_PATH="/api/unknown/example"
+# A path of the test-only route tests/smoke/gateway/latency.conf other than its health path (task 1.9).
+readonly LATENCY_ROUTE_EXAMPLE_PATH="/api/smoke-latency/example"
 # Pairs of simultaneous requests of two users in the concurrency check.
 readonly CONCURRENT_ROUNDS=10
 # Paths that only look like a public health path, or reach a protected path through /auth/; curl sends them as
@@ -997,13 +999,46 @@ check_sales_route_with_token() {
 
 # Req api-gateway: Public paths skip the access check - Scenario: Path that only starts like a health path, and the
 # rule of that requirement that any other path is subject to the access check (IA-03; see NOT_PUBLIC_PATHS)
-# sales never answers 401, so a 401 with a Bearer challenge shows that the gateway did not forward the request as
-# public. No service log is read.
-# Usage: check_not_public <check name> <raw path>
+# Neither sales nor the echo service ever answers 401, so a 401 with a Bearer challenge shows that the gateway did
+# not forward the request as public. No service log is read.
+# Usage: check_not_public <check name> <raw path> [method, GET by default]
 check_not_public() {
+  local check=$1 path=$2 method=${3:-GET}
+  http_headers "$method" "http://localhost:${gateway_port}${path}" --path-as-is
+  expect_bearer_challenge "$check" "$method $path without a token"
+}
+
+# Req api-gateway: Public paths skip the access check - Scenario: HEAD on service health without a token
+# Usage: check_public_head <check name> <path>
+check_public_head() {
   local check=$1 path=$2
-  http_headers GET "http://localhost:${gateway_port}${path}" --path-as-is
-  expect_bearer_challenge "$check" "$path without a token"
+  http_headers HEAD "http://localhost:${gateway_port}${path}" --head
+  if [[ $STATUS == 200 ]]; then
+    pass "$check"
+  else
+    fail "$check" "expected 200 for HEAD $path, $(last_response)"
+  fi
+}
+
+# Req api-gateway: Public paths skip the access check - Scenario: Health with a malformed token
+# The same health request is sent without a token and with Authorization: Bearer x; both answers must have the same
+# status code and body.
+# Usage: check_health_with_malformed_token <check name> <path>
+check_health_with_malformed_token() {
+  local check=$1 url="http://localhost:${gateway_port}$2" status body
+  http_get "$url"
+  status=$STATUS
+  body=$BODY
+  http_get "$url" --header "Authorization: Bearer x"
+  if [[ $status == 000 ]]; then
+    fail "$check" "the request without a token got no answer"
+  elif [[ $STATUS != "$status" ]]; then
+    fail "$check" "got $status without a token and $STATUS with Bearer x"
+  elif [[ $BODY != "$body" ]]; then
+    fail "$check" "the body with Bearer x differs from the body without a token"
+  else
+    pass "$check"
+  fi
 }
 
 # Req api-gateway: A request with more than one Authorization header is rejected - Scenario: Two Authorization
@@ -1272,11 +1307,50 @@ prepare_identity_checks() {
   fi
 }
 
+# The checks of the public paths (task 1.9). The route added later is the test-only route
+# tests/smoke/gateway/latency.conf, which needs the echo service of tests/smoke/compose.echo.yml.
+check_public_paths() {
+  local echo_problem
+  local check_get="identity: GET /api/catalog/health without a token is answered by catalog"
+  local check_head="identity: HEAD /api/payments/health without a token is answered by payments"
+  local check_malformed="identity: GET /api/sales/health with Authorization: Bearer x answers as without a token"
+  local check_post="identity: POST /api/sales/health without a token gets 401 with a Bearer challenge"
+  local check_slash="identity: GET /api/sales/health/ without a token gets 401 with a Bearer challenge"
+  local check_extra="identity: GET /api/sales/health/extra without a token gets 401 with a Bearer challenge"
+  local check_later="identity: $LATENCY_ROUTE_EXAMPLE_PATH, a route added later, without a token gets 401"
+
+  if [[ -n $identity_problem ]]; then
+    fail_each "$identity_problem" "$check_get" "$check_head" "$check_malformed" "$check_post" "$check_slash" \
+      "$check_extra" "$check_later"
+    return
+  fi
+
+  # Req api-gateway: Public paths skip the access check - Scenario: Service health without a token
+  expect_status "$check_get" 200 /api/catalog/health
+  check_public_head "$check_head" /api/payments/health
+  check_health_with_malformed_token "$check_malformed" /api/sales/health
+  # Req api-gateway: Public paths skip the access check - Scenarios: Other method on the health path; Path that only
+  # starts like a health path
+  check_not_public "$check_post" /api/sales/health POST
+  check_not_public "$check_slash" /api/sales/health/
+  check_not_public "$check_extra" /api/sales/health/extra
+
+  echo_problem=$(echo_route_problem)
+  if [[ -n $echo_problem ]]; then
+    skip_or_fail_forwarding "$echo_problem" "$check_later"
+    return
+  fi
+  # Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenario: Route
+  # added later
+  check_not_public "$check_later" "$LATENCY_ROUTE_EXAMPLE_PATH"
+}
+
 # Runs every identity check; called by main of smoke-test.sh after the other checks. The expired-token check runs
 # last (see check_expired_token).
 run_identity_checks() {
   check_identity_clients
   check_identity_tokens
   check_identity_access
+  check_public_paths
   check_expired_token "identity: an expired token gets 401 with a Bearer challenge"
 }

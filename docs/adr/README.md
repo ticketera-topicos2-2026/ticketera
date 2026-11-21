@@ -23,11 +23,11 @@ Registro de las decisiones de arquitectura del proyecto, según D-27 (`docs/PLAN
 | [ADR-0007](adr-0007-pago-en-etapa-ii.md) | Pago en Etapa II | D-25 | Accepted | 2026-11-21 |
 | [ADR-0008](adr-0008-concurrencia-e-idempotencia-postgresql.md) | Concurrencia e Idempotencia en PostgreSQL | D-30 | Accepted | 2026-11-21 |
 | [ADR-0009](adr-0009-pruebas-api-y-contrato-bruno.md) | Pruebas de API y Contrato con Bruno | D-24 | Accepted | 2026-11-21 |
+| [ADR-0011](adr-0011-bitacora-http-y-observabilidad.md) | Bitácora HTTP y observabilidad | D-23 (incluye una excepción a DS-13) | Proposed | 2026-11-20 |
 
 ## ADR previstos
 
 Se escriben en el change que implementa cada decisión. La numeración se fija al escribirlos.
 
-| Decisión | Change donde se escribe el ADR | Responsable |
-|---|---|---|
-| D-23 · Bitácora HTTP y observabilidad | `e1-request-log` | Integrante B |
+Las decisiones de la tabla del plan (PLAN 7.3) ya tienen su ADR: D-23 (ADR-0011), D-24 (ADR-0009), D-25 (ADR-0007)
+y D-30 (ADR-0008). La validación de tokens en el gateway de `e1-identity-access` escribe el suyo al implementarse.

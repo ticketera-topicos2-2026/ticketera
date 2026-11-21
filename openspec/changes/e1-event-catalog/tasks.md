@@ -117,10 +117,12 @@
 
 ## 7. Mockups (B) [P1]
 
-- [ ] 7.1 Draw the mockups of the public catalog, the event detail, "My events", the event form (with zones of
+- [x] 7.1 Draw the mockups of the public catalog, the event detail, "My events", the event form (with zones of
   both modalities and participants) and the publish errors, with the GoPass palette and fonts (D-38), in
   `docs/mockups/catalog/` as PNG exports with their source; sample data only. Verify: reviewed by C in the pull
-  request.
+  request. Done: HTML sources in `docs/mockups/catalog/src/` with a shared `gopass.css`, rendered with a headless
+  browser; `docs/mockups/catalog/README.md` maps each screen to its route and specs. The `409` of a stale version
+  is shown on the publish-errors screen.
 
 ## 8. Screens (B) [P2]
 

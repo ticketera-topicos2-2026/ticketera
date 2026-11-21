@@ -1,0 +1,20 @@
+meta {
+  name: 2. Query Available Seats
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/events/{{eventId}}/seats?status=AVAILABLE
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{clientToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body: isArray
+}

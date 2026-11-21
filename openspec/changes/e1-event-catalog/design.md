@@ -184,18 +184,19 @@ Alembic in `services/catalog/alembic/` (D-33). Tables:
   - A `CHECK` mirrors the modality rule: `seat_count` for `NUMBERED`, `capacity` for `UNNUMBERED`.
 - `event_participants`: `event_id FK`, `position`, `name`, primary key `(event_id, position)`.
   - Index on `lower(name)`, ready for DF-06.
-- `idempotency_keys`: primary key `(owner_id, key)`, `request_hash`, `response_status`, `response_body`,
-  `created_at`.
+- `idempotency_keys`: primary key `(owner_id, key)`, `request_hash`, `event_id` (null until the creation commits),
+  `created_at`. A replay returns the stored event: the spec asks for the same event, not for the same bytes, and
+  the application layer stays free of the API format.
 
 ## Concurrency and Idempotency
 
 - **Create (EC-05)**, in one `READ COMMITTED` transaction:
   1. `INSERT INTO idempotency_keys (owner_id, key, request_hash) ... ON CONFLICT DO NOTHING`, before anything else.
   2. If no row was inserted, PostgreSQL has already waited for the other transaction with the same key. Then
-     `SELECT` that row: the same hash gets a `ROLLBACK` and a replay of the stored `201`; a different hash gets a
-     `ROLLBACK` and `422`.
+     `SELECT` that row: the same hash gets a `ROLLBACK` and a `201` with the stored event; a different hash gets
+     a `ROLLBACK` and `422`.
   3. Insert the event, its zones and participants.
-  4. Store `response_status` and `response_body` on the key.
+  4. Store the event id on the key.
   5. `COMMIT`.
 
   `request_hash` is the SHA-256 of the canonical JSON of the body. A failed transaction removes its key, so a

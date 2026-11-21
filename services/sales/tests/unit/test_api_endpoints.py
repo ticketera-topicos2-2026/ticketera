@@ -3,7 +3,8 @@
 Verifies:
 - POST /events/{event_id}/inventory (Admin role, 401 unauthenticated, 403 forbidden)
 - GET /events/{event_id}/seats (Authentication required, 401 unauthenticated, 403 forbidden)
-- POST /events/{event_id}/orders with Idempotency-Key (Client purchase, duplicate replay, 400 on missing key, 422 payload mismatch, 422 empty/duplicate seats)
+- POST /events/{event_id}/orders with Idempotency-Key (Client purchase, duplicate replay,
+  400 on missing key, 422 payload mismatch, 422 empty/duplicate seats)
 - GET /orders/{order_id} with BOLA protection (404 on other customer's order)
 """
 
@@ -11,14 +12,20 @@ import base64
 import json
 import uuid
 from typing import Any
+
 import pytest
 from fastapi.testclient import TestClient
 
 from sales.api.app import create_app
 from sales.application.health import DatabaseProbe
-from sales.domain.models import Seat, SeatStatus, Order
-from sales.application.ports import InventoryRepository, OrderRepository, IdempotencyStore, StoredIdempotencyRecord
+from sales.application.ports import (
+    IdempotencyStore,
+    InventoryRepository,
+    OrderRepository,
+    StoredIdempotencyRecord,
+)
 from sales.domain.exceptions import SeatNotAvailableError
+from sales.domain.models import Order, Seat, SeatStatus
 
 
 def _make_jwt(sub: str, roles: list[str]) -> str:
@@ -27,7 +34,7 @@ def _make_jwt(sub: str, roles: list[str]) -> str:
     payload = base64.urlsafe_b64encode(
         json.dumps({
             "sub": sub,
-            "realm_access": {"roles": roles}
+            "realm_access": {"roles": roles},
         }).encode()
     ).decode().rstrip("=")
     return f"{header}.{payload}."
@@ -43,7 +50,7 @@ class InMemoryInventoryRepo(InventoryRepository):
         self.seats: dict[tuple[str, str], Seat] = {}
 
     def exists_any(self, event_id: str) -> bool:
-        return any(e_id == event_id for (e_id, _) in self.seats.keys())
+        return any(e_id == event_id for (e_id, _) in self.seats)
 
     def save_all(self, seats: list[Seat]) -> None:
         for s in seats:
@@ -112,7 +119,10 @@ def client() -> TestClient:
 
 def test_initialize_inventory_requires_admin(client: TestClient) -> None:
     # 401 unauthenticated
-    resp = client.post("/events/ev-1/inventory", json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 1000}]})
+    resp = client.post(
+        "/events/ev-1/inventory",
+        json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 1000}]},
+    )
     assert resp.status_code == 401
 
     # 403 forbidden if not ADMIN
@@ -120,7 +130,7 @@ def test_initialize_inventory_requires_admin(client: TestClient) -> None:
     resp = client.post(
         "/events/ev-1/inventory",
         headers={"Authorization": f"Bearer {client_token}"},
-        json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 1000}]}
+        json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 1000}]},
     )
     assert resp.status_code == 403
 
@@ -129,7 +139,7 @@ def test_initialize_inventory_requires_admin(client: TestClient) -> None:
     resp = client.post(
         "/events/ev-1/inventory",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 1000}]}
+        json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 1000}]},
     )
     assert resp.status_code == 201
 
@@ -153,7 +163,7 @@ def test_purchase_tickets_missing_or_invalid_idempotency_key(client: TestClient)
     resp = client.post(
         "/events/ev-1/orders",
         headers={"Authorization": f"Bearer {client_token}"},
-        json={"seat_ids": ["A-1"]}
+        json={"seat_ids": ["A-1"]},
     )
     assert resp.status_code == 400
 
@@ -161,7 +171,7 @@ def test_purchase_tickets_missing_or_invalid_idempotency_key(client: TestClient)
     resp = client.post(
         "/events/ev-1/orders",
         headers={"Authorization": f"Bearer {client_token}", "Idempotency-Key": "not-a-uuid"},
-        json={"seat_ids": ["A-1"]}
+        json={"seat_ids": ["A-1"]},
     )
     assert resp.status_code == 400
 
@@ -174,7 +184,7 @@ def test_purchase_tickets_successful_and_idempotent_replay(client: TestClient) -
     client.post(
         "/events/ev-1/inventory",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 5000}]}
+        json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 5000}]},
     )
 
     # 2. Purchase tickets
@@ -182,7 +192,7 @@ def test_purchase_tickets_successful_and_idempotent_replay(client: TestClient) -
     resp = client.post(
         "/events/ev-1/orders",
         headers={"Authorization": f"Bearer {client_token}", "Idempotency-Key": idem_key},
-        json={"seat_ids": ["A-1"]}
+        json={"seat_ids": ["A-1"]},
     )
     assert resp.status_code == 201
     body1 = resp.json()
@@ -196,7 +206,7 @@ def test_purchase_tickets_successful_and_idempotent_replay(client: TestClient) -
     resp2 = client.post(
         "/events/ev-1/orders",
         headers={"Authorization": f"Bearer {client_token}", "Idempotency-Key": idem_key},
-        json={"seat_ids": ["A-1"]}
+        json={"seat_ids": ["A-1"]},
     )
     assert resp2.status_code == 201
     assert resp2.json() == body1
@@ -205,7 +215,7 @@ def test_purchase_tickets_successful_and_idempotent_replay(client: TestClient) -
     resp3 = client.post(
         "/events/ev-1/orders",
         headers={"Authorization": f"Bearer {client_token}", "Idempotency-Key": idem_key},
-        json={"seat_ids": ["A-2"]}
+        json={"seat_ids": ["A-2"]},
     )
     assert resp3.status_code == 422
 
@@ -218,14 +228,14 @@ def test_get_order_bola_protection(client: TestClient) -> None:
     client.post(
         "/events/ev-1/inventory",
         headers={"Authorization": f"Bearer {admin_token}"},
-        json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 5000}]}
+        json={"seats": [{"seat_id": "A-1", "category": "GENERAL", "price_centavos": 5000}]},
     )
 
     idem_key = str(uuid.uuid4())
     resp = client.post(
         "/events/ev-1/orders",
         headers={"Authorization": f"Bearer {user1_token}", "Idempotency-Key": idem_key},
-        json={"seat_ids": ["A-1"]}
+        json={"seat_ids": ["A-1"]},
     )
     order_id = resp.json()["order_id"]
 

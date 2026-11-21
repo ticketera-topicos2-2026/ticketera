@@ -1,0 +1,28 @@
+meta {
+  name: Public detail with seat ids
+  type: http
+  seq: 11
+}
+
+get {
+  url: {{baseUrl}}/events/{{eventId}}
+  body: none
+  auth: none
+}
+
+script:post-response {
+  test("the numbered zone shows its seat ids", () => {
+    expect(res.body.zones[0].seat_ids).to.eql(["PLATEA-1", "PLATEA-2", "PLATEA-3"]);
+  });
+}
+
+assert {
+  res.status: eq 200
+  res.body.owner_id: isUndefined
+}
+
+docs {
+  Req: The public catalog shows a published event.
+  Scenario: Published event.
+  Req: The public catalog lists only published events. Scenario: Owner not shown.
+}

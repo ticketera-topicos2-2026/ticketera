@@ -1,0 +1,37 @@
+meta {
+  name: Edit with a stale version
+  type: http
+  seq: 8
+}
+
+put {
+  url: {{baseUrl}}/manage/events/{{eventId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "title": "Versión vieja",
+    "type": "CONCERT",
+    "organizer_name": "Orquesta Típica Malvón",
+    "participants": [{"name": "Lucía Ríos"}],
+    "starts_at": "{{startsAt}}",
+    "venue": {"name": "Teatro del Lago", "city": "Rosario"},
+    "zones": [{"code": "PLATEA", "name": "Platea", "modality": "NUMBERED", "seat_count": 3}],
+    "version": 1
+  }
+}
+
+assert {
+  res.status: eq 409
+}
+
+docs {
+  Req: A draft is edited with its current version.
+  Scenario: Edit with a stale version.
+}

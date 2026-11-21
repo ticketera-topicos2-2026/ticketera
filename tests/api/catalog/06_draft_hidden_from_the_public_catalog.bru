@@ -1,0 +1,20 @@
+meta {
+  name: Draft hidden from the public catalog
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{baseUrl}}/events/{{eventId}}
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 404
+}
+
+docs {
+  Req: The public catalog shows a published event.
+  Scenario: Draft requested by its identifier.
+}

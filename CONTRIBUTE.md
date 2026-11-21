@@ -360,3 +360,24 @@ Abrí el pull request hacia `main` y completá la plantilla:
 
 - Nadie puede saltear las reglas de `main`, ni siquiera un administrador. Si un merge rompe `main`, se revierte
   ese commit con un pull request nuevo (DS-21).
+
+## Pruebas y Comandos de `sales`
+
+Para el servicio `sales` (Core Domain, Etapa I):
+- **Linting y reglas de arquitectura hexagonal**:
+  ```bash
+  docker compose run --rm sales bin/lint
+  ```
+- **Chequeo de tipos estáticos**:
+  ```bash
+  docker compose run --rm sales mypy
+  ```
+- **Tests unitarios, de integración y de contrato OpenAPI**:
+  ```bash
+  docker compose run --rm sales pytest
+  ```
+- **Migraciones de base de datos con Alembic**:
+  ```bash
+  docker compose run --rm sales alembic upgrade head
+  ```
+

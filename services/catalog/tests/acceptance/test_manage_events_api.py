@@ -69,7 +69,9 @@ def test_empty_title_is_named() -> None:
 
 def test_start_without_time_zone_is_named() -> None:
     """Req: Event data is validated. Scenario: Start time without a time zone."""
-    response = client().post("/manage/events", json=event_body(starts_at="2026-12-20T21:00:00"), headers=with_key(OWNER))
+    response = client().post(
+        "/manage/events", json=event_body(starts_at="2026-12-20T21:00:00"), headers=with_key(OWNER)
+    )
 
     assert response.status_code == 422
     assert error_fields(response.json()) == {"starts_at"}
@@ -79,7 +81,9 @@ def test_too_many_participants_are_named() -> None:
     """Req: Event data is validated. Scenario: Too many participants."""
     participants = [{"name": f"Participante {n}"} for n in range(51)]
 
-    response = client().post("/manage/events", json=event_body(participants=participants), headers=with_key(OWNER))
+    response = client().post(
+        "/manage/events", json=event_body(participants=participants), headers=with_key(OWNER)
+    )
 
     assert response.status_code == 422
     assert error_fields(response.json()) == {"participants"}
@@ -168,7 +172,12 @@ def test_two_users_with_the_same_key_create_two_events() -> None:
     key = str(uuid4())
 
     for headers in (OWNER, ADMIN):
-        assert test_client.post("/manage/events", json=event_body(), headers={**headers, "Idempotency-Key": key}).status_code == 201
+        assert (
+            test_client.post(
+                "/manage/events", json=event_body(), headers={**headers, "Idempotency-Key": key}
+            ).status_code
+            == 201
+        )
 
     assert test_client.get("/manage/events", headers=ADMIN).json()["total"] == 2
 
@@ -178,7 +187,9 @@ def test_edit_with_the_current_version() -> None:
     test_client = client()
     event_id = create(test_client)["id"]
 
-    response = test_client.put(f"/manage/events/{event_id}", json=event_body(title="Nuevo", version=1), headers=OWNER)
+    response = test_client.put(
+        f"/manage/events/{event_id}", json=event_body(title="Nuevo", version=1), headers=OWNER
+    )
 
     assert response.status_code == 200
     assert (response.json()["title"], response.json()["version"]) == ("Nuevo", 2)
@@ -190,7 +201,9 @@ def test_edit_with_a_stale_version() -> None:
     event_id = create(test_client)["id"]
     test_client.put(f"/manage/events/{event_id}", json=event_body(title="v2", version=1), headers=OWNER)
 
-    response = test_client.put(f"/manage/events/{event_id}", json=event_body(title="v3", version=1), headers=ADMIN)
+    response = test_client.put(
+        f"/manage/events/{event_id}", json=event_body(title="v3", version=1), headers=ADMIN
+    )
 
     assert response.status_code == 409
     assert test_client.get(f"/manage/events/{event_id}", headers=OWNER).json()["title"] == "v2"
@@ -202,7 +215,9 @@ def test_edit_of_a_published_event() -> None:
     event_id = create(test_client)["id"]
     version = publish(test_client, event_id)["version"]
 
-    response = test_client.put(f"/manage/events/{event_id}", json=event_body(title="Otro", version=version), headers=OWNER)
+    response = test_client.put(
+        f"/manage/events/{event_id}", json=event_body(title="Otro", version=version), headers=OWNER
+    )
 
     assert response.status_code == 409
 
@@ -214,7 +229,10 @@ def test_complete_draft_is_published_and_listed() -> None:
 
     published = publish(test_client, event_id)
 
-    assert (published["status"], published["published_at"]) == ("PUBLISHED", NOW.isoformat().replace("+00:00", "Z"))
+    assert (published["status"], published["published_at"]) == (
+        "PUBLISHED",
+        NOW.isoformat().replace("+00:00", "Z"),
+    )
     assert [item["id"] for item in test_client.get("/events").json()["items"]] == [event_id]
 
 
@@ -253,7 +271,10 @@ def test_publishing_twice_keeps_the_first_publication() -> None:
 
 
 def test_another_owners_draft_is_not_found() -> None:
-    """Req: An EVENT_OWNER manages only their own events. Scenario: EVENT_OWNER reads another owner's draft."""
+    """Req: An EVENT_OWNER manages only their own events.
+
+    Scenario: EVENT_OWNER reads another owner's draft.
+    """
     test_client = client()
     event_id = create(test_client, ADMIN)["id"]
 
@@ -265,7 +286,10 @@ def test_another_owners_draft_is_not_found() -> None:
 
 
 def test_another_owners_draft_is_not_published() -> None:
-    """Req: An EVENT_OWNER manages only their own events. Scenario: EVENT_OWNER publishes another owner's draft."""
+    """Req: An EVENT_OWNER manages only their own events.
+
+    Scenario: EVENT_OWNER publishes another owner's draft.
+    """
     test_client = client()
     event_id = create(test_client, OTHER_OWNER)["id"]
 
@@ -278,7 +302,9 @@ def test_admin_edits_an_owners_draft() -> None:
     test_client = client()
     event_id = create(test_client)["id"]
 
-    response = test_client.put(f"/manage/events/{event_id}", json=event_body(title="Corregido", version=1), headers=ADMIN)
+    response = test_client.put(
+        f"/manage/events/{event_id}", json=event_body(title="Corregido", version=1), headers=ADMIN
+    )
 
     assert response.status_code == 200
     assert response.json()["owner_id"] == OWNER_SUB

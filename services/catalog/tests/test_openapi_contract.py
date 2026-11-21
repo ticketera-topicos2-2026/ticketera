@@ -31,7 +31,8 @@ def operations(schema: dict[str, Any]) -> dict[tuple[str, str], dict[str, Any]]:
 
 
 def success_status(operation: dict[str, Any]) -> str:
-    return min(code for code in operation["responses"] if code.startswith("2"))
+    codes: list[str] = [str(code) for code in operation["responses"] if str(code).startswith("2")]
+    return min(codes)
 
 
 def body_schema(operation: dict[str, Any]) -> str | None:

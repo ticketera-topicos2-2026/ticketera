@@ -41,7 +41,9 @@ def test_role_in_another_claim_is_ignored() -> None:
     Scenario: Role in another claim.
     """
     headers = bearer(
-        CLIENT_SUB, "CLIENT", extra_claims={"resource_access": {"catalog": {"roles": ["ADMIN"]}}, "role": "ADMIN"}
+        CLIENT_SUB,
+        "CLIENT",
+        extra_claims={"resource_access": {"catalog": {"roles": ["ADMIN"]}}, "role": "ADMIN"},
     )
 
     assert client().get("/manage/events", headers=headers).status_code == 403
@@ -86,7 +88,9 @@ def test_client_cannot_manage_events() -> None:
     ADMIN-only endpoint (the management API admits EVENT_OWNER and ADMIN only)."""
     test_client = client()
 
-    response = test_client.post("/manage/events", json=event_body(), headers=with_key(bearer(CLIENT_SUB, "CLIENT")))
+    response = test_client.post(
+        "/manage/events", json=event_body(), headers=with_key(bearer(CLIENT_SUB, "CLIENT"))
+    )
 
     assert response.status_code == 403
     assert test_client.get("/manage/events", headers=ADMIN).json()["total"] == 0

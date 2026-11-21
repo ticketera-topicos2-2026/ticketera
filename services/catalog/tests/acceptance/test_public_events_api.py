@@ -67,7 +67,11 @@ def test_filter_by_type_and_date_range() -> None:
 
     response = test_client.get(
         "/events",
-        params={"type": "CONCERT", "starts_from": "2026-12-01T00:00:00-03:00", "starts_to": "2026-12-31T23:59:59-03:00"},
+        params={
+            "type": "CONCERT",
+            "starts_from": "2026-12-01T00:00:00-03:00",
+            "starts_to": "2026-12-31T23:59:59-03:00",
+        },
     )
 
     assert [item["id"] for item in response.json()["items"]] == [december]
@@ -131,7 +135,9 @@ def test_tampered_token_changes_nothing() -> None:
     test_client = client()
     published(test_client)
     create(test_client, title="Borrador")
-    forged_payload = base64.urlsafe_b64encode(json.dumps({"sub": ADMIN_SUB, "realm_access": {"roles": ["ADMIN"]}}).encode())
+    forged_payload = base64.urlsafe_b64encode(
+        json.dumps({"sub": ADMIN_SUB, "realm_access": {"roles": ["ADMIN"]}}).encode()
+    )
     tampered = {"Authorization": f"Bearer eyJhbGciOiJSUzI1NiJ9.{forged_payload.decode().rstrip('=')}.forged"}
 
     anonymous = test_client.get("/events").json()

@@ -116,13 +116,18 @@
 
 ## 6. API tests (B) [P1]
 
-- [ ] 6.1 Write `tests/api/catalog/` in Bruno with the test users of #30: create with a key and retry it; edit;
+- [x] 6.1 Write `tests/api/catalog/` in Bruno with the test users of #30: create with a key and retry it; edit;
   stale version; publish; public list and detail; `403` for a `CLIENT`; `404` across owners (Req event-management
-  and event-browsing, the main scenarios). Verify: the collection passes with the runner of D-24.
-- [ ] 6.2 Write `tests/smoke/measure-catalog-latency.sh`: creates and publishes 100 events through the gateway,
+  and event-browsing, the main scenarios). Verify: the collection passes with the runner of D-24. Done: 13 requests
+  and 20 assertions pass. The runner of D-24 did not exist, so this change adds a minimal one, `tests/api/run.sh`:
+  Bruno CLI 4.3.0 from a lockfile in the pinned Node container of the CI, in the gateway's network namespace. Until
+  the test users of #30 exist it passes unsigned test tokens with a new `sub` per run; once the access check of #30
+  is merged it must get real tokens from `ticketera-api-tests`.
+- [x] 6.2 Write `tests/smoke/measure-catalog-latency.sh`: creates and publishes 100 events through the gateway,
   then measures 10 warm-up and 100 requests of `GET /api/catalog/events?limit=100` and prints the p95 (Req
   event-browsing: The public catalog answers quickly). Verify: the p95 is 300 ms or less on a member's machine;
-  the result goes to the team log.
+  the result goes to the team log. Done: p50 26 ms, p95 58 ms on 2026-11-21 (6 GiB machine, WSL 2); to the team
+  log with task 9.2.
 
 ## 7. Mockups (B) [P1]
 

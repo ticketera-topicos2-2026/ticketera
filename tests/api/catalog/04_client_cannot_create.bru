@@ -1,0 +1,40 @@
+meta {
+  name: CLIENT cannot create
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/manage/events
+  body: json
+  auth: bearer
+}
+
+headers {
+  Idempotency-Key: {{createKey}}
+}
+
+auth:bearer {
+  token: {{clientToken}}
+}
+
+body:json {
+  {
+    "title": "No debería existir",
+    "type": "CONCERT",
+    "organizer_name": "Orquesta Típica Malvón",
+    "participants": [{"name": "Lucía Ríos"}],
+    "starts_at": "{{startsAt}}",
+    "venue": {"name": "Teatro del Lago", "city": "Rosario"},
+    "zones": [{"code": "PLATEA", "name": "Platea", "modality": "NUMBERED", "seat_count": 3}]
+  }
+}
+
+assert {
+  res.status: eq 403
+}
+
+docs {
+  Req: An EVENT_OWNER or an ADMIN creates a draft event.
+  Scenario: CLIENT tries to create an event.
+}

@@ -1,0 +1,53 @@
+meta {
+  name: Create a draft
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/manage/events
+  body: json
+  auth: bearer
+}
+
+headers {
+  Idempotency-Key: {{createKey}}
+}
+
+auth:bearer {
+  token: {{ownerToken}}
+}
+
+body:json {
+  {
+    "title": "Noche de Tango (Bruno)",
+    "type": "CONCERT",
+    "organizer_name": "Orquesta Típica Malvón",
+    "participants": [{"name": "Lucía Ríos"}],
+    "starts_at": "{{startsAt}}",
+    "venue": {"name": "Teatro del Lago", "city": "Rosario"},
+    "zones": [{"code": "PLATEA", "name": "Platea", "modality": "NUMBERED", "seat_count": 3}]
+  }
+}
+
+script:pre-request {
+  // A new idempotency key and a start date one month ahead on every run.
+  const hex = () => Math.floor(Math.random() * 16).toString(16);
+  bru.setVar("createKey", "xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx".replace(/x/g, hex));
+  bru.setVar("startsAt", new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString());
+}
+
+script:post-response {
+  bru.setVar("eventId", res.body.id);
+}
+
+assert {
+  res.status: eq 201
+  res.body.status: eq "DRAFT"
+  res.body.version: eq 1
+}
+
+docs {
+  Req: An EVENT_OWNER or an ADMIN creates a draft event.
+  Scenario: EVENT_OWNER creates a draft.
+}

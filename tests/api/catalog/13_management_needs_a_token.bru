@@ -1,0 +1,20 @@
+meta {
+  name: Management needs a token
+  type: http
+  seq: 13
+}
+
+get {
+  url: {{baseUrl}}/manage/events
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 401
+}
+
+docs {
+  Req: Services authorize by role.
+  Scenario: Protected endpoint reached without a token.
+}

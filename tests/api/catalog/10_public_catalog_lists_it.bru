@@ -1,0 +1,27 @@
+meta {
+  name: Public catalog lists it
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{baseUrl}}/events?type=CONCERT&limit=100
+  body: none
+  auth: none
+}
+
+script:post-response {
+  test("the published event is listed", () => {
+    expect(res.body.items.map((item) => item.id)).to.include(bru.getVar("eventId"));
+  });
+}
+
+assert {
+  res.status: eq 200
+  res.body.total: gte 1
+}
+
+docs {
+  Req: The public catalog lists only published events.
+  Scenario: Visitor without a token.
+}

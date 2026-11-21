@@ -1,0 +1,11 @@
+[importlinter]
+root_package = catalog
+
+[importlinter:contract:hexagonal-layers]
+name = Catalog hexagonal layers contract (D-33)
+type = layers
+layers =
+    catalog.api
+    catalog.infrastructure
+    catalog.application
+    catalog.domain

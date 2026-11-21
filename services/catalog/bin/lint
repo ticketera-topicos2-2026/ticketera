@@ -1,0 +1,5 @@
+#!/bin/sh
+# Lint and layer rules of the hexagonal architecture (D-33).
+set -e
+ruff check .
+lint-imports --cache-dir /tmp/import_linter_cache

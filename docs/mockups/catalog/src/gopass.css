@@ -1,0 +1,142 @@
+/* GoPass mockup styles (change e1-event-catalog, task 7.1).
+   Tokens from the GoPass visual identity (D-38, openspec/config.yaml): the same palette and fonts the Tailwind
+   theme of the frontend uses. Mockups only: the real screens are built with Tailwind CSS and shadcn/ui (D-16). */
+
+:root {
+  --primary: #2563eb;
+  --secondary: #7c3aed;
+  --background: #f8fafc;
+  --surface: #ffffff;
+  --text: #111827;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --gradient: linear-gradient(135deg, var(--primary), var(--secondary));
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(17, 24, 39, 0.06), 0 4px 16px rgba(17, 24, 39, 0.06);
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+body {
+  font-family: "Inter", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--background);
+  width: 1440px;
+}
+
+h1, h2, h3, .brand { font-family: "Plus Jakarta Sans", "Inter", sans-serif; letter-spacing: -0.01em; }
+h1 { font-size: 34px; line-height: 1.2; font-weight: 800; }
+h2 { font-size: 22px; font-weight: 700; }
+h3 { font-size: 17px; font-weight: 700; }
+.muted { color: var(--muted); }
+.small { font-size: 13px; }
+
+/* Header */
+.header {
+  display: flex; align-items: center; gap: 40px;
+  height: 72px; padding: 0 64px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+.brand {
+  font-size: 26px; font-weight: 800;
+  background: var(--gradient); -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.nav { display: flex; gap: 28px; flex: 1; }
+.nav a { color: var(--muted); text-decoration: none; font-weight: 500; padding: 24px 0; }
+.nav a.active { color: var(--text); box-shadow: inset 0 -3px 0 var(--primary); }
+.user { display: flex; align-items: center; gap: 12px; }
+.avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: grid; place-items: center; color: #fff; font-weight: 700; background: var(--gradient);
+}
+.role {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: var(--secondary);
+  background: #ede9fe; padding: 2px 8px; border-radius: 999px;
+}
+
+/* Layout */
+.page { padding: 40px 64px 64px; }
+.row { display: flex; gap: 24px; align-items: flex-start; }
+.grow { flex: 1; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+.pad { padding: 24px; }
+.stack > * + * { margin-top: 16px; }
+.title-row { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 28px; }
+
+/* Buttons and inputs */
+.btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 42px; padding: 0 18px;
+  border-radius: 10px; border: 1px solid var(--border); background: var(--surface);
+  font: 600 14px "Inter", sans-serif; color: var(--text);
+}
+.btn.primary { background: var(--gradient); color: #fff; border: 0; }
+.btn.danger-outline { border-color: var(--error); color: var(--error); }
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; font-weight: 600; }
+.input {
+  height: 42px; padding: 0 14px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); display: flex; align-items: center; justify-content: space-between; color: var(--text);
+}
+.input.area { height: 96px; align-items: flex-start; padding-top: 10px; }
+.input.invalid { border-color: var(--error); box-shadow: 0 0 0 3px #fee2e2; }
+.hint { font-size: 12px; color: var(--muted); }
+.error-text { font-size: 12px; color: var(--error); font-weight: 600; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+
+/* Chips and badges */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px;
+  border-radius: 999px; font-size: 12px; font-weight: 600; background: #eff6ff; color: var(--primary);
+}
+.chip.violet { background: #f5f3ff; color: var(--secondary); }
+.chip.gray { background: #f1f5f9; color: var(--muted); }
+.badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px; }
+.badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.badge.draft { color: #b45309; background: #fef3c7; }
+.badge.published { color: #15803d; background: #dcfce7; }
+
+/* Event cards */
+.cover { height: 150px; border-radius: var(--radius) var(--radius) 0 0; background: var(--gradient); position: relative; overflow: hidden; }
+.cover::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.35), transparent 45%),
+              radial-gradient(circle at 10% 90%, rgba(255,255,255,0.18), transparent 40%);
+}
+.cover .chip { position: absolute; top: 14px; left: 14px; background: rgba(255,255,255,0.92); z-index: 1; }
+.cover.c2 { background: linear-gradient(135deg, #7c3aed, #ec4899); }
+.cover.c3 { background: linear-gradient(135deg, #0ea5e9, #2563eb); }
+.cover.c4 { background: linear-gradient(135deg, #16a34a, #0ea5e9); }
+.cover.c5 { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+.cover.c6 { background: linear-gradient(135deg, #1e3a8a, #7c3aed); }
+.event-card .body { padding: 18px 20px 20px; }
+.meta { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 14px; color: var(--muted); font-size: 14px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; padding: 14px 20px; border-bottom: 1px solid var(--border); }
+td { padding: 18px 20px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+.link { color: var(--primary); font-weight: 600; text-decoration: none; }
+
+/* Alerts */
+.alert { display: flex; gap: 14px; padding: 16px 20px; border-radius: 12px; border: 1px solid; }
+.alert .icon { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; flex: none; }
+.alert.error { background: #fef2f2; border-color: #fecaca; }
+.alert.error .icon { background: var(--error); }
+.alert.warning { background: #fffbeb; border-color: #fde68a; }
+.alert.warning .icon { background: var(--warning); }
+.alert ul { margin: 6px 0 0 18px; padding: 0; }
+
+/* Mockup annotation, outside the product UI */
+.note {
+  display: block; margin: 0 64px 32px; padding: 12px 14px;
+  background: #111827; color: #f8fafc; font-size: 12px; border-radius: 10px;
+}
+.note b { color: #c4b5fd; }

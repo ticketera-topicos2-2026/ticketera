@@ -36,7 +36,9 @@ FIRST_PAGE = Page(limit=20, offset=0)
 NO_FILTERS = PublicFilters()
 
 
-def details(title: str = "Noche de Tango", days: int = 30, event_type: EventType = EventType.CONCERT) -> EventDetails:
+def details(
+    title: str = "Noche de Tango", days: int = 30, event_type: EventType = EventType.CONCERT
+) -> EventDetails:
     return EventDetails(
         title=title,
         description="",
@@ -171,15 +173,23 @@ def test_publishing_twice_returns_the_same_publication(service: CatalogService) 
 
 
 def test_event_owner_cannot_read_another_owners_draft(service: CatalogService) -> None:
-    """Req: An EVENT_OWNER manages only their own events. Scenario: EVENT_OWNER reads another owner's draft."""
+    """Req: An EVENT_OWNER manages only their own events.
+
+    Scenario: EVENT_OWNER reads another owner's draft.
+    """
     event_id = create(service, user=ADMIN)
 
     with pytest.raises(EventNotFoundError):
         service.get_managed_event(OWNER, event_id)
 
 
-def test_event_owner_cannot_publish_another_owners_draft(service: CatalogService, uow: FakeUnitOfWork) -> None:
-    """Req: An EVENT_OWNER manages only their own events. Scenario: EVENT_OWNER publishes another owner's draft."""
+def test_event_owner_cannot_publish_another_owners_draft(
+    service: CatalogService, uow: FakeUnitOfWork
+) -> None:
+    """Req: An EVENT_OWNER manages only their own events.
+
+    Scenario: EVENT_OWNER publishes another owner's draft.
+    """
     event_id = create(service, user=OTHER_OWNER)
 
     with pytest.raises(EventNotFoundError):
@@ -208,7 +218,10 @@ def test_admin_edits_an_owners_draft_without_taking_it(service: CatalogService) 
 
 
 def test_unknown_event_is_not_found(service: CatalogService) -> None:
-    """Req: An EVENT_OWNER manages only their own events. Scenario: EVENT_OWNER reads another owner's draft."""
+    """Req: An EVENT_OWNER manages only their own events.
+
+    Scenario: EVENT_OWNER reads another owner's draft (an unknown id answers the same).
+    """
     with pytest.raises(EventNotFoundError):
         service.get_managed_event(ADMIN, uuid4())
 
@@ -247,8 +260,13 @@ def test_admin_lists_every_event(service: CatalogService) -> None:
     assert service.list_managed(ADMIN, FIRST_PAGE).total == 2
 
 
-def test_public_list_shows_only_published_upcoming_events(service: CatalogService, uow: FakeUnitOfWork) -> None:
-    """Req: The public catalog lists only published events. Scenarios: Visitor without a token; Draft not listed."""
+def test_public_list_shows_only_published_upcoming_events(
+    service: CatalogService, uow: FakeUnitOfWork
+) -> None:
+    """Req: The public catalog lists only published events.
+
+    Scenarios: Visitor without a token; Draft not listed.
+    """
     later = create(service, title="Después")
     service.publish_event(OWNER, later)
     sooner_id = service.create_event(
@@ -278,7 +296,10 @@ def test_public_list_filters_by_type(service: CatalogService) -> None:
     concert = create(service, title="Concierto")
     service.publish_event(OWNER, concert)
     play_id = service.create_event(
-        OWNER, details(title="Obra", event_type=EventType.THEATER), idempotency_key=uuid4(), request_hash="obra"
+        OWNER,
+        details(title="Obra", event_type=EventType.THEATER),
+        idempotency_key=uuid4(),
+        request_hash="obra",
     ).id
     service.publish_event(OWNER, play_id)
 

@@ -73,14 +73,15 @@ change; IA-xx are the decisions of `e1-identity-access` and DS-xx those of `proj
 | RL-16 | Three networks: the existing `edge` and `backend`, plus `observability` for Alloy, Loki and Grafana | DS-23 | Joining Loki to `backend` (services do not talk to Loki, so nothing needs that path) |
 | RL-17 | Loki image extended with the static BusyBox binary for its healthcheck; its quality labels run `loki -verify-config` | DS-12, DS-18, DS-25 | No healthcheck for Loki (breaks "Every container reports its health"); changing the `quality` job to skip images without labels (a CI change owned by A, and DS-18); an image mount of BusyBox (needs a newer Engine and Compose than the CI runner guarantees) |
 
-[adr-d23]: /docs/adr/README.md
+[adr-d23]: /docs/adr/adr-0011-bitacora-http-y-observabilidad.md
 [adr-0004]: /docs/adr/adr-0004-contenedor-y-base-logica-por-servicio.md
 [adr-0005]: /docs/adr/adr-0005-arquitectura-hexagonal.md
 
-The ADR of D-23 does not exist yet: a task of this change writes it with the `create-architectural-decision-record`
-skill (D-27). Its number is taken when it is merged, as agreed in the review of #32, and the link above is updated
-then. It records RL-01, RL-08, RL-11, RL-12 and RL-14: the log format and excluded fields, the correlation id, the
-collection stack, its access and its retention.
+The ADR of D-23 is [ADR-0011][adr-d23], written by task 6.1 following the template of the existing ADRs (the
+`create-architectural-decision-record` skill was not available). Its number may change when it is merged, as
+agreed in the review of #32; this link is updated then. It records RL-01, RL-08, RL-11, RL-12, RL-14 and RL-17:
+the log format and excluded fields, the correlation id, the collection stack, its access, its retention, and the
+exception to DS-13.
 
 ### Decision notes: gateway
 

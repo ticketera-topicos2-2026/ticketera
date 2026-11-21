@@ -119,9 +119,10 @@
   Done: the checks pass locally and the missing password stops Compose naming it; pending: the clean reset by
   hand, and a stable smoke run in CI (on a machine with 6 GiB of RAM the repeated stop and start of the three
   containers left WSL without memory).
-- [ ] 4.5 Measure the smoke-test duration and the memory of the three containers in CI and on a member's machine;
+- [x] 4.5 Measure the smoke-test duration and the memory of the three containers in CI and on a member's machine;
   record both in the team log; the CI still finishes within 15 minutes (Req continuous-integration of
-  `project-bootstrap`: The CI finishes within 15 minutes). Verify: numbers recorded.
+  `project-bootstrap`: The CI finishes within 15 minutes). Verify: numbers recorded. Recorded in the team log of
+  2026-11-20: smoke-test job 2 min 43 s (1 min 53 s before); Loki ~100 MiB, Alloy ~90 MiB, Grafana ~210 MiB.
 
 ## 5. API tests (B, with group 4 or later) [P2]
 
@@ -132,17 +133,20 @@
 
 ## 6. ADR, documentation and team log (B, in the pull request of group 4)
 
-- [ ] 6.1 Write the ADR of D-23 in `docs/adr/` with the `create-architectural-decision-record` skill: log line
+- [x] 6.1 Write the ADR of D-23 in `docs/adr/` with the `create-architectural-decision-record` skill: log line
   format and excluded fields, correlation id, Alloy + Loki + Grafana, read-only Docker socket as an accepted risk
   with a socket proxy as the upgrade path, 7-day retention; take its number when merging; update the link in
   `design.md` and the index in `docs/adr/README.md` (D-27, RL-01, RL-08, RL-11, RL-12, RL-14). Verify: the ADR
-  is listed in the index and linked from the design.
-- [ ] 6.2 Update `CONTRIBUTE.md` (Spanish): how to open Grafana, find a request by its correlation id, read the
-  dashboard, and stop Loki, Alloy and Grafana on a machine with little memory. Verify: a member follows it on a
-  clean clone.
-- [ ] 6.3 Update `AGENTS.md`: a service never logs anything but the request log line's fields, and an
+  is listed in the index and linked from the design. Done as ADR-0011 (`Proposed` until #39 is approved), with
+  the template of the existing ADRs because the skill was not available; it also records the exception to DS-13
+  and RL-17.
+- [x] 6.2 Update `CONTRIBUTE.md` (Spanish): how to open Grafana, find a request by its correlation id, read the
+  dashboard, and stop Loki, Alloy and Grafana on a machine with little memory; also what a new service does to
+  write its line. Verify: a member follows it on a clean clone (pending, by the reviewer).
+- [x] 6.3 Update `AGENTS.md`: a service never logs anything but the request log line's fields, and an
   authentication adapter stores the accepted `sub` in `request.state.user_id` (RL-06, RL-08). Verify: reviewed in
   the pull request.
 - [ ] 6.4 Write the team log entry `docs/bitacora/<date>-e1-request-log.md`: what was built, the measured memory
-  and smoke-test time, the dashboard screenshot, and who completed each part. Verify: linked from
-  `docs/bitacora/README.md`.
+  and smoke-test time, the dashboard screenshot, and who completed each part. Verify: the entry exists (the
+  README of the team log has a template, not an index). Done: `docs/bitacora/2026-11-20-e1-request-log.md`;
+  pending: the dashboard screenshot of task 4.3.

@@ -16,6 +16,7 @@ dev = [
     "httpx==0.28.1",
     "ruff==0.14.4",
     "mypy==1.18.2",
+    "import-linter==2.1",
 ]
 
 [tool.uv]

@@ -138,6 +138,35 @@ Les pasa los tokens `ownerToken`, `otherOwnerToken`, `adminToken` y `clientToken
 Por ahora son tokens de prueba sin firmar: sirven mientras el gateway no valide tokens. Cuando se integre el control
 de acceso de `e1-identity-access` (#30), el runner tiene que pedir tokens reales al cliente `ticketera-api-tests`.
 
+### Catálogo de eventos e inventario de `sales`
+
+El catálogo (`e1-event-catalog`) describe la oferta y `sales` la vende: cada servicio tiene su base y ninguno lee
+la del otro (D-06, D-28). En la Etapa I no hay eventos de integración, así que, después de publicar un evento, un
+`ADMIN` carga a mano el inventario de `sales` con los mismos ids:
+
+- el `event_id` de `sales` es el `id` del evento del catálogo;
+- cada asiento de una zona numerada es un `seat_id` de la forma `<código de zona>-<n>`, como los devuelve
+  `GET /api/catalog/events/{id}` en `zones[].seat_ids`;
+- la `category` del asiento es el código de su zona; el precio lo decide `sales` (`price_centavos`, en ARS).
+
+Por ejemplo, para un evento publicado con la zona numerada `PLATEA` de 3 asientos:
+
+```bash
+curl -X POST "http://localhost:18080/api/sales/events/<id del evento>/inventory" \
+  -H "Authorization: Bearer <token de ADMIN>" -H 'Content-Type: application/json' -d '{"seats": [
+    {"seat_id": "PLATEA-1", "category": "PLATEA", "price_centavos": 1500000},
+    {"seat_id": "PLATEA-2", "category": "PLATEA", "price_centavos": 1500000},
+    {"seat_id": "PLATEA-3", "category": "PLATEA", "price_centavos": 1500000}]}'
+```
+
+`GET /api/sales/events/<id>/seats` muestra después esos asientos como `AVAILABLE`. Las zonas no numeradas no se
+cargan todavía: `sales` vende solo asientos numerados en la Etapa I. Desde la Etapa II, el evento de integración
+`EventPublished` reemplaza esta carga manual.
+
+Pruebas del catálogo, como en `sales`: `docker compose run --rm catalog pytest` (unitarias, de integración contra
+PostgreSQL, de aceptación y de contrato), `docker compose run --rm catalog bin/lint` (Ruff e import-linter) y
+`docker compose run --rm catalog mypy`. `catalog` aplica sus migraciones al arrancar (`bin/run`).
+
 ### Día a día
 
 | Quiero... | Comando |

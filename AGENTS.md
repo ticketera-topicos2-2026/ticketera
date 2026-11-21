@@ -57,7 +57,13 @@ section), to the design of `project-bootstrap` (DS-xx) or to `openspec/config.ya
 
 ## Service internal structure
 
-Defined by the design of `e1-idempotent-purchase` (D-33).
+Defined by the design of `e1-idempotent-purchase` (D-33):
+- Four distinct layers: `domain`, `application`, `infrastructure`, and `api`.
+- Domain layer must remain pure: zero framework or database dependencies.
+- Application layer defines use cases and port protocols (`typing.Protocol`).
+- Infrastructure layer implements adapter repositories using SQLAlchemy and PostgreSQL.
+- API layer hosts FastAPI routes, Pydantic schemas, and perimeter JWT claims decoding.
+- Layer boundaries are strictly verified via `import-linter` in CI quality checks.
 
 ## Languages
 

@@ -175,20 +175,10 @@ services:
         UID: ${HOST_UID:-1000}
         GID: ${HOST_GID:-1000}
     command:
-      - uvicorn
-      - sales.api.main:app
-      - --app-dir
-      - src
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --reload
-      - --reload-dir
-      - src
+      - bin/run
     labels:
       ticketera.health-path: /health
-      ticketera.lint: ruff check .
+      ticketera.lint: bin/lint
       ticketera.typecheck: mypy
       ticketera.test: pytest
     environment:

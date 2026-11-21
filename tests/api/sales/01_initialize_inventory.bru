@@ -1,0 +1,36 @@
+meta {
+  name: 1. Initialize Inventory (Admin)
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/events/{{eventId}}/inventory
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{adminToken}}
+}
+
+body:json {
+  {
+    "seats": [
+      {
+        "seat_id": "SEAT-1",
+        "category": "VIP",
+        "price_centavos": 1500000
+      },
+      {
+        "seat_id": "SEAT-2",
+        "category": "GENERAL",
+        "price_centavos": 750000
+      }
+    ]
+  }
+}
+
+assert {
+  res.status: eq 201
+}

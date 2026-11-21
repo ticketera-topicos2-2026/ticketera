@@ -20,6 +20,7 @@ Registro de las decisiones de arquitectura del proyecto, según D-27 (`docs/PLAN
 | [ADR-0004](adr-0004-contenedor-y-base-logica-por-servicio.md) | Un contenedor y una base lógica por servicio | D-05, D-06 | Accepted | 2026-10-27 |
 | [ADR-0005](adr-0005-arquitectura-hexagonal.md) | Arquitectura hexagonal en los servicios | D-17 (incluye D-33) | Accepted | 2026-10-27 |
 | [ADR-0006](adr-0006-rutas-publicas-sin-version.md) | Rutas públicas sin versión | D-29 | Accepted | 2026-11-15 |
+| [ADR-0011](adr-0011-bitacora-http-y-observabilidad.md) | Bitácora HTTP y observabilidad | D-23 (incluye una excepción a DS-13) | Proposed | 2026-11-20 |
 
 ## ADR previstos
 
@@ -27,7 +28,6 @@ Se escriben en el change que implementa cada decisión. La numeración se fija a
 
 | Decisión | Change donde se escribe el ADR | Responsable |
 |---|---|---|
-| D-23 · Bitácora HTTP y observabilidad | `e1-request-log` | Integrante B |
 | D-24 · Tests de API y contrato | El primer change e1 con endpoints | Su dueño |
 | D-25 · Pago en la Etapa II | `e1-idempotent-purchase` | Integrante C |
 | D-30 · Concurrencia e idempotencia sobre PostgreSQL | `e1-idempotent-purchase` | Integrante C |

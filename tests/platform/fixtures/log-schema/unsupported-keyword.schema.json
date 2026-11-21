@@ -1,0 +1,6 @@
+{
+  "type": "object",
+  "properties": {
+    "timestamp": {"type": "string", "format": "date-time"}
+  }
+}

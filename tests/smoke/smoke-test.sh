@@ -19,7 +19,8 @@
 # inside a Python container pinned by digest (DS-25); only its standard output is read as data (see run_python).
 #
 # Change project-bootstrap, task group 2 (design: platform/continuous-integration, platform/api-gateway), and the
-# CORS checks of task 3.6.
+# CORS checks of task 3.6. The correlation id and gateway access log checks of e1-request-log are in
+# tests/smoke/request-log-checks.sh.
 
 set -uo pipefail
 
@@ -28,8 +29,12 @@ readonly REQUEST_TIMEOUT_SECONDS=10
 readonly REQUIRED_CURL_MAJOR=8
 readonly REQUIRED_CURL_MINOR=1
 readonly HEALTH_PATH_LABEL="ticketera.health-path"
-# Services allowed to publish ports (Req local-environment: Only the gateway and the frontend publish ports).
-readonly PUBLISHING_SERVICES=" gateway frontend "
+# Services allowed to publish ports (Req local-environment: Only the gateway and the frontend publish ports, which
+# e1-request-log extends to Grafana).
+readonly PUBLISHING_SERVICES=" gateway frontend grafana "
+# Containers allowed to run as root: only the log collector, which reads the Docker socket (e1-request-log, design
+# RL-12, an exception to DS-13 recorded in its ADR). It runs with no capabilities and publishes no port.
+readonly ROOT_ALLOWED_SERVICES=" alloy "
 # Test-only echo service and gateway route (tests/smoke/compose.echo.yml), and the forged values the forwarding
 # checks send; 203.0.113.7 is a documentation address (RFC 5737).
 readonly ECHO_SERVICE="echo"
@@ -372,6 +377,8 @@ check_non_root() {
   done <<< "$processes"
   if [[ -z $uid ]]; then
     fail "$check" "its main process (PID $pid) is not listed by docker top"
+  elif [[ $uid == 0 && $ROOT_ALLOWED_SERVICES == *" $service "* ]]; then
+    pass "container $service: main process runs as root by the recorded exception (RL-12)"
   elif [[ $uid == 0 ]]; then
     fail "$check" "its main process runs as UID 0 (root)"
   else
@@ -383,7 +390,7 @@ check_running_containers() {
   local containers container_id service pid ports binding host_address check
   local -a bindings publishing_services=() exposed_bindings=()
   local gateway_binding_found=false expected_gateway_address="127.0.0.1:${gateway_port}"
-  local check_publishers="ports: only the gateway and the frontend publish ports"
+  local check_publishers="ports: only the gateway, the frontend and Grafana publish ports"
   local check_local="ports: every published port is bound to 127.0.0.1"
   local check_gateway="ports: the gateway publishes GATEWAY_PORT on 127.0.0.1"
 
@@ -581,8 +588,11 @@ expect_allowed_origin() {
 # Usage: service_log_contains <service> <text>
 service_log_contains() {
   local service=$1 text=$2 attempt
+  local log
   for ((attempt = 0; attempt <= LOG_WAIT_SECONDS; attempt++)); do
-    if docker compose logs --no-color "$service" 2> /dev/null | grep --quiet --fixed-strings -- "$text"; then
+    # Read first: with pipefail, grep --quiet ending the pipe early could make a match look like a failure.
+    log=$(docker compose logs --no-color "$service" 2> /dev/null)
+    if grep --quiet --fixed-strings -- "$text" <<< "$log"; then
       return 0
     fi
     if ((attempt < LOG_WAIT_SECONDS)); then
@@ -595,16 +605,16 @@ service_log_contains() {
 # Req api-gateway: The frontend can call the API from the browser - Scenarios: CORS preflight from the frontend's
 # address; CORS preflight from another origin; Status page loads the health of every service (DS-09)
 # The gateway answers every preflight under /api/ itself, so the two preflight scenarios hold even without the route
-# of the service; the cross-origin GET and the access-log control need the route. Each request carries a unique
-# marker in its query string, which the access log of the service shows only when the request reached it: the GET
-# marker must appear, which proves the log is observed, and the preflight marker must not.
+# of the service; the cross-origin GET and the access-log control need the route. Each answer carries the correlation
+# id of its request (e1-request-log), which the request log of the service shows only when the request reached it:
+# the GET id must appear, which proves the log is observed, and the preflight id must not.
 check_cors() {
   local check_allowed="cors: preflight from FRONTEND_ORIGIN is answered and allows that origin"
   local check_not_forwarded="cors: the preflight does not reach $CORS_SERVICE"
   local check_other="cors: preflight from another origin gets no permission"
   local check_get="cors: GET $CORS_PATH from FRONTEND_ORIGIN answers 200 and allows that origin"
   local -a checks=("$check_allowed" "$check_not_forwarded" "$check_other" "$check_get") values
-  local check frontend_origin base_url preflight_marker get_marker get_reached=false
+  local check frontend_origin base_url preflight_id get_id get_reached=false
   local problem=""
 
   if [[ -n $gateway_port_problem ]]; then
@@ -624,12 +634,11 @@ check_cors() {
   fi
 
   base_url="http://localhost:${gateway_port}${CORS_PATH}"
-  preflight_marker="smoke-cors-preflight-$$-${RANDOM}${RANDOM}"
-  get_marker="smoke-cors-get-$$-${RANDOM}${RANDOM}"
 
   # Scenario: CORS preflight from the frontend's address
-  http_headers OPTIONS "${base_url}?marker=${preflight_marker}" --header "Origin: $frontend_origin" \
+  http_headers OPTIONS "$base_url" --header "Origin: $frontend_origin" \
     --header "Access-Control-Request-Method: GET"
+  preflight_id=$(last_correlation_id)
   if [[ $STATUS != 2?? ]]; then
     fail "$check_allowed" "expected a 2xx answer to the preflight, $(last_response)"
   else
@@ -637,7 +646,8 @@ check_cors() {
   fi
 
   # Scenario: Status page loads the health of every service (the cross-origin request itself)
-  http_headers GET "${base_url}?marker=${get_marker}" --header "Origin: $frontend_origin"
+  http_headers GET "$base_url" --header "Origin: $frontend_origin"
+  get_id=$(last_correlation_id)
   if [[ $STATUS != 200 ]]; then
     fail "$check_get" "expected 200 from $base_url, $(last_response)"
   else
@@ -645,14 +655,15 @@ check_cors() {
   fi
 
   # Scenario: CORS preflight from the frontend's address (the service does not receive the request)
-  if service_log_contains "$CORS_SERVICE" "$get_marker"; then
+  if [[ -n $get_id ]] && service_log_contains "$CORS_SERVICE" "$get_id"; then
     get_reached=true
   fi
-  if [[ $get_reached != true ]]; then
-    fail "$check_not_forwarded" "the access log of $CORS_SERVICE cannot be observed: the GET with marker $get_marker did not show up in it within $LOG_WAIT_SECONDS s"
-  elif docker compose logs --no-color "$CORS_SERVICE" 2> /dev/null |
-    grep --quiet --fixed-strings -- "$preflight_marker"; then
-    fail "$check_not_forwarded" "the preflight with marker $preflight_marker shows up in the access log of $CORS_SERVICE"
+  if [[ -z $preflight_id ]]; then
+    fail "$check_not_forwarded" "the preflight answer has no single $CORRELATION_HEADER"
+  elif [[ $get_reached != true ]]; then
+    fail "$check_not_forwarded" "the request log of $CORS_SERVICE cannot be observed: the GET with correlation id '$get_id' did not show up in it within $LOG_WAIT_SECONDS s"
+  elif grep --quiet --fixed-strings -- "$preflight_id" <<< "$(docker compose logs --no-color "$CORS_SERVICE" 2> /dev/null)"; then
+    fail "$check_not_forwarded" "the preflight with correlation id $preflight_id shows up in the request log of $CORS_SERVICE"
   else
     pass "$check_not_forwarded"
   fi
@@ -668,6 +679,12 @@ check_cors() {
     pass "$check_other"
   fi
 }
+
+# Correlation id and gateway access log checks (change e1-request-log).
+# shellcheck source=tests/smoke/request-log-checks.sh
+source tests/smoke/request-log-checks.sh
+# shellcheck source=tests/smoke/log-collection-checks.sh
+source tests/smoke/log-collection-checks.sh
 
 main() {
   parse_arguments "$@"
@@ -713,6 +730,12 @@ main() {
   check_running_containers
   check_forwarding
   check_cors
+  check_correlation_ids
+  check_gateway_access_log
+  check_service_request_logs
+  check_log_collection
+  # Last: it stops and starts the log collection containers.
+  check_collection_is_optional
 
   printf 'Smoke test: %d passed, %d failed, %d skipped\n' "$passed" "$failed" "$skipped"
   ((failed == 0))

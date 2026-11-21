@@ -106,3 +106,16 @@ Defined by the design of `e1-idempotent-purchase` (D-33).
 - Follow Clean Code: descriptive names, small single-purpose functions, no duplication, explicit error handling
   (`openspec/config.yaml`).
 - Align security with OWASP ASVS and the OWASP API Security Top 10 (`openspec/config.yaml`).
+
+## Request log
+
+Defined by the change `e1-request-log` (D-23, ADR-0011).
+
+- Log each HTTP request only through the request log middleware, `api/request_log.py`: one JSON line with its
+  fixed fields; never log a token, a header, the query string, a request or response body, or payment data
+  (RL-08).
+- In an authentication adapter, store the accepted token's `sub` in `request.state.user_id`; never decode the
+  token in the middleware (RL-06).
+- Run Uvicorn with `--no-access-log` (RL-10).
+- Take the correlation id only from the gateway's `X-Correlation-ID` header; never generate one in a service or
+  accept one from a client (RL-01, RL-03).

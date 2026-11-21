@@ -10,6 +10,19 @@
 # Analysis: Information disclosure). This file is included in the http context, so it applies to both servers.
 server_tokens off;
 
+# Access log: one JSON line per request on standard output (change e1-request-log, RL-01, RL-09; Req api-gateway: The
+# gateway writes one JSON access log line per request; The gateway access log line has a fixed set of fields).
+# escape=json escapes quotes, backslashes and control characters in every value, so no request can break a line or
+# add a field. $status and $request_time are written without quotes: they are JSON numbers. $request_id is the
+# correlation id, 32 random hexadecimal characters that the gateway generates for every request (RL-01).
+# Rule from e1-identity-access (IA-08), kept here: never log $request, $args, $query_string, $request_uri,
+# $http_authorization, $http_referer or any other client header; $uri is the normalized path without the query
+# string (Req api-gateway: The gateway access log keeps tokens and the query string out).
+log_format ticketera_json escape=json
+    '{"timestamp":"$time_iso8601","service":"gateway","correlation_id":"$request_id",'
+    '"method":"$request_method","path":"$uri","status":$status,"duration_seconds":$request_time,'
+    '"client_address":"$remote_addr"}';
+
 # CORS for the API (DS-09; Req api-gateway: The frontend can call the API from the browser). The only allowed
 # origin is the frontend's, FRONTEND_ORIGIN in .env, substituted when the template is rendered. Any other origin
 # maps to an empty value, and NGINX sends no header whose value is empty, so it gets no permission: neither a
@@ -40,6 +53,9 @@ map "$request_method:$is_api_request" $is_api_preflight {
 # only the expected host names).
 server {
     listen 8080 default_server;
+    # Rejected host names are logged and correlated too (Req api-gateway: Scenario: Unexpected host name).
+    access_log /var/log/nginx/access.log ticketera_json;
+    add_header X-Correlation-ID $request_id always;
     return 421;
 }
 
@@ -48,6 +64,15 @@ server {
     # server_name matches the host name without the port, so "localhost:<port>" from the browser is served; the
     # container healthcheck uses 127.0.0.1.
     server_name localhost 127.0.0.1;
+
+    # The image's access.log is a link to standard output; this replaces the image's "main" format, which logs the
+    # query string.
+    access_log /var/log/nginx/access.log ticketera_json;
+
+    # The correlation id goes back to the client on every answer, those the gateway gives itself included (Req
+    # request-correlation: The gateway gives every request a correlation id). A location that declares its own
+    # add_header stops inheriting this one, so route files never use add_header (DS-09).
+    add_header X-Correlation-ID $request_id always;
 
     # CORS headers of the API, sent with every status code. A location that declares its own add_header stops
     # inheriting these, so route files never use add_header.

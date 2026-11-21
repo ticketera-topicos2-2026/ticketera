@@ -1,0 +1,41 @@
+// Alloy: collects the standard output of every container of this Compose project and sends it to Loki
+// (change e1-request-log, design RL-12, RL-13; spec log-collection).
+//
+// It reads the logs through the Docker socket, mounted read-only (an exception to DS-13 recorded in the ADR of
+// D-23). Only containers whose Compose project is COMPOSE_PROJECT are collected, so another project on the same
+// machine is never read. Each stream gets a single label, service (the Compose service name); the JSON fields of
+// the request log are parsed at query time with "| json", which keeps the label cardinality low.
+
+discovery.docker "project" {
+  host = "unix:///var/run/docker.sock"
+  // The default is 60 s: a container started just after a refresh, such as the gateway, which waits for the
+  // identity service, would go uncollected for up to a minute. The spec gives a line 15 s to be queryable.
+  refresh_interval = "5s"
+
+  filter {
+    name   = "label"
+    values = ["com.docker.compose.project=" + sys.env("COMPOSE_PROJECT")]
+  }
+}
+
+discovery.relabel "project" {
+  targets = discovery.docker.project.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+}
+
+loki.source.docker "project" {
+  host          = "unix:///var/run/docker.sock"
+  targets       = discovery.relabel.project.output
+  relabel_rules = discovery.relabel.project.rules
+  forward_to    = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

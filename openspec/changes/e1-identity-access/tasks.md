@@ -38,7 +38,7 @@
   password grant; The realm has one test user per platform role; Users cannot register themselves; The sign-in page
   carries the GoPass name; The realm definition contains no secrets - Scenario: Test user passwords in the realm
   definition; IA-10, IA-11, IA-18). Verify: the tests fail on the current realm.
-- [ ] 1.4 [P1] Create `tests/smoke/identity-checks.sh`, sourced by `smoke-test.sh`, with a helper that gets tokens
+- [x] 1.4 [P1] Create `tests/smoke/identity-checks.sh`, sourced by `smoke-test.sh`, with a helper that gets tokens
   from `ticketera-api-tests` (scope `openid`, passwords from the Compose configuration), and write its realm client
   checks (red): password grant refused with `unauthorized_client` for the frontend client and for `admin-cli` of
   `ticketera`; `admin-cli` of `master` still issues the administrator's token; authorization requests of the

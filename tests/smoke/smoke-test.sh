@@ -19,7 +19,8 @@
 # inside a Python container pinned by digest (DS-25); only its standard output is read as data (see run_python).
 #
 # Change project-bootstrap, task group 2 (design: platform/continuous-integration, platform/api-gateway), and the
-# CORS checks of task 3.6.
+# CORS checks of task 3.6. The identity checks of change e1-identity-access are in tests/smoke/identity-checks.sh,
+# sourced below (IA-17).
 
 set -uo pipefail
 
@@ -669,6 +670,10 @@ check_cors() {
   fi
 }
 
+# The identity checks of change e1-identity-access (IA-17), which use the helpers above.
+# shellcheck source=tests/smoke/identity-checks.sh
+source tests/smoke/identity-checks.sh
+
 main() {
   parse_arguments "$@"
   require_curl
@@ -713,6 +718,7 @@ main() {
   check_running_containers
   check_forwarding
   check_cors
+  run_identity_checks
 
   printf 'Smoke test: %d passed, %d failed, %d skipped\n' "$passed" "$failed" "$skipped"
   ((failed == 0))

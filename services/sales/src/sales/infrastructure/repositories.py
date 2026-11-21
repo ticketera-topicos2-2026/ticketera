@@ -1,5 +1,6 @@
 """PostgreSQL SQLAlchemy repository and store implementations for sales."""
 
+import json
 from typing import Any
 
 from sqlalchemy import text
@@ -214,8 +215,6 @@ class PostgresIdempotencyStore:
         )
 
     def update_response(self, customer_id: str, key: str, status: int, body: dict[str, Any]) -> None:
-        import json
-
         self.session.execute(
             text(
                 """

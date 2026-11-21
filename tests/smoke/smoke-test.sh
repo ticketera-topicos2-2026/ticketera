@@ -9,7 +9,8 @@
 # when the system was started with more than one file.
 #
 # The forwarding checks need the echo service of tests/smoke/compose.echo.yml. Without it they are skipped, unless
-# --require-echo is given (CI and task 2.14), which makes them fail instead.
+# --require-echo is given (CI and task 2.14), which makes them fail instead. The echo route is protected by the
+# access check of the gateway, so they send the access token of the CLIENT test user (e1-identity-access).
 #
 # Output: one line per check, "PASS <check>", "FAIL <check>: <reason>" or "SKIP <check>: <reason>", then a summary
 # line. Exit status: 0 when no check fails, 1 when any check fails, 2 for an unknown argument or when curl is
@@ -493,6 +494,7 @@ check_forwarding() {
   local check_proto="forwarding: X-Forwarded-Proto is the scheme used"
   local -a checks=("$check_for" "$check_host" "$check_proto") for_values
   local check no_echo="the $ECHO_SERVICE service is not in the compose configuration (add tests/smoke/compose.echo.yml)"
+  local token
 
   if [[ -n $compose_problem ]]; then
     skip_or_fail_forwarding "the compose configuration could not be read" "${checks[@]}"
@@ -509,8 +511,16 @@ check_forwarding() {
     return
   fi
 
-  http_get "http://localhost:${gateway_port}${ECHO_PATH}" --header "X-Forwarded-For: $FORGED_FOR" \
-    --header "X-Forwarded-Host: $FORGED_HOST" --header "X-Forwarded-Proto: $FORGED_PROTO"
+  # The token reaches curl on its standard input (api_test_token, tests/smoke/identity-checks.sh).
+  if ! token=$(api_test_token CLIENT); then
+    for check in "${checks[@]}"; do
+      fail "$check" "no access token for the echo route: $token"
+    done
+    return
+  fi
+  http_get "http://localhost:${gateway_port}${ECHO_PATH}" --header @- --header "X-Forwarded-For: $FORGED_FOR" \
+    --header "X-Forwarded-Host: $FORGED_HOST" --header "X-Forwarded-Proto: $FORGED_PROTO" \
+    < <(printf 'Authorization: Bearer %s\n' "$token")
   if [[ $STATUS != 200 ]]; then
     for check in "${checks[@]}"; do
       fail "$check" "expected 200 from the echo route $ECHO_PATH, $(last_response)"
@@ -688,6 +698,7 @@ main() {
     compose_problem=$compose_service_lines
     compose_service_lines=""
   fi
+  prepare_identity_checks
 
   # Req api-gateway: The gateway reports its own health - Scenario: Gateway running
   # Req continuous-integration: The smoke-test check verifies the running system through the gateway - Scenario:

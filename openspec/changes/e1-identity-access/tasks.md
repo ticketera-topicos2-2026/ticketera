@@ -72,18 +72,24 @@
   with `${VAR:?message}`, set `KC_PROXY_HEADERS=xforwarded`, add the placeholders to `.env.example`, and give the
   frontend `VITE_OIDC_AUTHORITY` and `VITE_OIDC_CLIENT_ID` (IA-09, IA-11). Verify: after `docker compose down -v`
   and `up --wait`, the checks of 1.4 and 1.5 pass.
-- [ ] 1.8 [P1] Write the access check tests in `identity-checks.sh` (red), and make the existing forwarding checks
-  of `smoke-test.sh` send a token: `401` with `WWW-Authenticate: Bearer` without a token, with `Basic`, with
-  `Bearer x` and with an altered payload; an expired token (obtained at the start of the script, checked last);
-  the token of a signed-out session; a token issued without `openid`; a token only in the query string; each test
-  user's token forwarded with `Authorization` unchanged through the echo route; `GET /api/sales/example` with a
-  token answered by `sales`; the echo route without a token gets `401`; `/healthz` gets `200` and
-  `/api/unknown/example` gets `404` without a token; concurrent requests of two users through the echo route each
-  carry their own header; two `Authorization` headers get `400` (Req api-gateway: Each backend service has one
+- [x] 1.8 [P1] Write the access check tests in `identity-checks.sh` (red), and make the existing forwarding checks
+  of `smoke-test.sh` send a token: a control that an API test token with `openid` gets `200` from `userinfo`;
+  `401` with `WWW-Authenticate: Bearer` without a token, with `Basic`, with `Bearer x` and with an altered payload;
+  an expired token (obtained at the start of the script, checked last); the token of a signed-out session; a token
+  issued without `openid`; a token only in the query string; each test user's token forwarded with
+  `Authorization` unchanged through the echo route; `GET /api/sales/example` with a token answered by `sales`; the
+  echo route without a token gets `401`; `/healthz` gets `200` and `/api/unknown/example` gets `404` without a
+  token; concurrent requests of two users through the echo route each carry their own header; two `Authorization`
+  headers get `400`; paths that only look public get `401` without a token, sent as written:
+  `/api/sales/healthx`, `/api/sales/heal%74h`, `/api/sales/health%2F`, `/api/sales/%2e%2e/sales/health`,
+  `/api/sales/../sales/health` and `/auth/../api/sales/example`. The `401` and `400` cases go through the echo
+  route, which answers every request it receives with `200`, and the paths that look public go to `sales`, which
+  never answers `401`, so no check reads a service log (Req api-gateway: Each backend service has one
   route - Scenario: Authenticated request routed to the sales service; Requests forwarded on paths that are not
   public require a valid access token - all scenarios except Route added later; A token rejected by the identity
   service is answered 401; A request with more than one Authorization header is rejected; Tokens are accepted only
-  in the Authorization header). Verify: every check that depends on the access check fails.
+  in the Authorization header; Public paths skip the access check - Scenario: Path that only starts like a health
+  path; IA-03). Verify: every check that depends on the access check fails.
 - [ ] 1.9 [P1] Add the test-only route `tests/smoke/gateway/latency.conf` (`/api/smoke-latency/` to the echo
   service, declaring nothing about access) and write the public path tests (red): `GET` and `HEAD` on health
   without a token; health with `Bearer x` answers as without a token; the realm discovery document without a token

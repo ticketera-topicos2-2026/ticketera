@@ -14,8 +14,8 @@
 # wrong password. So each check asserts the answer of an existing client, and the wrong-password check needs the
 # right password to work first. The markers below come from the pages of Keycloak 26.8 and its login theme.
 #
-# Change e1-identity-access, tasks 1.4 and 1.5 (design: Test Strategy, platform/identity-provisioning,
-# identity/access-token).
+# Change e1-identity-access, tasks 1.4, 1.5 and 1.8 (design: Test Strategy, platform/identity-provisioning,
+# identity/access-token, platform/api-gateway).
 
 readonly REALM_PATH="/auth/realms/ticketera"
 readonly MASTER_REALM_PATH="/auth/realms/master"
@@ -26,6 +26,25 @@ readonly ADMIN_CLI_CLIENT_ID="admin-cli"
 readonly SIGNIN_CALLBACK_PATH="/signin-callback"
 readonly -a PLATFORM_ROLES=(ADMIN EVENT_OWNER CLIENT)
 readonly WRONG_PASSWORD="smoke-test-wrong-password"
+readonly USERINFO_PATH="$REALM_PATH/protocol/openid-connect/userinfo"
+# sales has no /example route and answers it 404 with the JSON body of FastAPI; no route serves /api/unknown/.
+readonly SALES_EXAMPLE_PATH="/api/sales/example"
+readonly SALES_NOT_FOUND_BODY='{"detail":"Not Found"}'
+readonly UNKNOWN_EXAMPLE_PATH="/api/unknown/example"
+# Pairs of simultaneous requests of two users in the concurrency check.
+readonly CONCURRENT_ROUNDS=10
+# Paths that only look like a public health path, or reach a protected path through /auth/; curl sends them as
+# written (--path-as-is). NGINX normalizes the last four to /api/sales/health or /api/sales/example, but only a raw
+# URI that matches the health pattern exactly is public, and /auth/ is public only for the location chosen on the
+# normalized URI (IA-03), so without a token each gets 401.
+readonly -a NOT_PUBLIC_PATHS=(
+  "/api/sales/healthx"
+  "/api/sales/heal%74h"
+  "/api/sales/health%2F"
+  "/api/sales/%2e%2e/sales/health"
+  "/api/sales/../sales/health"
+  "/auth/../api/sales/example"
+)
 # PKCE example of RFC 7636, appendix B: the verifier and its S256 challenge.
 readonly PKCE_VERIFIER="dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"
 readonly PKCE_CHALLENGE="E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
@@ -50,8 +69,8 @@ print(value)
 '
 
 # Reads a token on standard input, either a JWT or a JSON object of claims (as the admin API generates them), and
-# prints three lines: its sub, its sid and its realm roles separated by spaces, each empty when absent. The JWT
-# signature is not verified: the token comes straight from the identity service.
+# prints four lines: its sub, its sid, its realm roles separated by spaces and its exp, each empty when absent. The
+# JWT signature is not verified: the token comes straight from the identity service.
 readonly TOKEN_CLAIMS_PROGRAM='
 import base64, json, sys
 
@@ -71,6 +90,22 @@ roles = access.get("roles") if isinstance(access, dict) else None
 print(claims.get("sub") or "")
 print(claims.get("sid") or "")
 print(" ".join(role for role in roles if isinstance(role, str)) if isinstance(roles, list) else "")
+print(claims.get("exp") or "")
+'
+
+# Reads a JWT on standard input and prints it with its payload altered (every platform role added) and its header
+# and signature unchanged, so the signature no longer matches.
+readonly TAMPERED_TOKEN_PROGRAM='
+import base64, json, sys
+
+parts = sys.stdin.read().strip().split(".")
+try:
+    payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * (-len(parts[1]) % 4)))
+except (IndexError, ValueError):
+    sys.exit("it is not a JWT")
+payload["realm_access"] = {"roles": ["ADMIN", "EVENT_OWNER", "CLIENT"]}
+parts[1] = base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode()).rstrip(b"=").decode()
+print(".".join(parts))
 '
 
 # Reads the JSON answer of an admin API search on standard input and prints the id of its only result; exits with
@@ -118,8 +153,13 @@ CLAIMS_PROBLEM=""
 CLAIM_SUB=""
 CLAIM_SID=""
 CLAIM_ROLES=""
+CLAIM_EXPIRY=""
 # Set by check_test_user_token: the sub of each test user's API test token, by platform role.
 declare -A test_user_subs=()
+# Set by prepare_identity_checks: the token of the expired-token check and its exp, or the reason it is missing.
+expiring_token=""
+expiring_token_expiry=""
+expiring_token_problem=""
 
 # Prints the value of an environment variable of the identity service in the Compose configuration; prints the
 # reason and fails when it cannot be read.
@@ -251,8 +291,8 @@ admin_resource_id() {
   printf '%s\n' "$id"
 }
 
-# Reads the claims of a token, a JWT or a JSON object of claims, and sets CLAIM_SUB, CLAIM_SID and CLAIM_ROLES; sets
-# CLAIMS_PROBLEM and fails when they cannot be read.
+# Reads the claims of a token, a JWT or a JSON object of claims, and sets CLAIM_SUB, CLAIM_SID, CLAIM_ROLES and
+# CLAIM_EXPIRY; sets CLAIMS_PROBLEM and fails when they cannot be read.
 read_token_claims() {
   local output
   local -a lines
@@ -264,6 +304,16 @@ read_token_claims() {
   CLAIM_SUB=${lines[0]:-}
   CLAIM_SID=${lines[1]:-}
   CLAIM_ROLES=${lines[2]:-}
+  CLAIM_EXPIRY=${lines[3]:-}
+}
+
+# Signs a session out with a form POST of its refresh token, which reaches curl on its standard input, to the logout
+# endpoint of the API test client, and sets STATUS, BODY and ERROR; fails unless the answer is 204.
+# Usage: sign_out <refresh token>
+sign_out() {
+  http_get "http://localhost:${gateway_port}${REALM_PATH}/protocol/openid-connect/logout" \
+    --data-urlencode "client_id=$API_TESTS_CLIENT_ID" --data-urlencode refresh_token@- < <(printf '%s' "$1")
+  [[ $STATUS == 204 ]]
 }
 
 # Prints why a list of realm roles does not hold exactly one platform role, the expected one; prints nothing when
@@ -607,10 +657,7 @@ check_sub_after_sign_out() {
     return
   fi
   first_sub=$CLAIM_SUB
-  http_get "http://localhost:${gateway_port}${REALM_PATH}/protocol/openid-connect/logout" \
-    --data-urlencode "client_id=$API_TESTS_CLIENT_ID" --data-urlencode refresh_token@- \
-    < <(printf '%s' "$refresh_token")
-  if [[ $STATUS != 204 ]]; then
+  if ! sign_out "$refresh_token"; then
     fail "$check" "expected 204 from the logout endpoint, $(last_response)"
   elif ! token=$(api_test_token CLIENT); then
     fail "$check" "signing in again failed: $token"
@@ -773,6 +820,308 @@ check_missing_test_password() {
   pass "$check"
 }
 
+# Sends a request with a bearer token, which reaches curl on its standard input, and sets STATUS, HEADERS and ERROR
+# as http_headers does. Extra arguments are passed to curl.
+# Usage: headers_with_token <method> <url> <token> [curl arguments...]
+headers_with_token() {
+  local method=$1 url=$2 token=$3
+  shift 3
+  http_headers "$method" "$url" --header @- "$@" < <(printf 'Authorization: Bearer %s\n' "$token")
+}
+
+# Sends a GET request with a bearer token, which reaches curl on its standard input, and sets STATUS, BODY and ERROR
+# as http_get does. Extra arguments are passed to curl.
+# Usage: get_with_token <url> <token> [curl arguments...]
+get_with_token() {
+  local url=$1 token=$2
+  shift 2
+  http_get "$url" --header @- "$@" < <(printf 'Authorization: Bearer %s\n' "$token")
+}
+
+# Checks that the last response of http_headers is 401 with one WWW-Authenticate header holding a Bearer challenge.
+# Usage: expect_bearer_challenge <check name> <description of the request>
+expect_bearer_challenge() {
+  local check=$1 request=$2
+  local -a values
+  mapfile -t values < <(response_header_values WWW-Authenticate)
+  if [[ $STATUS != 401 ]]; then
+    fail "$check" "expected 401 for $request, $(last_response)"
+  elif ((${#values[@]} != 1)) || [[ ${values[0]} != Bearer* ]]; then
+    fail "$check" "the 401 for $request has no WWW-Authenticate: Bearer challenge (${values[*]:-none})"
+  else
+    pass "$check"
+  fi
+}
+
+# Prints why the echo route cannot be used; prints nothing when the echo service is in the Compose configuration.
+echo_route_problem() {
+  if [[ -n $compose_problem ]]; then
+    printf 'the compose configuration could not be read\n'
+  elif [[ $'\n'$compose_service_lines != *$'\n'"$ECHO_SERVICE"$'\t'* ]]; then
+    printf 'the %s service is not in the compose configuration (add tests/smoke/compose.echo.yml)\n' "$ECHO_SERVICE"
+  fi
+}
+
+# Control for the checks of task 1.8 that send a valid token (Req api-gateway: Requests forwarded on paths that are
+# not public require a valid access token - Scenario: Valid token of any platform role): the identity service
+# accepts an API test token with the openid scope at userinfo, the endpoint the gateway asks, so a 401 of the
+# gateway for such a token is the gateway's doing. Sent under /auth/, which is public.
+check_userinfo_control() {
+  local check=$1 token
+  if ! token=$(api_test_token CLIENT); then
+    fail "$check" "$token"
+    return
+  fi
+  get_with_token "http://localhost:${gateway_port}${USERINFO_PATH}" "$token"
+  if [[ $STATUS == 200 ]]; then
+    pass "$check"
+  else
+    fail "$check" "expected 200 from userinfo, $(last_response)"
+  fi
+}
+
+# Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenario:
+# Malformed or tampered token (a valid access token whose payload has been altered)
+# Usage: check_tampered_token <check name> <url>
+check_tampered_token() {
+  local check=$1 url=$2 token tampered
+  if ! token=$(api_test_token CLIENT); then
+    fail "$check" "$token"
+  elif ! tampered=$(run_python "$TAMPERED_TOKEN_PROGRAM" <<< "$token"); then
+    fail "$check" "the token could not be altered: $tampered"
+  else
+    headers_with_token GET "$url" "$tampered"
+    expect_bearer_challenge "$check" "a token whose payload was altered"
+  fi
+}
+
+# Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenario: Token
+# reused after signing out
+# Usage: check_signed_out_token <check name> <url>
+check_signed_out_token() {
+  local check=$1 url=$2 token refresh_token
+  if ! request_test_user_tokens CLIENT; then
+    fail "$check" "$TOKEN_PROBLEM"
+  elif ! token=$(json_string_field access_token <<< "$BODY") ||
+    ! refresh_token=$(json_string_field refresh_token <<< "$BODY"); then
+    fail "$check" "the token response has no access token or no refresh token"
+  elif ! sign_out "$refresh_token"; then
+    fail "$check" "expected 204 from the logout endpoint, $(last_response)"
+  else
+    headers_with_token GET "$url" "$token"
+    expect_bearer_challenge "$check" "the access token of a signed-out session"
+  fi
+}
+
+# Req api-gateway: A token rejected by the identity service is answered 401 - Scenario: Token without the openid
+# scope
+# Control: userinfo itself answers the token with a 4xx other than 401 (403), so the check exercises the mapping.
+# Usage: check_token_without_openid <check name> <url>
+check_token_without_openid() {
+  local check=$1 url=$2 password token userinfo_status
+  if ! password=$(identity_environment_value TEST_USER_CLIENT_PASSWORD); then
+    fail "$check" "$password"
+    return
+  fi
+  password_grant "$REALM_PATH" "$API_TESTS_CLIENT_ID" "$(test_username CLIENT)" "$password"
+  if [[ $STATUS != 200 ]] || ! token=$(json_string_field access_token <<< "$BODY"); then
+    fail "$check" "no token was issued without the openid scope, $(last_response)"
+    return
+  fi
+  get_with_token "http://localhost:${gateway_port}${USERINFO_PATH}" "$token"
+  userinfo_status=$STATUS
+  if [[ $userinfo_status == 401 || $userinfo_status != 4?? ]]; then
+    fail "$check" "control failed: userinfo answered $userinfo_status, not a 4xx other than 401"
+    return
+  fi
+  headers_with_token GET "$url" "$token"
+  expect_bearer_challenge "$check" "a token without the openid scope, which userinfo answers $userinfo_status"
+}
+
+# Req api-gateway: Tokens are accepted only in the Authorization header - Scenario: Token in the query string
+# The token reaches curl on its standard input; --get puts it in the query string.
+# Usage: check_token_in_query_string <check name> <url>
+check_token_in_query_string() {
+  local check=$1 url=$2 token
+  if ! token=$(api_test_token CLIENT); then
+    fail "$check" "$token"
+    return
+  fi
+  http_headers GET "$url" --get --data-urlencode access_token@- < <(printf '%s' "$token")
+  expect_bearer_challenge "$check" "a token only in the query string"
+}
+
+# Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenarios:
+# Request without a token; Route outside /api/; Authorization header that is not a bearer token; Malformed or
+# tampered token; Token reused after signing out (and the scenarios of the helpers above)
+# Every request goes through the echo route. The echo service answers every request it receives with 200, and never
+# with 401, so a 401 shows that the gateway answered the request itself and did not forward it, as each scenario
+# requires. No service log is read.
+# Usage: check_rejected_requests <url> <check name>...
+check_rejected_requests() {
+  local url=$1 check_none=$2 check_basic=$3 check_malformed=$4 check_tampered=$5 check_signed_out=$6
+  local check_no_openid=$7 check_query=$8
+
+  http_headers GET "$url"
+  expect_bearer_challenge "$check_none" "a request without a token"
+
+  http_headers GET "$url" --header "Authorization: Basic dXNlcjpwYXNz"
+  expect_bearer_challenge "$check_basic" "a Basic Authorization header"
+
+  http_headers GET "$url" --header "Authorization: Bearer x"
+  expect_bearer_challenge "$check_malformed" "Authorization: Bearer x"
+
+  check_tampered_token "$check_tampered" "$url"
+  check_signed_out_token "$check_signed_out" "$url"
+  check_token_without_openid "$check_no_openid" "$url"
+  check_token_in_query_string "$check_query" "$url"
+}
+
+# Req api-gateway: Each backend service has one route - Scenario: Authenticated request routed to the sales service
+# sales has no /example route, so it answers 404 with the JSON body of FastAPI, which the gateway's own 404, an HTML
+# page, does not have. Removing the /api/sales prefix is the route's bootstrap behavior, which the health checks
+# cover. No service log is read.
+check_sales_route_with_token() {
+  local check=$1 token
+  if ! token=$(api_test_token CLIENT); then
+    fail "$check" "$token"
+    return
+  fi
+  get_with_token "http://localhost:${gateway_port}${SALES_EXAMPLE_PATH}" "$token"
+  if [[ $STATUS == 404 && $BODY == "$SALES_NOT_FOUND_BODY" ]]; then
+    pass "$check"
+  else
+    fail "$check" "expected the 404 of sales with the body $SALES_NOT_FOUND_BODY, $(last_response)"
+  fi
+}
+
+# Req api-gateway: Public paths skip the access check - Scenario: Path that only starts like a health path, and the
+# rule of that requirement that any other path is subject to the access check (IA-03; see NOT_PUBLIC_PATHS)
+# sales never answers 401, so a 401 with a Bearer challenge shows that the gateway did not forward the request as
+# public. No service log is read.
+# Usage: check_not_public <check name> <raw path>
+check_not_public() {
+  local check=$1 path=$2
+  http_headers GET "http://localhost:${gateway_port}${path}" --path-as-is
+  expect_bearer_challenge "$check" "$path without a token"
+}
+
+# Req api-gateway: A request with more than one Authorization header is rejected - Scenario: Two Authorization
+# headers
+# Sent through the echo route, whose service answers every request it receives with 200, so a 400 shows that the
+# request was not forwarded.
+# Usage: check_two_authorization_headers <check name> <url>
+check_two_authorization_headers() {
+  local check=$1 url=$2
+  http_headers GET "$url" --header "Authorization: Bearer a" --header "Authorization: Bearer b"
+  if [[ $STATUS == 400 ]]; then
+    pass "$check"
+  else
+    fail "$check" "expected 400, $(last_response)"
+  fi
+}
+
+# Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenario: Valid
+# token of any platform role
+# Usage: check_token_forwarded <check name> <ADMIN|EVENT_OWNER|CLIENT>
+check_token_forwarded() {
+  local check=$1 role=$2 token
+  local -a values
+  if ! token=$(api_test_token "$role"); then
+    fail "$check" "$token"
+    return
+  fi
+  get_with_token "http://localhost:${gateway_port}${ECHO_PATH}" "$token"
+  if [[ $STATUS != 200 ]]; then
+    fail "$check" "expected 200 from the echo route, $(last_response)"
+    return
+  fi
+  mapfile -t values < <(echoed_header_values Authorization)
+  if ((${#values[@]} != 1)); then
+    fail "$check" "the echo service received ${#values[@]} Authorization headers"
+  elif [[ ${values[0]} != "Bearer $token" ]]; then
+    fail "$check" "the echo service received an Authorization header other than the one sent"
+  else
+    pass "$check"
+  fi
+}
+
+# Starts a GET request of the echo route in the background, with a bearer token on curl's standard input, and saves
+# the answer in a file.
+# Usage: echo_request_in_background <token> <file>
+echo_request_in_background() {
+  curl --silent --noproxy '*' --max-time "$REQUEST_TIMEOUT_SECONDS" --header @- --output "$2" \
+    "http://localhost:${gateway_port}${ECHO_PATH}" < <(printf 'Authorization: Bearer %s\n' "$1") &
+}
+
+# Succeeds when the echo answer saved in a file shows exactly one Authorization header, equal to Bearer <token>.
+# BODY is declared local so that echoed_header_values reads the file's content instead of the last response.
+# Usage: echoed_authorization_is <file> <token>
+echoed_authorization_is() {
+  local BODY
+  local -a values
+  BODY=$(< "$1")
+  mapfile -t values < <(echoed_header_values Authorization)
+  ((${#values[@]} == 1)) && [[ ${values[0]} == "Bearer $2" ]]
+}
+
+# Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenario:
+# Concurrent requests of different users
+# CONCURRENT_ROUNDS pairs of requests of the CLIENT and EVENT_OWNER test users are sent at the same time through the
+# echo route; each answer must echo its sender's own Authorization header.
+check_concurrent_users() {
+  local check=$1 client_token owner_token round
+  if [[ -z $temp_dir ]]; then
+    fail "$check" "mktemp could not create a directory for the answers"
+    return
+  fi
+  if ! client_token=$(api_test_token CLIENT); then
+    fail "$check" "$client_token"
+    return
+  fi
+  if ! owner_token=$(api_test_token EVENT_OWNER); then
+    fail "$check" "$owner_token"
+    return
+  fi
+  for ((round = 0; round < CONCURRENT_ROUNDS; round++)); do
+    echo_request_in_background "$client_token" "$temp_dir/concurrent-$round-client"
+    echo_request_in_background "$owner_token" "$temp_dir/concurrent-$round-owner"
+  done
+  wait
+  for ((round = 0; round < CONCURRENT_ROUNDS; round++)); do
+    if ! echoed_authorization_is "$temp_dir/concurrent-$round-client" "$client_token" ||
+      ! echoed_authorization_is "$temp_dir/concurrent-$round-owner" "$owner_token"; then
+      fail "$check" "in round $((round + 1)) an answer did not echo its own sender's Authorization header"
+      return
+    fi
+  done
+  pass "$check"
+}
+
+# Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenario: Expired
+# token
+# The token was obtained by prepare_identity_checks before every other check and lasts 60 s (IA-18). This check
+# runs last, through the echo route as the other rejections, and first waits for what is left of that lifespan,
+# plus a margin of 2 s.
+check_expired_token() {
+  local check=$1 echo_problem wait_seconds
+  if [[ -n $expiring_token_problem ]]; then
+    fail "$check" "$expiring_token_problem"
+    return
+  fi
+  echo_problem=$(echo_route_problem)
+  if [[ -n $echo_problem ]]; then
+    skip_or_fail_forwarding "$echo_problem" "$check"
+    return
+  fi
+  wait_seconds=$((expiring_token_expiry + 2 - $(date +%s)))
+  if ((wait_seconds > 0)); then
+    sleep "$wait_seconds"
+  fi
+  headers_with_token GET "http://localhost:${gateway_port}${ECHO_PATH}" "$expiring_token"
+  expect_bearer_challenge "$check" "a token that has expired"
+}
+
 # The checks of the realm's clients and settings (task 1.4).
 check_identity_clients() {
   local check_frontend_grant="identity: $FRONTEND_CLIENT_ID refuses the password grant"
@@ -845,14 +1194,89 @@ check_identity_tokens() {
   check_missing_test_password "$check_missing"
 }
 
-# Runs every identity check; called by main of smoke-test.sh after the other checks.
-run_identity_checks() {
+# The checks of the gateway's access check (task 1.8). The checks through the echo route need the echo service of
+# tests/smoke/compose.echo.yml and are skipped without it, unless --require-echo was given (CI).
+check_identity_access() {
+  local role path echo_problem index
+  local -a role_checks=() not_public_checks=() echo_checks=()
+  local check_userinfo="identity: an API test token with the openid scope gets 200 from userinfo"
+  local check_sales="identity: $SALES_EXAMPLE_PATH with a token is answered by sales"
+  local check_unknown="identity: $UNKNOWN_EXAMPLE_PATH without a token gets 404"
+  local check_none="identity: the echo route without a token gets 401 with a Bearer challenge"
+  local check_basic="identity: a Basic Authorization header gets 401 with a Bearer challenge"
+  local check_malformed="identity: Authorization: Bearer x gets 401 with a Bearer challenge"
+  local check_tampered="identity: a token with an altered payload gets 401 with a Bearer challenge"
+  local check_signed_out="identity: the token of a signed-out session gets 401 with a Bearer challenge"
+  local check_no_openid="identity: a token without the openid scope gets 401, not 403"
+  local check_query="identity: a token only in the query string gets 401 with a Bearer challenge"
+  local check_two="identity: two Authorization headers get 400"
+  local check_concurrent="identity: concurrent requests of two users through the echo route carry their own tokens"
+  for path in "${NOT_PUBLIC_PATHS[@]}"; do
+    not_public_checks+=("identity: $path without a token is not public and gets 401")
+  done
+  for role in "${PLATFORM_ROLES[@]}"; do
+    role_checks+=("identity: the token of $(test_username "$role") reaches the echo service unchanged")
+  done
+  echo_checks=("$check_none" "$check_basic" "$check_malformed" "$check_tampered" "$check_signed_out"
+    "$check_no_openid" "$check_query" "$check_two" "${role_checks[@]}" "$check_concurrent")
+
+  if [[ -n $identity_problem ]]; then
+    fail_each "$identity_problem" "$check_userinfo" "$check_sales" "$check_unknown" "${not_public_checks[@]}" \
+      "${echo_checks[@]}"
+    return
+  fi
+
+  check_userinfo_control "$check_userinfo"
+  check_sales_route_with_token "$check_sales"
+  # Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenario: Path
+  # that matches no route, without a token (the scenario Gateway health without a token is the /healthz check of
+  # smoke-test.sh)
+  expect_status "$check_unknown" 404 "$UNKNOWN_EXAMPLE_PATH"
+  for index in "${!NOT_PUBLIC_PATHS[@]}"; do
+    check_not_public "${not_public_checks[index]}" "${NOT_PUBLIC_PATHS[index]}"
+  done
+
+  echo_problem=$(echo_route_problem)
+  if [[ -n $echo_problem ]]; then
+    skip_or_fail_forwarding "$echo_problem" "${echo_checks[@]}"
+    return
+  fi
+  check_rejected_requests "http://localhost:${gateway_port}${ECHO_PATH}" "$check_none" "$check_basic" \
+    "$check_malformed" "$check_tampered" "$check_signed_out" "$check_no_openid" "$check_query"
+  check_two_authorization_headers "$check_two" "http://localhost:${gateway_port}${ECHO_PATH}"
+  for index in "${!PLATFORM_ROLES[@]}"; do
+    check_token_forwarded "${role_checks[index]}" "${PLATFORM_ROLES[index]}"
+  done
+  check_concurrent_users "$check_concurrent"
+}
+
+# Prepares the identity checks; called by main of smoke-test.sh before any check. It also obtains the token of the
+# expired-token check, which run_identity_checks sends last, once its 60-second lifespan is over.
+prepare_identity_checks() {
   if [[ -n $gateway_port_problem ]]; then
     identity_problem=$gateway_port_problem
   elif ! identity_frontend_origin=$(config_value FRONTEND_ORIGIN); then
     identity_problem="FRONTEND_ORIGIN is not set in the environment or in .env"
   fi
   identity_compose_config=$(docker compose config --format json 2> /dev/null) || identity_compose_config=""
+  if [[ -n $identity_problem ]]; then
+    expiring_token_problem=$identity_problem
+  elif ! expiring_token=$(api_test_token CLIENT); then
+    expiring_token_problem=$expiring_token
+  elif ! read_token_claims "$expiring_token"; then
+    expiring_token_problem=$CLAIMS_PROBLEM
+  elif [[ ! $CLAIM_EXPIRY =~ ^[0-9]+$ ]]; then
+    expiring_token_problem="the access token for the expired-token check has no exp claim"
+  else
+    expiring_token_expiry=$CLAIM_EXPIRY
+  fi
+}
+
+# Runs every identity check; called by main of smoke-test.sh after the other checks. The expired-token check runs
+# last (see check_expired_token).
+run_identity_checks() {
   check_identity_clients
   check_identity_tokens
+  check_identity_access
+  check_expired_token "identity: an expired token gets 401 with a Bearer challenge"
 }

@@ -64,7 +64,7 @@
   the client's address - both scenarios; Req access-token: The access token identifies the user - all scenarios;
   The access token carries the user's platform roles - all scenarios). Verify: the checks fail against the current
   realm and Compose file.
-- [ ] 1.6 [P1] Write the realm in `infra/keycloak/ticketera-realm.json`: `ticketera-frontend` with its ID-token
+- [x] 1.6 [P1] Write the realm in `infra/keycloak/ticketera-realm.json`: `ticketera-frontend` with its ID-token
   roles mapper, `ticketera-api-tests`, `admin-cli` without direct grants, `displayName`, `registrationAllowed`, the
   three test users with complete profiles and `${TEST_USER_<ROLE>_PASSWORD}` placeholders (IA-10, IA-11, IA-18).
   Verify: the tests of 1.3 and the realm secret check pass.

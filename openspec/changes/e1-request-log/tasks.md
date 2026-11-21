@@ -102,12 +102,14 @@
 - [x] 4.2 Add `infra/observability/loki/config.yaml` with 7-day retention (RL-14) and a `unittest` in
   `tests/platform/` that reads it and asserts `retention_enabled` and `retention_period: 168h` (Req
   log-collection: Log retention is bounded - Scenario: Retention setting). Verify: the test passes.
-- [ ] 4.3 Add `infra/observability/alloy/config.alloy` (RL-12, RL-13) and the Grafana provisioning: Loki data
+- [x] 4.3 Add `infra/observability/alloy/config.alloy` (RL-12, RL-13) and the Grafana provisioning: Loki data
   source and `dashboards/request-log.json` with requests per service, per status class and p50/p95/p99 of
   `duration_seconds`, and a logs panel filtered by a correlation id (Req log-collection: Grafana opens with the
-  request log ready to use). Done; pending: the dashboard checked by hand with traffic and recorded in the team
-  log. Verify: the dashboard loads by hand with traffic; recorded in the team log.
-- [ ] 4.4 Add `loki` (image of RL-17), `alloy` and `grafana` to `docker-compose.yml`: images pinned by index
+  request log ready to use). Verify: the dashboard loads by hand with traffic; recorded in the team log. Done on
+  2026-11-21: with traffic through the gateway, every panel query of the dashboard, run through Grafana's API,
+  returned data (3 services, 2 status classes, p50/p95/p99 per service, and the 2 lines of a chosen correlation
+  id); recorded in the team log. The screenshot needs a signed-in browser and is left to a member.
+- [x] 4.4 Add `loki` (image of RL-17), `alloy` and `grafana` to `docker-compose.yml`: images pinned by index
   digest, healthchecks with tools each image has (DS-12), `mem_limit`, `cap_drop: ALL`, `no-new-privileges`, the
   `observability` network, the read-only Docker socket for Alloy as root (RL-12), the volumes
   `ticketera-loki-data` and `ticketera-alloy-data`, Grafana on
@@ -116,9 +118,11 @@
   (RL-11, RL-15, RL-16). Verify: the checks of 4.1 pass; `docker compose config` without
   `GRAFANA_ADMIN_PASSWORD` fails and names it (Req log-collection: Grafana requires the credentials from local
   configuration - Scenario: Missing password); `down -v` and `up` leave Loki empty (Scenario: Clean reset).
-  Done: the checks pass locally and the missing password stops Compose naming it; pending: the clean reset by
-  hand, and a stable smoke run in CI (on a machine with 6 GiB of RAM the repeated stop and start of the three
-  containers left WSL without memory).
+  Done: the checks pass locally and in CI, and the missing password stops Compose naming it. Clean reset checked
+  on 2026-11-21: a correlation id found in Loki before `down -v` is gone after `up`, the Loki volume is new, and
+  lines written after the reset are collected. On a machine with 6 GiB of RAM the cold start after `down -v`
+  (realm import, Grafana migrations) did not reach healthy in 15 minutes, and Alloy can lose its Docker API
+  connection under that load until it is restarted; both are documented in `CONTRIBUTE.md`.
 - [x] 4.5 Measure the smoke-test duration and the memory of the three containers in CI and on a member's machine;
   record both in the team log; the CI still finishes within 15 minutes (Req continuous-integration of
   `project-bootstrap`: The CI finishes within 15 minutes). Verify: numbers recorded. Recorded in the team log of

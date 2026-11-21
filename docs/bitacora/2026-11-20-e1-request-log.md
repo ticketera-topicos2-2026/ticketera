@@ -68,10 +68,27 @@
 - El servicio `echo` (traefik/whoami, en Go) imprime los nombres de encabezado en forma canónica:
   `X-Correlation-Id`.
 
+## Verificaciones del 2026-11-21
+
+- **Dashboard (4.3).** Con tráfico a través del gateway, cada consulta del dashboard «Request log», ejecutada con
+  la API de Grafana, devolvió datos: solicitudes por servicio (3 series), por clase de status (2xx y 4xx),
+  percentiles p50, p95 y p99 por servicio, y el panel de logs con las 2 líneas (gateway y `catalog`) de un
+  *correlation id* elegido.
+- **Reinicio limpio (4.4).** Un *correlation id* que Loki tenía antes de `docker compose down -v` da 0 líneas
+  después de `up`, el volumen de Loki se volvió a crear y las líneas posteriores se recolectan (1701 de 9
+  servicios).
+- **Hallazgos en una máquina de 6 GiB:**
+  - el arranque en frío después de `down -v` (reimportación del realm y migraciones de Grafana) no llegó a
+    estado sano en 15 minutos; con datos existentes, el sistema completo tardó unos 4 minutos y medio;
+  - con el arranque saturando la CPU, Alloy perdió la conexión con la API de Docker y dejó de recolectar hasta
+    que se lo reinició; su healthcheck lo marca `unhealthy`, pero Compose no reinicia contenedores por eso.
+    `CONTRIBUTE.md` documenta cómo recuperarlo y cómo levantar la recolección después del resto;
+  - después de reiniciar Alloy, una línea apareció dos veces en Loki (lectura repetida al retomar).
+
 ## Pendientes
 
-- 4.3: revisar el dashboard a mano con tráfico y agregar la captura en `evidencia/e1-request-log/`.
-- 4.4: probar a mano el reinicio limpio (`docker compose down -v` y `up` dejan Loki vacío).
+- 4.3: la captura del dashboard en `evidencia/e1-request-log/` (hace falta un navegador con sesión iniciada en
+  Grafana). Lo demás está verificado (ver «Verificaciones del 2026-11-21»).
 - Grupo 3, `sales`: empieza cuando se integre la implementación de `e1-idempotent-purchase` (#32). El adaptador de
   autenticación de C tiene que guardar el `sub` en `request.state.user_id`.
 - Grupo 5: la colección de Bruno de `tests/api/platform/`, cuando exista el runner de D-24.

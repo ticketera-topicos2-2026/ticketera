@@ -205,6 +205,16 @@ docker compose up -d --wait loki alloy grafana
 `docker compose down -v` también borra los volúmenes `ticketera-loki-data` y `ticketera-alloy-data`: Loki vuelve a
 empezar vacío.
 
+**Alloy queda `unhealthy` o no llegan líneas nuevas.** Si el arranque satura la máquina, el daemon de Docker
+responde lento, Alloy pierde la conexión con su API («error while listing containers» en su log) y puede no
+recuperarse solo. Con el sistema ya estable, reinicialo: `docker compose restart alloy`. En una máquina de 6 GiB
+conviene además levantar primero el sistema sin la recolección y sumarla después:
+
+```bash
+docker compose up -d --wait database identity catalog sales payments frontend gateway
+docker compose up -d --wait loki alloy grafana
+```
+
 Alloy es el único contenedor que corre como root: lee los logs por el socket de Docker, montado en solo lectura, y
 no tiene capacidades, puertos publicados ni otra red que la de Loki. Es una excepción a DS-13, registrada en el ADR
 de D-23.

@@ -18,6 +18,7 @@ dev = [
     "ruff==0.14.4",
     "mypy==1.18.2",
     "import-linter==2.1",
+    "pyyaml==6.0.2",
 ]
 
 [tool.uv]

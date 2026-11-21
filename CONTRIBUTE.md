@@ -122,6 +122,22 @@ docker run --rm --network none --read-only --user "$(id -u):$(id -g)" -v "$PWD:/
   python -I -B scripts/check_realm_secrets.py infra/keycloak/ticketera-realm.json
 ```
 
+### Tests de API (Bruno)
+
+Cada servicio tiene su colección de Bruno en `tests/api/<servicio>/` (D-24). `tests/api/run.sh` la corre contra el
+sistema levantado, con Bruno CLI instalado desde `tests/api/package-lock.json` en el contenedor de Node de la CI,
+sin instalar nada en el host:
+
+```bash
+docker compose up -d --wait
+tests/api/run.sh catalog
+```
+
+El runner comparte la red del gateway, así que las colecciones llaman a `http://localhost:8080/api/<servicio>`.
+Les pasa los tokens `ownerToken`, `otherOwnerToken`, `adminToken` y `clientToken`, con un `sub` nuevo por corrida.
+Por ahora son tokens de prueba sin firmar: sirven mientras el gateway no valide tokens. Cuando se integre el control
+de acceso de `e1-identity-access` (#30), el runner tiene que pedir tokens reales al cliente `ticketera-api-tests`.
+
 ### Día a día
 
 | Quiero... | Comando |

@@ -24,19 +24,25 @@ from sales.application.ports import (
     OrderRepository,
     StoredIdempotencyRecord,
 )
-from sales.domain.exceptions import SeatNotAvailableError
 from sales.domain.models import Order, Seat, SeatStatus
+from tests.unit.fake_uow import InMemoryUnitOfWork
 
 
 def _make_jwt(sub: str, roles: list[str]) -> str:
     """Helper to generate an unverified base64url encoded JWT for perimeter testing."""
     header = base64.urlsafe_b64encode(json.dumps({"alg": "none"}).encode()).decode().rstrip("=")
-    payload = base64.urlsafe_b64encode(
-        json.dumps({
-            "sub": sub,
-            "realm_access": {"roles": roles},
-        }).encode()
-    ).decode().rstrip("=")
+    payload = (
+        base64.urlsafe_b64encode(
+            json.dumps(
+                {
+                    "sub": sub,
+                    "realm_access": {"roles": roles},
+                }
+            ).encode()
+        )
+        .decode()
+        .rstrip("=")
+    )
     return f"{header}.{payload}."
 
 
@@ -64,11 +70,10 @@ class InMemoryInventoryRepo(InventoryRepository):
 
     def find_by_seats_for_update(self, event_id: str, seat_ids: list[str]) -> list[Seat]:
         res = []
-        for sid in seat_ids:
+        for sid in sorted(seat_ids):
             key = (event_id, sid)
-            if key not in self.seats or self.seats[key].status != SeatStatus.AVAILABLE:
-                raise SeatNotAvailableError(f"Seat {sid} is not available")
-            res.append(self.seats[key])
+            if key in self.seats:
+                res.append(self.seats[key])
         return res
 
 
@@ -108,11 +113,15 @@ class InMemoryIdempotencyStore(IdempotencyStore):
 
 @pytest.fixture
 def client() -> TestClient:
+    inv_repo = InMemoryInventoryRepo()
+    ord_repo = InMemoryOrderRepo()
+    idem_store = InMemoryIdempotencyStore()
+
     app = create_app(
         database_probe=FakeDatabaseProbe(),
-        inventory_repo=InMemoryInventoryRepo(),
-        order_repo=InMemoryOrderRepo(),
-        idempotency_store=InMemoryIdempotencyStore(),
+        uow_factory=lambda: InMemoryUnitOfWork(inv_repo, ord_repo, idem_store),
+        inventory_repo_factory=lambda: inv_repo,
+        order_repo_factory=lambda: ord_repo,
     )
     return TestClient(app)
 

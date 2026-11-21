@@ -41,7 +41,8 @@ def initialize_inventory(
     payload: InventoryInitRequest,
     request: Request,
 ) -> dict[str, str]:
-    use_case: InitializeInventoryUseCase = request.app.state.init_inventory_use_case
+    uow = request.app.state.uow_factory()
+    use_case = InitializeInventoryUseCase(uow)
     dtos = [
         SeatInitDTO(seat_id=s.seat_id, category=s.category, price_centavos=s.price_centavos)
         for s in payload.seats
@@ -66,7 +67,8 @@ def get_available_seats(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     seat_status: Annotated[SeatStatus | None, Query(alias="status")] = SeatStatus.AVAILABLE,
 ) -> list[SeatResponse]:
-    use_case: GetAvailableSeatsUseCase = request.app.state.get_seats_use_case
+    repo = request.app.state.inventory_repo_factory()
+    use_case = GetAvailableSeatsUseCase(repo)
     seats = use_case.execute(event_id=event_id, status=seat_status)
     return [
         SeatResponse(
@@ -118,7 +120,8 @@ def purchase_tickets(
             detail="Duplicate seat_ids in purchase request",
         )
 
-    use_case: PurchaseTicketsUseCase = request.app.state.purchase_tickets_use_case
+    uow = request.app.state.uow_factory()
+    use_case = PurchaseTicketsUseCase(uow)
     try:
         result = use_case.execute(
             PurchaseTicketsCommand(
@@ -148,8 +151,7 @@ def purchase_tickets(
         currency=order.total_amount.currency,
         status=order.status.value,
         tickets=[
-            TicketResponse(ticket_id=t.ticket_id, seat_id=t.seat_id, code=t.code)
-            for t in order.tickets
+            TicketResponse(ticket_id=t.ticket_id, seat_id=t.seat_id, code=t.code) for t in order.tickets
         ],
     )
 
@@ -163,7 +165,8 @@ def get_order(
     request: Request,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> OrderResponse:
-    use_case: GetOrderUseCase = request.app.state.get_order_use_case
+    repo = request.app.state.order_repo_factory()
+    use_case = GetOrderUseCase(repo)
     try:
         order = use_case.execute(
             order_id=order_id,
@@ -185,7 +188,6 @@ def get_order(
         currency=order.total_amount.currency,
         status=order.status.value,
         tickets=[
-            TicketResponse(ticket_id=t.ticket_id, seat_id=t.seat_id, code=t.code)
-            for t in order.tickets
+            TicketResponse(ticket_id=t.ticket_id, seat_id=t.seat_id, code=t.code) for t in order.tickets
         ],
     )

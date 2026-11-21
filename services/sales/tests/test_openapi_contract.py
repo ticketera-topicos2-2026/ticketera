@@ -33,6 +33,6 @@ def test_openapi_contract_matches_fastapi_schema() -> None:
         assert path in generated_schema["paths"], f"Path {path} missing in FastAPI generated OpenAPI"
         for method in path_item:
             if method in ("get", "post", "put", "delete", "head"):
-                assert (
-                    method in generated_schema["paths"][path]
-                ), f"Method {method.upper()} for {path} missing in generated OpenAPI"
+                assert method in generated_schema["paths"][path], (
+                    f"Method {method.upper()} for {path} missing in generated OpenAPI"
+                )

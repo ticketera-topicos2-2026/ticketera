@@ -17,6 +17,7 @@ import pytest
 
 from sales.domain.exceptions import SeatNotAvailableError
 from sales.domain.models import Money, Order, Seat, SeatStatus, Ticket
+from tests.unit.fake_uow import InMemoryUnitOfWork
 
 
 class FakeInventoryRepository:
@@ -107,7 +108,8 @@ def test_initialize_inventory_use_case() -> None:
     from sales.application.inventory import InitializeInventoryCommand, InitializeInventoryUseCase
 
     repo = FakeInventoryRepository()
-    use_case = InitializeInventoryUseCase(repo)
+    uow = InMemoryUnitOfWork(repo, FakeOrderRepository(), FakeIdempotencyStore())
+    use_case = InitializeInventoryUseCase(uow)
 
     seats_to_init = [
         SeatInitDTO(seat_id="A-1", category="VIP", price_centavos=100000),
@@ -128,7 +130,8 @@ def test_initialize_inventory_rejects_reinitialization() -> None:
     from sales.application.inventory import InitializeInventoryCommand, InitializeInventoryUseCase
 
     repo = FakeInventoryRepository()
-    use_case = InitializeInventoryUseCase(repo)
+    uow = InMemoryUnitOfWork(repo, FakeOrderRepository(), FakeIdempotencyStore())
+    use_case = InitializeInventoryUseCase(uow)
 
     seats_to_init = [SeatInitDTO(seat_id="A-1", category="VIP", price_centavos=50000)]
     use_case.execute(InitializeInventoryCommand(event_id="evt-1", seats=seats_to_init))
@@ -170,8 +173,9 @@ def test_purchase_tickets_successful_execution() -> None:
     )
     order_repo = FakeOrderRepository()
     idempotency_store = FakeIdempotencyStore()
+    uow = InMemoryUnitOfWork(inventory_repo, order_repo, idempotency_store)
 
-    use_case = PurchaseTicketsUseCase(inventory_repo, order_repo, idempotency_store)
+    use_case = PurchaseTicketsUseCase(uow)
 
     cmd = PurchaseTicketsCommand(
         customer_id="usr-10",
@@ -203,8 +207,9 @@ def test_purchase_tickets_replay_on_identical_key() -> None:
     )
     order_repo = FakeOrderRepository()
     idempotency_store = FakeIdempotencyStore()
+    uow = InMemoryUnitOfWork(inventory_repo, order_repo, idempotency_store)
 
-    use_case = PurchaseTicketsUseCase(inventory_repo, order_repo, idempotency_store)
+    use_case = PurchaseTicketsUseCase(uow)
 
     cmd = PurchaseTicketsCommand(
         customer_id="usr-10",
@@ -238,8 +243,9 @@ def test_purchase_tickets_rejects_payload_mismatch_with_same_key() -> None:
     )
     order_repo = FakeOrderRepository()
     idempotency_store = FakeIdempotencyStore()
+    uow = InMemoryUnitOfWork(inventory_repo, order_repo, idempotency_store)
 
-    use_case = PurchaseTicketsUseCase(inventory_repo, order_repo, idempotency_store)
+    use_case = PurchaseTicketsUseCase(uow)
 
     cmd1 = PurchaseTicketsCommand(
         customer_id="usr-10",
@@ -271,8 +277,9 @@ def test_purchase_tickets_rejects_unavailable_seat() -> None:
     )
     order_repo = FakeOrderRepository()
     idempotency_store = FakeIdempotencyStore()
+    uow = InMemoryUnitOfWork(inventory_repo, order_repo, idempotency_store)
 
-    use_case = PurchaseTicketsUseCase(inventory_repo, order_repo, idempotency_store)
+    use_case = PurchaseTicketsUseCase(uow)
 
     cmd = PurchaseTicketsCommand(
         customer_id="usr-10",

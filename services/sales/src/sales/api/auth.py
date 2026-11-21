@@ -50,6 +50,8 @@ def get_current_user(authorization: Annotated[str | None, Header()] = None) -> C
         padding = "=" * (4 - (len(payload_b64) % 4))
         decoded_bytes = base64.urlsafe_b64decode(payload_b64 + padding)
         payload = json.loads(decoded_bytes.decode("utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("Token payload must be a JSON object")
     except (ValueError, UnicodeDecodeError) as err:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

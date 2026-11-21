@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from sales.application.dtos import SeatInitDTO
 from sales.application.exceptions import InventoryAlreadyInitializedError
 from sales.application.ports import InventoryRepository
+from sales.application.uow import UnitOfWork
 from sales.domain.models import Money, Seat, SeatStatus
 
 
@@ -15,28 +16,30 @@ class InitializeInventoryCommand:
 
 
 class InitializeInventoryUseCase:
-    """Initializes seat inventory for an event."""
+    """Initializes seat inventory for an event within a Unit of Work."""
 
-    def __init__(self, inventory_repo: InventoryRepository) -> None:
-        self.inventory_repo = inventory_repo
+    def __init__(self, uow: UnitOfWork) -> None:
+        self.uow = uow
 
     def execute(self, cmd: InitializeInventoryCommand) -> None:
-        if self.inventory_repo.exists_any(cmd.event_id):
-            raise InventoryAlreadyInitializedError(
-                f"Inventory for event {cmd.event_id} has already been initialized"
-            )
+        with self.uow:
+            if self.uow.inventory_repo.exists_any(cmd.event_id):
+                raise InventoryAlreadyInitializedError(
+                    f"Inventory for event {cmd.event_id} has already been initialized"
+                )
 
-        seat_entities = [
-            Seat(
-                event_id=cmd.event_id,
-                seat_id=s.seat_id,
-                category=s.category,
-                price=Money(amount_centavos=s.price_centavos, currency="ARS"),
-                status=SeatStatus.AVAILABLE,
-            )
-            for s in cmd.seats
-        ]
-        self.inventory_repo.save_all(seat_entities)
+            seat_entities = [
+                Seat(
+                    event_id=cmd.event_id,
+                    seat_id=s.seat_id,
+                    category=s.category,
+                    price=Money(amount_centavos=s.price_centavos, currency="ARS"),
+                    status=SeatStatus.AVAILABLE,
+                )
+                for s in cmd.seats
+            ]
+            self.uow.inventory_repo.save_all(seat_entities)
+            self.uow.commit()
 
 
 class GetAvailableSeatsUseCase:

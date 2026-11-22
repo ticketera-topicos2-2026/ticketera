@@ -85,10 +85,23 @@
     `CONTRIBUTE.md` documenta cómo recuperarlo y cómo levantar la recolección después del resto;
   - después de reiniciar Alloy, una línea apareció dos veces en Loki (lectura repetida al retomar).
 
+## Captura del dashboard (2026-11-22)
+
+[`evidencia/e1-request-log/dashboard-request-log.png`](evidencia/e1-request-log/dashboard-request-log.png): el
+dashboard «Request log» con 3 minutos de tráfico a través del gateway (salud de los servicios, rutas inexistentes,
+alta, publicación y consulta de eventos de `catalog`). Se ven los cuatro paneles con datos: solicitudes por servicio
+(`catalog`, `gateway`, `payments`), por clase de status (2xx y 4xx), percentiles p50, p95 y p99, y las 2 líneas
+(gateway y `catalog`) del *correlation id* elegido.
+
+- `sales` no aparece porque su línea del request log llega con el grupo 3 (#48), que todavía no está en `main`.
+- Las duraciones altas de la solicitud elegida (unos 50 s) son de la máquina, no del servicio: con 5,9 GiB de RAM,
+  el sistema completo y Chrome, WSL quedó con presión de E/S alta y swap.
+- Para sacar la captura hubo que bajar la carga: Keycloak y el frontend detenidos, contenedores de los servicios
+  recreados (Alloy, que leía horas de logs anteriores, no había enviado nada a Loki), y después del tráfico, todo
+  detenido salvo Loki y Grafana. La captura se tomó con Chrome sin interfaz, con sesión iniciada en Grafana.
+
 ## Pendientes
 
-- 4.3: la captura del dashboard en `evidencia/e1-request-log/` (hace falta un navegador con sesión iniciada en
-  Grafana). Lo demás está verificado (ver «Verificaciones del 2026-11-21»).
 - Grupo 3, `sales`: empieza cuando se integre la implementación de `e1-idempotent-purchase` (#32). El adaptador de
   autenticación de C tiene que guardar el `sub` en `request.state.user_id`.
 - Grupo 5: la colección de Bruno de `tests/api/platform/`, cuando exista el runner de D-24.

@@ -157,7 +157,7 @@
 - [x] 1.24 [P1] Refactor `identity-checks.sh` so that it looks up a test user's token by username and password
   variable instead of by platform role, with no change of behavior (IA-17). Verify: the full smoke test with the
   echo overlay and `--require-echo` is green, as before the refactor.
-- [ ] 1.25 [P1] Add smoke checks to `identity-checks.sh` (red): `test-other-event-owner` gets a token with its
+- [x] 1.25 [P1] Add smoke checks to `identity-checks.sh` (red): `test-other-event-owner` gets a token with its
   password and holds only `EVENT_OWNER`; its `sub` differs from that of `test-event-owner`; `docker compose config`
   with `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` empty fails and names it (Req identity-provisioning: The realm has a
   second EVENT_OWNER test user - all scenarios; IA-11). Verify: only these new checks fail; every pre-existing check

@@ -14,7 +14,7 @@
 # wrong password. So each check asserts the answer of an existing client, and the wrong-password check needs the
 # right password to work first. The markers below come from the pages of Keycloak 26.8 and its login theme.
 #
-# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9 and 1.10 (design: Test Strategy,
+# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10 and 1.25 (design: Test Strategy,
 # platform/identity-provisioning, identity/access-token, platform/api-gateway).
 
 readonly REALM_PATH="/auth/realms/ticketera"
@@ -26,6 +26,9 @@ readonly ADMIN_CLI_CLIENT_ID="admin-cli"
 readonly SIGNIN_CALLBACK_PATH="/signin-callback"
 readonly -a PLATFORM_ROLES=(ADMIN EVENT_OWNER CLIENT)
 readonly WRONG_PASSWORD="smoke-test-wrong-password"
+# The second EVENT_OWNER test user, for the checks of ownership (IA-11), and the variable that holds its password.
+readonly SECOND_OWNER_USERNAME="test-other-event-owner"
+readonly SECOND_OWNER_PASSWORD_VARIABLE="TEST_USER_OTHER_EVENT_OWNER_PASSWORD"
 readonly USERINFO_PATH="$REALM_PATH/protocol/openid-connect/userinfo"
 # sales has no /example route and answers it 404 with the JSON body of FastAPI; no route serves /api/unknown/.
 readonly SALES_EXAMPLE_PATH="/api/sales/example"
@@ -158,6 +161,8 @@ CLAIM_ROLES=""
 CLAIM_EXPIRY=""
 # Set by check_test_user_token: the sub of each test user's API test token, by platform role.
 declare -A test_user_subs=()
+# Set by check_second_owner_token: the sub of the API test token of the second EVENT_OWNER test user.
+second_owner_sub=""
 # Set by prepare_identity_checks: the token of the expired-token check and its exp, or the reason it is missing.
 expiring_token=""
 expiring_token_expiry=""
@@ -842,6 +847,33 @@ check_missing_test_passwords() {
   pass "$check"
 }
 
+# Req identity-provisioning: The realm has a second EVENT_OWNER test user - Scenario: Second EVENT_OWNER test user
+# As for the other test users, a token also proves that its first sign-in needs no extra step. Sets
+# second_owner_sub when the check passes.
+check_second_owner_token() {
+  local check=$1 token
+  if ! token=$(user_token "$SECOND_OWNER_USERNAME" "$SECOND_OWNER_PASSWORD_VARIABLE"); then
+    fail "$check" "$token"
+  elif ! read_token_claims "$token"; then
+    fail "$check" "$CLAIMS_PROBLEM"
+  elif expect_sub_and_only_role "$check" EVENT_OWNER; then
+    second_owner_sub=$CLAIM_SUB
+  fi
+}
+
+# Req identity-provisioning: The realm has a second EVENT_OWNER test user - Scenario: Two different EVENT_OWNER test
+# users
+check_different_owner_subs() {
+  local check=$1 owner_sub=${test_user_subs[EVENT_OWNER]:-}
+  if [[ -z $owner_sub || -z $second_owner_sub ]]; then
+    fail "$check" "the sub of $(test_username EVENT_OWNER) or $SECOND_OWNER_USERNAME was not read (see its check)"
+  elif [[ $owner_sub == "$second_owner_sub" ]]; then
+    fail "$check" "both have the sub $owner_sub"
+  else
+    pass "$check"
+  fi
+}
+
 # Sends a request with a bearer token, which reaches curl on its standard input, and sets STATUS, HEADERS and ERROR
 # as http_headers does. Extra arguments are passed to curl.
 # Usage: headers_with_token <method> <url> <token> [curl arguments...]
@@ -1276,6 +1308,25 @@ check_identity_tokens() {
   check_missing_test_passwords "$check_missing" "${role_password_variables[@]}"
 }
 
+# The checks of the second EVENT_OWNER test user (task 1.25). They run after check_identity_tokens, which reads the
+# sub of the EVENT_OWNER test user.
+check_second_event_owner() {
+  local check_token="identity: $SECOND_OWNER_USERNAME gets a token with its password and holds only EVENT_OWNER"
+  local check_different="identity: $SECOND_OWNER_USERNAME and $(test_username EVENT_OWNER) have different sub values"
+  local check_missing="identity: docker compose config fails and names an empty $SECOND_OWNER_PASSWORD_VARIABLE"
+
+  if [[ -n $identity_problem ]]; then
+    fail_each "$identity_problem" "$check_token" "$check_different" "$check_missing"
+    return
+  fi
+
+  check_second_owner_token "$check_token"
+  check_different_owner_subs "$check_different"
+  # Req identity-provisioning: The realm has a second EVENT_OWNER test user - Scenario: Second EVENT_OWNER password
+  # missing
+  check_missing_test_passwords "$check_missing" "$SECOND_OWNER_PASSWORD_VARIABLE"
+}
+
 # The checks of the gateway's access check (task 1.8). The checks through the echo route need the echo service of
 # tests/smoke/compose.echo.yml and are skipped without it, unless --require-echo was given (CI).
 check_identity_access() {
@@ -1399,6 +1450,7 @@ check_public_paths() {
 run_identity_checks() {
   check_identity_clients
   check_identity_tokens
+  check_second_event_owner
   check_identity_access
   check_public_paths
   check_expired_token "identity: an expired token gets 401 with a Bearer challenge"

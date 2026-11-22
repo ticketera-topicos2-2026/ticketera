@@ -32,5 +32,6 @@ RUN uv sync --frozen --no-cache
 COPY --chown=app:app . .
 
 EXPOSE 8000
-CMD ["uvicorn", "sales.api.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+# --no-access-log: the request log middleware writes the only line per request (e1-request-log, RL-10).
+CMD ["uvicorn", "sales.api.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
 

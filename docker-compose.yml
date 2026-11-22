@@ -131,27 +131,21 @@ services:
       args:
         UID: ${HOST_UID:-1000}
         GID: ${HOST_GID:-1000}
-    # Same server as the image's CMD, with reload on source changes (DS-17).
+    # Applies the schema migrations, then runs the same server as the image's CMD with reload on source changes
+    # (e1-event-catalog, D-33; DS-17).
     command:
-      - uvicorn
-      - catalog.api.main:app
-      - --app-dir
-      - src
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --reload
-      - --reload-dir
-      - src
+      # bin/run starts Uvicorn with --no-access-log: the request log middleware writes the only line per
+      # request (e1-request-log, RL-10).
+      - bin/run
     labels:
       # Health path checked by the smoke test through the gateway at /api/catalog/health (DS-19).
       ticketera.health-path: /health
       # Commands run by the quality job with "docker compose run --rm catalog <command>" (DS-18): split on
-      # whitespace, with no shell.
-      ticketera.lint: ruff check .
+      # whitespace, with no shell. bin/lint also checks the hexagonal layers with import-linter (D-33).
+      ticketera.lint: bin/lint
       ticketera.typecheck: mypy
-      ticketera.test: pytest
+      # --cov measures domain and application and fails below 80 % (D-18; [tool.coverage] in pyproject.toml).
+      ticketera.test: pytest --cov
     environment:
       # Its own database and role, created by infra/database/ (DS-02).
       DATABASE_URL: postgresql+psycopg://catalog:${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD in .env (copy .env.example to .env)}@database:5432/catalog
@@ -169,6 +163,9 @@ services:
       - ALL
     healthcheck:
       <<: *healthcheck-defaults
+      # bin/run applies the migrations before Uvicorn starts; on a loaded machine that took longer than the 45 s
+      # the default timing tolerates (e1-event-catalog).
+      start_period: 60s
       # The image has no curl: Python's urllib requests /health, and a 503 or a refused connection raises, so the
       # check fails (DS-12).
       test:
@@ -185,22 +182,13 @@ services:
         UID: ${HOST_UID:-1000}
         GID: ${HOST_GID:-1000}
     command:
-      - uvicorn
-      - sales.api.main:app
-      - --app-dir
-      - src
-      - --host
-      - 0.0.0.0
-      - --port
-      - "8000"
-      - --reload
-      - --reload-dir
-      - src
+      - bin/run
     labels:
       ticketera.health-path: /health
-      ticketera.lint: ruff check .
+      ticketera.lint: bin/lint
       ticketera.typecheck: mypy
-      ticketera.test: pytest
+      # --cov measures domain and application and fails below 80 % (D-18; [tool.coverage] in pyproject.toml).
+      ticketera.test: pytest --cov
     environment:
       DATABASE_URL: postgresql+psycopg://sales:${SALES_DB_PASSWORD:?set SALES_DB_PASSWORD in .env (copy .env.example to .env)}@database:5432/sales
     volumes:
@@ -238,6 +226,7 @@ services:
       - 0.0.0.0
       - --port
       - "8000"
+      - --no-access-log
       - --reload
       - --reload-dir
       - src
@@ -349,10 +338,134 @@ services:
       <<: *healthcheck-defaults
       test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
 
+  # Log collection (change e1-request-log, design RL-11 to RL-17; spec log-collection). Alloy reads the standard
+  # output of every container of the project and sends it to Loki; Grafana queries Loki. No application container
+  # depends on these three, so stopping them changes no response of the system, and each one has a memory limit
+  # (768 MiB in total) for machines with little memory for WSL (#24).
+
+  # Loki: log storage (RL-14). Built from infra/observability/loki/ only to add a healthcheck tool to the distroless
+  # official image (RL-17).
+  loki:
+    build:
+      context: ./infra/observability/loki
+    command: ["-config.file=/etc/loki/config.yaml"]
+    labels:
+      # Commands run by the quality job (DS-18). Loki has no code of the project, only its configuration, so each
+      # step validates the configuration file; they run with the image's entrypoint, the loki binary.
+      ticketera.lint: -verify-config -config.file=/etc/loki/config.yaml
+      ticketera.typecheck: -verify-config -config.file=/etc/loki/config.yaml
+      ticketera.test: -verify-config -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./infra/observability/loki/config.yaml:/etc/loki/config.yaml:ro
+      # Log data; removed only with "docker compose down -v".
+      - ticketera-loki-data:/loki
+    networks:
+      - observability
+    mem_limit: 256m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Loki answers /ready only once its ring and ingester are up, some seconds after a cold start.
+      start_period: 60s
+      test: ["CMD", "/usr/local/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3100/ready"]
+
+  # Alloy: log collector (RL-12, RL-13). It reads the logs through the Docker socket, mounted read-only, and runs as
+  # root, which the socket needs: the only exception to DS-13 and to the non-root rule, recorded in the ADR of D-23.
+  # It keeps no capability, publishes no port and joins only the observability network.
+  alloy:
+    image: grafana/alloy:v1.22.0@sha256:9acc2529bc1edb7f5b2bd801dd8334ebc80c158e3a9e5526ecd7c9a273d43189
+    user: "0:0"
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      # Not the image's /var/lib/alloy/data: it belongs to the image's alloy user (mode 770), which root without
+      # capabilities cannot enter. Docker creates this mount point owned by root.
+      - --storage.path=/alloy-data
+      # Its HTTP server (readiness for the healthcheck) listens only inside the container.
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --disable-reporting
+    environment:
+      # Only the containers of this Compose project are collected (spec: Containers of another Compose project).
+      COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-ticketera}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./infra/observability/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      # Read positions, so a restart does not send the same lines again.
+      - ticketera-alloy-data:/alloy-data
+    networks:
+      - observability
+    depends_on:
+      loki:
+        condition: service_healthy
+    mem_limit: 128m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      <<: *healthcheck-defaults
+      # The image has no HTTP client: bash requests the readiness endpoint over a TCP connection, as for Keycloak
+      # (DS-12).
+      test:
+        - CMD
+        - bash
+        - -c
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/12345 &&
+          printf '%s\r\n' 'GET /-/ready HTTP/1.1' 'Host: localhost' 'Connection: close' '' >&3 &&
+          read -r status_line <&3 &&
+          [[ $$status_line == *' 200 '* ]]
+
+  # Grafana: queries the request log (RL-15). Published only on the local machine, with the administrator
+  # credentials from .env; anonymous access and sign-up are off, and its data source and dashboard come from files.
+  grafana:
+    image: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT:?set GRAFANA_PORT in .env (copy .env.example to .env)}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?set GRAFANA_ADMIN_USER in .env (copy .env.example to .env)}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env (copy .env.example to .env)}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # No data leaves the local machine.
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+      # No plugin downloads on start: slower starts and traffic outside the local machine, and the Loki data source
+      # is built in.
+      GF_PLUGINS_PREINSTALL_DISABLED: "true"
+    volumes:
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/etc/grafana/dashboards:ro
+    networks:
+      - observability
+    depends_on:
+      loki:
+        condition: service_healthy
+    mem_limit: 384m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      <<: *healthcheck-defaults
+      # Its first start runs the database migrations of its internal store, which takes up to two minutes.
+      start_period: 120s
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000/api/health"]
+
 networks:
   edge:
   backend:
+  # Alloy, Loki and Grafana only; no service talks to Loki (RL-16).
+  observability:
 
 volumes:
   # PostgreSQL data, mounted at /var/lib/postgresql (DS-24); removed only with "docker compose down -v".
   ticketera-db-data:
+  # Loki data and Alloy read positions (e1-request-log, RL-14); removed only with "docker compose down -v".
+  ticketera-loki-data:
+  ticketera-alloy-data:

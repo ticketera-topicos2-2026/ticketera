@@ -1,0 +1,24 @@
+meta {
+  name: Another owner gets 404
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/manage/events/{{eventId}}
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{otherOwnerToken}}
+}
+
+assert {
+  res.status: eq 404
+}
+
+docs {
+  Req: An EVENT_OWNER manages only their own events.
+  Scenario: EVENT_OWNER reads another owner's draft.
+}

@@ -1,0 +1,41 @@
+meta {
+  name: Retry with the same key
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/manage/events
+  body: json
+  auth: bearer
+}
+
+headers {
+  Idempotency-Key: {{createKey}}
+}
+
+auth:bearer {
+  token: {{ownerToken}}
+}
+
+body:json {
+  {
+    "title": "Noche de Tango (Bruno)",
+    "type": "CONCERT",
+    "organizer_name": "Orquesta Típica Malvón",
+    "participants": [{"name": "Lucía Ríos"}],
+    "starts_at": "{{startsAt}}",
+    "venue": {"name": "Teatro del Lago", "city": "Rosario"},
+    "zones": [{"code": "PLATEA", "name": "Platea", "modality": "NUMBERED", "seat_count": 3}]
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.id: eq {{eventId}}
+}
+
+docs {
+  Req: Event creation is idempotent.
+  Scenario: Retry after a network timeout.
+}

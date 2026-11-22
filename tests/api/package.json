@@ -1,0 +1,8 @@
+{
+  "name": "ticketera-api-tests",
+  "private": true,
+  "description": "Bruno API test collections, one folder per service (D-24). Run them with tests/api/run.sh.",
+  "devDependencies": {
+    "@usebruno/cli": "4.3.0"
+  }
+}

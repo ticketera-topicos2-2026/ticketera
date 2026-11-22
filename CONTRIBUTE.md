@@ -122,6 +122,51 @@ docker run --rm --network none --read-only --user "$(id -u):$(id -g)" -v "$PWD:/
   python -I -B scripts/check_realm_secrets.py infra/keycloak/ticketera-realm.json
 ```
 
+### Tests de API (Bruno)
+
+Cada servicio tiene su colección de Bruno en `tests/api/<servicio>/` (D-24). `tests/api/run.sh` la corre contra el
+sistema levantado, con Bruno CLI instalado desde `tests/api/package-lock.json` en el contenedor de Node de la CI,
+sin instalar nada en el host:
+
+```bash
+docker compose up -d --wait
+tests/api/run.sh catalog
+```
+
+El runner comparte la red del gateway, así que las colecciones llaman a `http://localhost:8080/api/<servicio>`.
+Les pasa los tokens `ownerToken`, `otherOwnerToken`, `adminToken` y `clientToken`, con un `sub` nuevo por corrida.
+Por ahora son tokens de prueba sin firmar: sirven mientras el gateway no valide tokens. Cuando se integre el control
+de acceso de `e1-identity-access` (#30), el runner tiene que pedir tokens reales al cliente `ticketera-api-tests`.
+
+### Catálogo de eventos e inventario de `sales`
+
+El catálogo (`e1-event-catalog`) describe la oferta y `sales` la vende: cada servicio tiene su base y ninguno lee
+la del otro (D-06, D-28). En la Etapa I no hay eventos de integración, así que, después de publicar un evento, un
+`ADMIN` carga a mano el inventario de `sales` con los mismos ids:
+
+- el `event_id` de `sales` es el `id` del evento del catálogo;
+- cada asiento de una zona numerada es un `seat_id` de la forma `<código de zona>-<n>`, como los devuelve
+  `GET /api/catalog/events/{id}` en `zones[].seat_ids`;
+- la `category` del asiento es el código de su zona; el precio lo decide `sales` (`price_centavos`, en ARS).
+
+Por ejemplo, para un evento publicado con la zona numerada `PLATEA` de 3 asientos:
+
+```bash
+curl -X POST "http://localhost:18080/api/sales/events/<id del evento>/inventory" \
+  -H "Authorization: Bearer <token de ADMIN>" -H 'Content-Type: application/json' -d '{"seats": [
+    {"seat_id": "PLATEA-1", "category": "PLATEA", "price_centavos": 1500000},
+    {"seat_id": "PLATEA-2", "category": "PLATEA", "price_centavos": 1500000},
+    {"seat_id": "PLATEA-3", "category": "PLATEA", "price_centavos": 1500000}]}'
+```
+
+`GET /api/sales/events/<id>/seats` muestra después esos asientos como `AVAILABLE`. Las zonas no numeradas no se
+cargan todavía: `sales` vende solo asientos numerados en la Etapa I. Desde la Etapa II, el evento de integración
+`EventPublished` reemplaza esta carga manual.
+
+Pruebas del catálogo, como en `sales`: `docker compose run --rm catalog pytest` (unitarias, de integración contra
+PostgreSQL, de aceptación y de contrato), `docker compose run --rm catalog bin/lint` (Ruff e import-linter) y
+`docker compose run --rm catalog mypy`. `catalog` aplica sus migraciones al arrancar (`bin/run`).
+
 ### Día a día
 
 | Quiero... | Comando |
@@ -144,6 +189,64 @@ importado. Es el comando que hace falta cuando:
 
 `docker compose restart gateway` es la solución cuando el gateway responde `502` después de recrear un servicio:
 NGINX resuelve la dirección de cada servicio al arrancar, y un servicio recreado puede recibir otra IP (DS-07).
+
+### Bitácora de solicitudes y Grafana
+
+El gateway y cada servicio escriben una línea JSON por solicitud en su salida estándar (D-23, change
+`e1-request-log`). El gateway genera un *correlation id* por solicitud: lo manda al servicio y lo devuelve en el
+encabezado `X-Correlation-ID` de toda respuesta, así que la misma solicitud se sigue de punta a punta. Las líneas
+nunca llevan tokens, encabezados, cuerpos ni el query string; los servicios registran la plantilla de la ruta
+(`/events/{event_id}/orders`), no la ruta pedida.
+
+Para seguir una solicitud desde la terminal:
+
+```bash
+id=$(curl -s -o /dev/null -D - http://localhost:18080/api/catalog/health | tr -d '\r' \
+  | awk -F': ' 'tolower($1)=="x-correlation-id" {print $2}')
+docker compose logs --no-log-prefix gateway catalog | grep "$id"
+```
+
+**Grafana.** Alloy recolecta la salida de todos los contenedores, Loki la guarda 7 días y Grafana la consulta. Grafana
+abre en <http://localhost:3000> (`GRAFANA_PORT`, solo en `127.0.0.1`), con `GRAFANA_ADMIN_USER` y
+`GRAFANA_ADMIN_PASSWORD` de `.env`; no hay acceso anónimo. Si tu `.env` es anterior a este cambio, agregale esas
+tres variables desde `.env.example`: sin ellas, Compose se detiene y las nombra.
+
+- *Dashboards → Ticketera → Request log*: solicitudes por servicio y por clase de status, percentiles 50, 95 y 99
+  de la duración, y un panel con todas las líneas de un *correlation id* que pegás arriba, en «Correlation id».
+  Solo cuenta las solicitudes que pasaron por el gateway; los healthchecks de los contenedores no llevan id.
+- *Explore*, con la fuente de datos Loki, para consultas propias. Cada línea tiene la etiqueta `service` (el nombre
+  del servicio de Compose) y los campos JSON se leen con `| json`, por ejemplo:
+
+  ```logql
+  {service="sales"} | json | status >= 500
+  {service=~".+"} |= "<correlation id>"
+  ```
+
+**Máquinas con poca memoria.** Loki, Alloy y Grafana tienen límites de 256, 128 y 384 MiB (768 MiB en total), y
+ningún servicio depende de ellos: si tu máquina no da abasto, paralos sin afectar al resto del sistema y volvé a
+levantarlos cuando los necesites. Las líneas siguen disponibles en `docker compose logs`.
+
+```bash
+docker compose stop loki alloy grafana
+docker compose up -d --wait loki alloy grafana
+```
+
+`docker compose down -v` también borra los volúmenes `ticketera-loki-data` y `ticketera-alloy-data`: Loki vuelve a
+empezar vacío.
+
+**Alloy queda `unhealthy` o no llegan líneas nuevas.** Si el arranque satura la máquina, el daemon de Docker
+responde lento, Alloy pierde la conexión con su API («error while listing containers» en su log) y puede no
+recuperarse solo. Con el sistema ya estable, reinicialo: `docker compose restart alloy`. En una máquina de 6 GiB
+conviene además levantar primero el sistema sin la recolección y sumarla después:
+
+```bash
+docker compose up -d --wait database identity catalog sales payments frontend gateway
+docker compose up -d --wait loki alloy grafana
+```
+
+Alloy es el único contenedor que corre como root: lee los logs por el socket de Docker, montado en solo lectura, y
+no tiene capacidades, puertos publicados ni otra red que la de Loki. Es una excepción a DS-13, registrada en el ADR
+de D-23.
 
 ### Cambios en el realm
 
@@ -195,6 +298,13 @@ Probá cada comando en local antes del pull request, por ejemplo `docker compose
 Para el frontend, los comandos de ESLint, `tsc --noEmit` y Vitest (por ejemplo `npx eslint .`,
 `npx tsc --noEmit` y `npx vitest run`).
 
+**Cobertura (D-18).** `domain` y `application` necesitan al menos 80 % de cobertura. `catalog` la mide con
+`pytest-cov`: su etiqueta es `ticketera.test: pytest --cov`, y `[tool.coverage]` en su `pyproject.toml` fija las
+capas, la cobertura de ramas, el mínimo (`fail_under = 80`) y el archivo de datos en `/tmp`, fuera de la carpeta
+montada. Con eso el job `quality` falla si la cobertura baja. Para sumarlo a otro servicio, copiá esa sección
+cambiando el nombre del paquete, agregá `pytest-cov` a sus dependencias de desarrollo y regenerá su lockfile con
+`docker compose run --rm <servicio> uv lock`.
+
 **Ruta del gateway.** Un archivo por servicio, `infra/gateway/routes/<servicio>.conf`, con un único `location`
 que incluye los encabezados de reenvío. La barra final de `proxy_pass` quita el prefijo `/api/<servicio>/`, y la
 ruta pública no lleva versión (ADR-0006):
@@ -212,6 +322,16 @@ Dos reglas para estos archivos:
   `infra/gateway/templates/default.conf.template`, y un `location` que declara su propio `add_header` deja de
   heredar esos encabezados.
 - Cada ruta es un solo `location` que incluye `snippets/forwarded-headers.conf`.
+
+**Bitácora de solicitudes.** Un servicio backend escribe su línea por solicitud (D-23):
+
+- copiá `api/request_log.py` de otro servicio y agregá `RequestLogMiddleware` al final de `create_app`, con el
+  nombre del servicio, para que envuelva el ruteo y los manejadores de excepciones;
+- agregá `--no-access-log` al `command` de Uvicorn en `docker-compose.yml` y al `CMD` del Dockerfile;
+- cuando el servicio autentique, su adaptador de autenticación guarda el `sub` aceptado en
+  `request.state.user_id`; el middleware nunca lee el token;
+- sumá el servicio a `REQUEST_LOG_SERVICES` en `tests/smoke/request-log-checks.sh`, y copiá los tests de
+  `tests/unit/test_request_log.py` y `tests/acceptance/test_request_log_api.py`.
 
 **`depends_on` del gateway.** NGINX resuelve cada servicio al arrancar, así que el gateway espera a que los
 servicios a los que enruta estén sanos. Los grupos 3, 5 y 6 agregan su entrada al mismo `depends_on` del gateway
@@ -360,3 +480,24 @@ Abrí el pull request hacia `main` y completá la plantilla:
 
 - Nadie puede saltear las reglas de `main`, ni siquiera un administrador. Si un merge rompe `main`, se revierte
   ese commit con un pull request nuevo (DS-21).
+
+## Pruebas y Comandos de `sales`
+
+Para el servicio `sales` (Core Domain, Etapa I):
+- **Linting y reglas de arquitectura hexagonal**:
+  ```bash
+  docker compose run --rm sales bin/lint
+  ```
+- **Chequeo de tipos estáticos**:
+  ```bash
+  docker compose run --rm sales mypy
+  ```
+- **Tests unitarios, de integración y de contrato OpenAPI**:
+  ```bash
+  docker compose run --rm sales pytest
+  ```
+- **Migraciones de base de datos con Alembic**:
+  ```bash
+  docker compose run --rm sales alembic upgrade head
+  ```
+

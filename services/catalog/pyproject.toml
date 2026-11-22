@@ -8,6 +8,7 @@ dependencies = [
     "uvicorn==0.38.0",
     "sqlalchemy==2.0.44",
     "psycopg[binary]==3.2.12",
+    "alembic==1.17.2",
 ]
 
 [dependency-groups]
@@ -16,6 +17,9 @@ dev = [
     "httpx==0.28.1",
     "ruff==0.14.4",
     "mypy==1.18.2",
+    "import-linter==2.1",
+    "pyyaml==6.0.2",
+    "pytest-cov==7.1.0",
 ]
 
 [tool.uv]
@@ -47,3 +51,16 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 # Tests must not write into the mounted folder (design, platform/local-environment).
 addopts = "-p no:cacheprovider"
+
+# Coverage of the domain and application layers, which D-18 requires to be 80 % or more. "pytest --cov" (the
+# ticketera.test label, run by the quality job) measures it and fails below the minimum (issue #49).
+[tool.coverage.run]
+source = ["catalog.domain", "catalog.application"]
+branch = true
+# Outside the mounted folder, like the other caches (design, platform/local-environment).
+data_file = "/tmp/.coverage"
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true

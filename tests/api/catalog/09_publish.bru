@@ -1,0 +1,25 @@
+meta {
+  name: Publish
+  type: http
+  seq: 9
+}
+
+post {
+  url: {{baseUrl}}/manage/events/{{eventId}}/publish
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ownerToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq "PUBLISHED"
+}
+
+docs {
+  Req: A draft is published once it is complete.
+  Scenario: Complete draft published.
+}

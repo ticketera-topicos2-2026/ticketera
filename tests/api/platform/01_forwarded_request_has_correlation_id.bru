@@ -1,0 +1,30 @@
+meta {
+  name: Forwarded request carries a correlation id
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/catalog/health
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.headers['x-correlation-id']: matches ^[0-9a-f]{32}$
+}
+
+tests {
+  test("response carries a 32-char lowercase hex X-Correlation-ID", function () {
+    const id = res.getHeader("x-correlation-id");
+    expect(id).to.be.a("string");
+    expect(id).to.match(/^[0-9a-f]{32}$/);
+    bru.setVar("firstCorrelationId", id);
+  });
+}
+
+docs {
+  Req: The gateway gives every request a correlation id.
+  Scenario: Forwarded request.
+}

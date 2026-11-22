@@ -1,0 +1,38 @@
+meta {
+  name: Edit with the current version
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/manage/events/{{eventId}}
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{ownerToken}}
+}
+
+body:json {
+  {
+    "title": "Tango en el Puerto (Bruno)",
+    "type": "CONCERT",
+    "organizer_name": "Orquesta Típica Malvón",
+    "participants": [{"name": "Lucía Ríos"}],
+    "starts_at": "{{startsAt}}",
+    "venue": {"name": "Teatro del Lago", "city": "Rosario"},
+    "zones": [{"code": "PLATEA", "name": "Platea", "modality": "NUMBERED", "seat_count": 3}],
+    "version": 1
+  }
+}
+
+assert {
+  res.status: eq 200
+  res.body.version: eq 2
+}
+
+docs {
+  Req: A draft is edited with its current version.
+  Scenario: Edit with the current version.
+}

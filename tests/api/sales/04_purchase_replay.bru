@@ -1,0 +1,33 @@
+meta {
+  name: 4. Purchase Replay (Identical Response)
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/events/{{eventId}}/orders
+  body: json
+  auth: bearer
+}
+
+headers {
+  Idempotency-Key: 11111111-2222-3333-4444-555555555555
+}
+
+auth:bearer {
+  token: {{clientToken}}
+}
+
+body:json {
+  {
+    "seat_ids": [
+      "SEAT-1"
+    ]
+  }
+}
+
+assert {
+  res.status: eq 201
+  res.body.order_id: isDefined
+  res.body.status: eq "CONFIRMED"
+}

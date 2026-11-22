@@ -7,8 +7,10 @@ FROM python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652a
 ARG UID=1000
 ARG GID=1000
 
+# PYTHONPATH=src lets import-linter and Alembic import the catalog package, as in sales (D-33).
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    PYTHONPATH=src \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     UV_COMPILE_BYTECODE=0 \
     UV_LINK_MODE=copy \
@@ -31,4 +33,5 @@ RUN uv sync --frozen --no-cache
 COPY --chown=app:app . .
 
 EXPOSE 8000
-CMD ["uvicorn", "catalog.api.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000"]
+# --no-access-log: the request log middleware writes the only line per request (e1-request-log, RL-10).
+CMD ["uvicorn", "catalog.api.main:app", "--app-dir", "src", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]

@@ -1,0 +1,11 @@
+[importlinter]
+root_package = sales
+
+[importlinter:contract:hexagonal-layers]
+name = Sales hexagonal layers contract (D-33)
+type = layers
+layers =
+    sales.api
+    sales.infrastructure
+    sales.application
+    sales.domain

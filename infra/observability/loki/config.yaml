@@ -1,0 +1,50 @@
+# Loki: storage of the collected container logs (change e1-request-log, design RL-13, RL-14; spec log-collection).
+#
+# Single binary, single tenant, filesystem storage under /loki, which is the named volume ticketera-loki-data
+# ("docker compose down -v" removes it). Loki publishes no port: only Alloy pushes to it and only Grafana queries it,
+# both on the observability network (RL-16), so authentication is off.
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: warn
+
+common:
+  instance_addr: 127.0.0.1
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2026-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+# Req log-collection: Log retention is bounded. Lines older than 7 days are deleted by the compactor (RL-14), and
+# lines that old are not accepted either.
+limits_config:
+  retention_period: 168h
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+
+compactor:
+  working_directory: /loki/compactor
+  retention_enabled: true
+  delete_request_store: filesystem
+
+# No usage data leaves the local machine.
+analytics:
+  reporting_enabled: false

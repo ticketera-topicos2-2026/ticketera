@@ -1,0 +1,36 @@
+meta {
+  name: Forged correlation id is replaced
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/catalog/health
+  body: none
+  auth: none
+}
+
+headers {
+  X-Correlation-ID: 00000000000000000000000000000000
+}
+
+assert {
+  res.status: eq 200
+  res.headers['x-correlation-id']: matches ^[0-9a-f]{32}$
+  res.headers['x-correlation-id']: neq 00000000000000000000000000000000
+}
+
+tests {
+  test("forged X-Correlation-ID is replaced by a fresh gateway id", function () {
+    const id = res.getHeader("x-correlation-id");
+    expect(id).to.be.a("string");
+    expect(id).to.match(/^[0-9a-f]{32}$/);
+    expect(id).to.not.equal("00000000000000000000000000000000");
+    expect(id).to.not.equal(bru.getVar("firstCorrelationId"));
+  });
+}
+
+docs {
+  Req: The correlation id is never taken from the client.
+  Scenario: Client sends its own correlation id.
+}

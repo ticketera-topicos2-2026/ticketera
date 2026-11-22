@@ -69,7 +69,7 @@ change; DS-xx are the decisions of `project-bootstrap`.
 | IA-08 | Gateway log format without query string or referrer; gateway error log at level `crit` | — | Keep `main` (logs `id_token_hint` and query tokens); reject token-like query parameters (incomplete: any name can carry one) |
 | IA-09 | `KC_PROXY_HEADERS=xforwarded`; the auth location includes the forwarding snippet too | DS-08 | `KC_PROXY_TRUSTED_ADDRESSES` with the backend subnet (Compose assigns it dynamically) |
 | IA-10 | Realm clients: public `ticketera-frontend` (code flow, PKCE `S256`, exact redirect URIs from `FRONTEND_ORIGIN`), public `ticketera-api-tests` (password grant only), `admin-cli` redefined without direct grants | D-03 [ADR-0002][adr-0002] | Confidential clients (a secret in the repository or in every member's `.env`); services checking `azp` instead of disabling `admin-cli` grants (one more rule in every service) |
-| IA-11 | Test users with complete profiles and `${TEST_USER_<ROLE>_PASSWORD}` placeholders; realm `${FRONTEND_ORIGIN}` placeholders | DS-05, DS-16 | Users created by a script after startup (state outside the realm definition; `down -v` would need a second step) |
+| IA-11 | Four test users (one per platform role and a second `EVENT_OWNER` for ownership tests) with complete profiles and `${TEST_USER_*_PASSWORD}` placeholders; realm `${FRONTEND_ORIGIN}` placeholders | DS-05, DS-16 | Users created by a script after startup (state outside the realm definition; `down -v` would need a second step) |
 | IA-12 | Realm secret check reads credential objects field by field | DS-20 | Removing `credentials` from the secret keys (lets exported password hashes through) |
 | IA-13 | Frontend OIDC with `oidc-client-ts` and a small own `AuthProvider`; routing with React Router in declarative mode | D-01, D-16 | `keycloak-js`, `react-oidc-context`, own PKCE code; TanStack Router, wouter (see Alternatives Considered) |
 | IA-14 | Tokens kept in memory; renewal with the refresh token; page reload restored by a silent sign-in in a hidden frame | — | `sessionStorage` (default of the library) or `localStorage` (readable by any injected script) |
@@ -161,20 +161,23 @@ it is written, and this link is updated if they change.
   `master` realm's `admin-cli`, used by the bootstrap administrator, is untouched.
 - **Realm settings.** `displayName: "GoPass"`, `registrationAllowed: false` (stated explicitly), default token
   lifespans (access token 5 minutes) for the frontend.
-- **Test users (IA-11).** `test-admin`, `test-event-owner` and `test-client`, each with `enabled: true`,
-  `emailVerified: true`, `email` under `example.com`, `firstName` "Test", `lastName` naming the role, no required
-  actions, the single realm role of its name and one credential
-  `{"type": "password", "value": "${TEST_USER_<ROLE>_PASSWORD}", "temporary": false}`. The Keycloak 26
-  declarative user profile requires `email`, `firstName` and `lastName`; without them, or with
+- **Test users (IA-11).** `test-admin`, `test-event-owner`, `test-client` and `test-other-event-owner`, each with
+  `enabled: true`, `emailVerified: true`, `email` under `example.com`, `firstName` "Test", `lastName` naming the
+  role, no required actions, a single realm role (that of its name; `EVENT_OWNER` for `test-other-event-owner`) and
+  one credential `{"type": "password", "value": "${TEST_USER_<NAME>_PASSWORD}", "temporary": false}`, where
+  `<NAME>` is `ADMIN`, `EVENT_OWNER`, `CLIENT` or `OTHER_EVENT_OWNER`. `test-other-event-owner` exists so that API
+  tests can check that an `EVENT_OWNER` cannot reach the events of another one (catalog's Bruno test 05). The
+  Keycloak 26 declarative user profile requires `email`, `firstName` and `lastName`; without them, or with
   `emailVerified: false`, the first sign-in shows an update-profile form and the password grant fails with
   "Account is not fully set up". Usernames are not secret and are documented in `CONTRIBUTE.md`.
   Because each test user lists its `realmRoles`, Keycloak does not grant it `default-roles-ticketera`, so it holds
   no `account` role and the Keycloak account console (`/auth/realms/ticketera/account`) fails after sign-in (its
   profile request gets `401`); the project does not use that console, whose job the frontend's "My account" page
   does.
-- **Variables.** `.env.example` gains `TEST_USER_ADMIN_PASSWORD`, `TEST_USER_EVENT_OWNER_PASSWORD` and
-  `TEST_USER_CLIENT_PASSWORD` with placeholder values in the style of the existing ones. The identity service
-  receives them and `FRONTEND_ORIGIN` with `${VAR:?message}` (DS-16), so startup stops and names a missing value.
+- **Variables.** `.env.example` gains `TEST_USER_ADMIN_PASSWORD`, `TEST_USER_EVENT_OWNER_PASSWORD`,
+  `TEST_USER_CLIENT_PASSWORD` and `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` with placeholder values in the style of the
+  existing ones. The identity service receives them and `FRONTEND_ORIGIN` with `${VAR:?message}` (DS-16), so
+  startup stops and names a missing value.
   Keycloak substitutes `${VAR}` placeholders in the realm file at import time. The frontend receives
   `VITE_OIDC_AUTHORITY` (`http://localhost:${GATEWAY_PORT}/auth/realms/ticketera`) and `VITE_OIDC_CLIENT_ID`
   (`ticketera-frontend`) from Compose.
@@ -535,7 +538,7 @@ Each scenario gets one test, in the place that can observe it. Tokens come from 
 | `platform/identity-provisioning`, realm secrets | `tests/platform/test_check_realm_secrets.py` | New fixtures (IA-12) |
 | `identity/access-token` | `tests/smoke/identity-checks.sh` and the Bruno collection | `sub` present, stable across sign-in and sign-out, different between users; roles per test user; two sessions of the same user: the `sub` of an example access token of the frontend client, generated by the admin API's scope evaluation, equals the `sub` of a `ticketera-api-tests` token of the same user |
 | `identity/user-authentication` | Vitest + React Testing Library, with a mocked `UserManager` and mocked `fetch` | Every scenario: sign-in redirect and return, `access_denied`, unmatched callback, session and role guards, "My account" roles, header, `Bearer` only on protected calls, renewal success and failure, single-flight `401`, sign-out form `POST` with no token in any URL, status page public and working with the identity service down |
-| Bruno (D-24) | `tests/api/identity/`, run locally | Token requests per role and claims, `401` for a protected path without and with an invalid token, public health; passwords from environment variables, never in the collection |
+| Bruno (D-24) | `tests/api/identity/`, run locally | Token requests per role and claims, `401` for a protected path without and with an invalid token, public health; passwords from environment variables, never in the collection. `tests/api/run.sh` gives every collection real tokens of the four test users from `ticketera-api-tests` (task 1.27) |
 
 Checked by hand in a browser and recorded as evidence in the team log, because they need a real browser and a real
 identity service: sign-in from `/account` and back, sign-out ending the identity session (the next sign-in asks
@@ -576,8 +579,8 @@ lifespan (IA-18) adds only the time left after the other checks.
      screens, the Bruno collection with its command in `CONTRIBUTE.md`, and the latency measurement; its sign-in
      steps in `CONTRIBUTE.md` and its team log entry.
    The frontend's manual evidence needs the backend merged, or its branch running on top of the backend branch.
-3. When the backend pull request merges, a message to the team asks every member to copy the three
-   `TEST_USER_<ROLE>_PASSWORD` lines from `.env.example` to `.env` (Compose stops otherwise) and to run
+3. When the backend pull request merges, a message to the team asks every member to copy the four
+   `TEST_USER_*_PASSWORD` lines from `.env.example` to `.env` (Compose stops otherwise) and to run
    `docker compose down -v` before `docker compose up`, because an existing realm is never re-imported.
    `CONTRIBUTE.md` documents both, the test usernames and how to sign in.
 4. Feature changes start using tokens from `ticketera-api-tests` in their API tests, and copy the token-claims

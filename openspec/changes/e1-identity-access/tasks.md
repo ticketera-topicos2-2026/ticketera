@@ -141,13 +141,42 @@
   trusting the forwarded token) with the `create-architectural-decision-record` skill, add it to the index in
   `docs/adr/README.md`, and fix the link in `design.md` if the number or slug changed (D-27; IA-01). Verify: the
   ADR is in the pull request and the link resolves.
-- [ ] 1.20 [P1] Write the `CONTRIBUTE.md` section (Spanish): the test users and their roles, the three new `.env`
+- [ ] 1.20 [P1] Write the `CONTRIBUTE.md` section (Spanish): the test users and their roles, the four new `.env`
   variables, `docker compose down -v` after realm changes, and getting a token from `ticketera-api-tests`.
   Verify: a reviewer follows it from a fresh clone.
 - [ ] 1.21 [P1] Write the team log entry for this group with the red and green evidence, the closed pending item
   of group 3 (502 handling at server level) and the AI usage. Verify: the entry is in the pull request.
-- [ ] 1.22 [P1] After the merge, send the team message: copy the three `TEST_USER_<ROLE>_PASSWORD` lines to
-  `.env` and run `docker compose down -v` before `up`. Verify: the message is linked in the team log.
+- [ ] 1.22 [P1] After the merge, send the team message: copy the four `TEST_USER_*_PASSWORD` lines to `.env` and
+  run `docker compose down -v` before `up`. Verify: the message is linked in the team log.
+- [ ] 1.23 [P1] Extend `tests/platform/test_realm_definition.py` (red) to a second EVENT_OWNER test user,
+  `test-other-event-owner`: exactly four test users, this one with a complete profile, no required actions, only
+  `EVENT_OWNER` and the placeholder `${TEST_USER_OTHER_EVENT_OWNER_PASSWORD}` (Req identity-provisioning: The realm
+  has a second EVENT_OWNER test user - Scenario: Second EVENT_OWNER test user; The realm definition contains no
+  secrets - Scenario: Test user passwords in the realm definition; IA-11). Verify: only the new and changed tests
+  fail on the current realm; every other test of `tests/platform` still passes.
+- [ ] 1.24 [P1] Refactor `identity-checks.sh` so that it looks up a test user's token by username and password
+  variable instead of by platform role, with no change of behavior (IA-17). Verify: the full smoke test with the
+  echo overlay and `--require-echo` is green, as before the refactor.
+- [ ] 1.25 [P1] Add smoke checks to `identity-checks.sh` (red): `test-other-event-owner` gets a token with its
+  password and holds only `EVENT_OWNER`; its `sub` differs from that of `test-event-owner`; `docker compose config`
+  with `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` empty fails and names it (Req identity-provisioning: The realm has a
+  second EVENT_OWNER test user - all scenarios; IA-11). Verify: only these new checks fail; every pre-existing check
+  still passes.
+- [ ] 1.26 [P1] Add `test-other-event-owner` to the realm, pass `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` to the
+  identity service with `${VAR:?message}` and add it to `.env.example` (IA-11). Verify: after `docker compose
+  down -v` and `up --wait`, the tests of 1.23 and the checks of 1.25 pass and the full smoke test is green.
+- [ ] 1.27 [P1] Make `tests/api/run.sh` and `tests/smoke/measure-catalog-latency.sh` get real tokens from
+  `ticketera-api-tests` (password grant, `openid` scope, passwords from `docker compose config`): `run.sh` gets the
+  tokens of `test-event-owner`, `test-other-event-owner`, `test-admin` and `test-client` right before Bruno runs, as
+  `ownerToken`, `otherOwnerToken`, `adminToken` and `clientToken`; the latency script renews the owner's token when
+  less than 15 s of it is left (IA-18). When a token request fails, either script stops at once with a message that
+  names the username, and neither ever prints a password or a token. `run.sh` runs its `docker compose` commands
+  from the repository root, so a relative `COMPOSE_FILE` works. Verify: `run.sh sales`, run first on the database
+  left by the `down -v` of 1.26, is reported for information; then the static tests, the full smoke test with
+  `--require-echo`, `run.sh catalog` and `run.sh platform` pass, and the latency script, run last, passes.
+  Afterwards `run.sh catalog` test 10 is expected to fail until the next `docker compose down -v`: the public
+  catalog sorts by `starts_at`, so the latency events push the new event out of the first 100 (known issue,
+  reported to Ariel, not changed here).
 
 ## 2. Frontend and API tests (A, feature/e1-identity-access-frontend)
 

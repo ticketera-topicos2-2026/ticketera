@@ -159,6 +159,27 @@ stop when one of those passwords is missing.
 - **WHEN** the password of one test user is missing from `.env` or empty
 - **THEN** startup stops before any container starts and the error names the missing value
 
+### Requirement: The realm has a second EVENT_OWNER test user
+
+The `ticketera` realm SHALL contain a second test user holding only `EVENT_OWNER`, distinct from the `EVENT_OWNER`
+test user, so that API tests can check that an `EVENT_OWNER` cannot reach the events of another one. It SHALL sign
+in with the password set in `.env` without any extra step, and startup SHALL stop when that password is missing.
+
+#### Scenario: Second EVENT_OWNER test user
+
+- **WHEN** the second `EVENT_OWNER` test user signs in
+- **THEN** the sign-in succeeds and the user holds the `EVENT_OWNER` role and no other platform role
+
+#### Scenario: Two different EVENT_OWNER test users
+
+- **WHEN** the `EVENT_OWNER` test user and the second `EVENT_OWNER` test user sign in
+- **THEN** their access tokens have different `sub` values
+
+#### Scenario: Second EVENT_OWNER password missing
+
+- **WHEN** the password of the second `EVENT_OWNER` test user is missing from `.env` or empty
+- **THEN** startup stops before any container starts and the error names the missing value
+
 ### Requirement: Users cannot register themselves
 
 The `ticketera` realm MUST NOT let anyone create an account from the sign-in page.

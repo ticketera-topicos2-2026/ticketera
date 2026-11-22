@@ -108,7 +108,8 @@
   request log ready to use). Verify: the dashboard loads by hand with traffic; recorded in the team log. Done on
   2026-11-21: with traffic through the gateway, every panel query of the dashboard, run through Grafana's API,
   returned data (3 services, 2 status classes, p50/p95/p99 per service, and the 2 lines of a chosen correlation
-  id); recorded in the team log. The screenshot needs a signed-in browser and is left to a member.
+  id); recorded in the team log. Screenshot taken on 2026-11-22 with every panel showing data:
+  `docs/bitacora/evidencia/e1-request-log/dashboard-request-log.png`.
 - [x] 4.4 Add `loki` (image of RL-17), `alloy` and `grafana` to `docker-compose.yml`: images pinned by index
   digest, healthchecks with tools each image has (DS-12), `mem_limit`, `cap_drop: ALL`, `no-new-privileges`, the
   `observability` network, the read-only Docker socket for Alloy as root (RL-12), the volumes
@@ -150,7 +151,7 @@
 - [x] 6.3 Update `AGENTS.md`: a service never logs anything but the request log line's fields, and an
   authentication adapter stores the accepted `sub` in `request.state.user_id` (RL-06, RL-08). Verify: reviewed in
   the pull request.
-- [ ] 6.4 Write the team log entry `docs/bitacora/<date>-e1-request-log.md`: what was built, the measured memory
+- [x] 6.4 Write the team log entry `docs/bitacora/<date>-e1-request-log.md`: what was built, the measured memory
   and smoke-test time, the dashboard screenshot, and who completed each part. Verify: the entry exists (the
-  README of the team log has a template, not an index). Done: `docs/bitacora/2026-11-20-e1-request-log.md`;
-  pending: the dashboard screenshot of task 4.3.
+  README of the team log has a template, not an index). Done: `docs/bitacora/2026-11-20-e1-request-log.md`, with
+  the dashboard screenshot of task 4.3 added on 2026-11-22.

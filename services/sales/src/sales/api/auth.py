@@ -6,7 +6,7 @@ import os
 from dataclasses import dataclass
 from typing import Annotated, Any
 
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, Request, status
 
 
 @dataclass(frozen=True)
@@ -18,7 +18,10 @@ class CurrentUser:
         return role in self.roles
 
 
-def get_current_user(authorization: Annotated[str | None, Header()] = None) -> CurrentUser:
+def get_current_user(
+    request: Request,
+    authorization: Annotated[str | None, Header()] = None,
+) -> CurrentUser:
     """Decodes JWT payload without signature verification (perimeter trusted by NGINX gateway)."""
     auth_required = os.environ.get("SALES_AUTH_REQUIRED", "true").lower() in ("true", "1", "yes")
 
@@ -59,11 +62,13 @@ def get_current_user(authorization: Annotated[str | None, Header()] = None) -> C
         ) from err
 
     sub = payload.get("sub")
-    if not sub:
+    if not isinstance(sub, str) or not sub:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token missing sub claim",
         )
+    # Expose the accepted token subject to the request log middleware (e1-request-log, RL-06).
+    request.state.user_id = sub
 
     roles = []
     realm_access = payload.get("realm_access")

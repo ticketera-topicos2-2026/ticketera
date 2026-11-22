@@ -89,31 +89,44 @@
 
 ## 4. Log collection: Alloy, Loki and Grafana (B, feature/e1-request-log-collection)
 
-- [ ] 4.1 Write the smoke checks (red): `loki`, `alloy` and `grafana` healthy; a Loki query for a correlation id
+- [x] 4.1 Write the smoke checks (red), in `tests/smoke/log-collection-checks.sh`: `loki`, `alloy` and `grafana` healthy; a Loki query for a correlation id
   returns the gateway line and the service line within 15 s; a query on `service="sales"` returns only `sales`
   lines; Grafana answers `401` to `/api/search` without credentials and lists the Loki data source and the
   request log dashboard with the `.env` credentials; Grafana published only on `127.0.0.1` and Loki not
   published; each of the three has a memory limit, summing to 768 MiB or less; with the three stopped, every
   gateway route answers as before (Req log-collection: every requirement except "Log retention is bounded" -
-  Scenario: Clean reset; Req local-environment: both requirements, all scenarios). Verify: the checks fail.
-- [ ] 4.2 Add `infra/observability/loki/config.yaml` with 7-day retention (RL-14) and a `unittest` in
+  Scenario: Clean reset; Req local-environment: both requirements, all scenarios). Loki is queried through
+  Grafana's data source proxy, because it publishes no port. The non-root check allows root only for `alloy`
+  (RL-12; Req log-collection: The log collector has read-only access to the container runtime - Scenario:
+  Collector runs as root without capabilities). Verify: the checks fail.
+- [x] 4.2 Add `infra/observability/loki/config.yaml` with 7-day retention (RL-14) and a `unittest` in
   `tests/platform/` that reads it and asserts `retention_enabled` and `retention_period: 168h` (Req
   log-collection: Log retention is bounded - Scenario: Retention setting). Verify: the test passes.
-- [ ] 4.3 Add `infra/observability/alloy/config.alloy` (RL-12, RL-13) and the Grafana provisioning: Loki data
+- [x] 4.3 Add `infra/observability/alloy/config.alloy` (RL-12, RL-13) and the Grafana provisioning: Loki data
   source and `dashboards/request-log.json` with requests per service, per status class and p50/p95/p99 of
-  `duration_seconds` (Req log-collection: Grafana opens with the request log ready to use). Verify: the dashboard
-  loads by hand with traffic; recorded in the team log.
-- [ ] 4.4 Add `loki`, `alloy` and `grafana` to `docker-compose.yml`: images pinned by index digest, healthchecks
-  with tools each image has (DS-12), `mem_limit`, `cap_drop: ALL`, `no-new-privileges`, the `observability`
-  network, the read-only Docker socket for Alloy, the volume `ticketera-loki-data`, Grafana on
+  `duration_seconds`, and a logs panel filtered by a correlation id (Req log-collection: Grafana opens with the
+  request log ready to use). Verify: the dashboard loads by hand with traffic; recorded in the team log. Done on
+  2026-11-21: with traffic through the gateway, every panel query of the dashboard, run through Grafana's API,
+  returned data (3 services, 2 status classes, p50/p95/p99 per service, and the 2 lines of a chosen correlation
+  id); recorded in the team log. The screenshot needs a signed-in browser and is left to a member.
+- [x] 4.4 Add `loki` (image of RL-17), `alloy` and `grafana` to `docker-compose.yml`: images pinned by index
+  digest, healthchecks with tools each image has (DS-12), `mem_limit`, `cap_drop: ALL`, `no-new-privileges`, the
+  `observability` network, the read-only Docker socket for Alloy as root (RL-12), the volumes
+  `ticketera-loki-data` and `ticketera-alloy-data`, Grafana on
   `127.0.0.1:${GRAFANA_PORT}` with `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD` as `${VAR:?}`; add the three
   variables with placeholders to `.env.example`; no application container gets a `depends_on` on them
   (RL-11, RL-15, RL-16). Verify: the checks of 4.1 pass; `docker compose config` without
   `GRAFANA_ADMIN_PASSWORD` fails and names it (Req log-collection: Grafana requires the credentials from local
   configuration - Scenario: Missing password); `down -v` and `up` leave Loki empty (Scenario: Clean reset).
-- [ ] 4.5 Measure the smoke-test duration and the memory of the three containers in CI and on a member's machine;
+  Done: the checks pass locally and in CI, and the missing password stops Compose naming it. Clean reset checked
+  on 2026-11-21: a correlation id found in Loki before `down -v` is gone after `up`, the Loki volume is new, and
+  lines written after the reset are collected. On a machine with 6 GiB of RAM the cold start after `down -v`
+  (realm import, Grafana migrations) did not reach healthy in 15 minutes, and Alloy can lose its Docker API
+  connection under that load until it is restarted; both are documented in `CONTRIBUTE.md`.
+- [x] 4.5 Measure the smoke-test duration and the memory of the three containers in CI and on a member's machine;
   record both in the team log; the CI still finishes within 15 minutes (Req continuous-integration of
-  `project-bootstrap`: The CI finishes within 15 minutes). Verify: numbers recorded.
+  `project-bootstrap`: The CI finishes within 15 minutes). Verify: numbers recorded. Recorded in the team log of
+  2026-11-20: smoke-test job 2 min 43 s (1 min 53 s before); Loki ~100 MiB, Alloy ~90 MiB, Grafana ~210 MiB.
 
 ## 5. API tests (B, with group 4 or later) [P2]
 
@@ -124,17 +137,20 @@
 
 ## 6. ADR, documentation and team log (B, in the pull request of group 4)
 
-- [ ] 6.1 Write the ADR of D-23 in `docs/adr/` with the `create-architectural-decision-record` skill: log line
+- [x] 6.1 Write the ADR of D-23 in `docs/adr/` with the `create-architectural-decision-record` skill: log line
   format and excluded fields, correlation id, Alloy + Loki + Grafana, read-only Docker socket as an accepted risk
   with a socket proxy as the upgrade path, 7-day retention; take its number when merging; update the link in
   `design.md` and the index in `docs/adr/README.md` (D-27, RL-01, RL-08, RL-11, RL-12, RL-14). Verify: the ADR
-  is listed in the index and linked from the design.
-- [ ] 6.2 Update `CONTRIBUTE.md` (Spanish): how to open Grafana, find a request by its correlation id, read the
-  dashboard, and stop Loki, Alloy and Grafana on a machine with little memory. Verify: a member follows it on a
-  clean clone.
-- [ ] 6.3 Update `AGENTS.md`: a service never logs anything but the request log line's fields, and an
+  is listed in the index and linked from the design. Done as ADR-0011 (`Proposed` until #39 is approved), with
+  the template of the existing ADRs because the skill was not available; it also records the exception to DS-13
+  and RL-17.
+- [x] 6.2 Update `CONTRIBUTE.md` (Spanish): how to open Grafana, find a request by its correlation id, read the
+  dashboard, and stop Loki, Alloy and Grafana on a machine with little memory; also what a new service does to
+  write its line. Verify: a member follows it on a clean clone (pending, by the reviewer).
+- [x] 6.3 Update `AGENTS.md`: a service never logs anything but the request log line's fields, and an
   authentication adapter stores the accepted `sub` in `request.state.user_id` (RL-06, RL-08). Verify: reviewed in
   the pull request.
 - [ ] 6.4 Write the team log entry `docs/bitacora/<date>-e1-request-log.md`: what was built, the measured memory
-  and smoke-test time, the dashboard screenshot, and who completed each part. Verify: linked from
-  `docs/bitacora/README.md`.
+  and smoke-test time, the dashboard screenshot, and who completed each part. Verify: the entry exists (the
+  README of the team log has a template, not an index). Done: `docs/bitacora/2026-11-20-e1-request-log.md`;
+  pending: the dashboard screenshot of task 4.3.

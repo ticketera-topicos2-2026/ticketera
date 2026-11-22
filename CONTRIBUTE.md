@@ -161,6 +161,64 @@ importado. Es el comando que hace falta cuando:
 `docker compose restart gateway` es la solución cuando el gateway responde `502` después de recrear un servicio:
 NGINX resuelve la dirección de cada servicio al arrancar, y un servicio recreado puede recibir otra IP (DS-07).
 
+### Bitácora de solicitudes y Grafana
+
+El gateway y cada servicio escriben una línea JSON por solicitud en su salida estándar (D-23, change
+`e1-request-log`). El gateway genera un *correlation id* por solicitud: lo manda al servicio y lo devuelve en el
+encabezado `X-Correlation-ID` de toda respuesta, así que la misma solicitud se sigue de punta a punta. Las líneas
+nunca llevan tokens, encabezados, cuerpos ni el query string; los servicios registran la plantilla de la ruta
+(`/events/{event_id}/orders`), no la ruta pedida.
+
+Para seguir una solicitud desde la terminal:
+
+```bash
+id=$(curl -s -o /dev/null -D - http://localhost:18080/api/catalog/health | tr -d '\r' \
+  | awk -F': ' 'tolower($1)=="x-correlation-id" {print $2}')
+docker compose logs --no-log-prefix gateway catalog | grep "$id"
+```
+
+**Grafana.** Alloy recolecta la salida de todos los contenedores, Loki la guarda 7 días y Grafana la consulta. Grafana
+abre en <http://localhost:3000> (`GRAFANA_PORT`, solo en `127.0.0.1`), con `GRAFANA_ADMIN_USER` y
+`GRAFANA_ADMIN_PASSWORD` de `.env`; no hay acceso anónimo. Si tu `.env` es anterior a este cambio, agregale esas
+tres variables desde `.env.example`: sin ellas, Compose se detiene y las nombra.
+
+- *Dashboards → Ticketera → Request log*: solicitudes por servicio y por clase de status, percentiles 50, 95 y 99
+  de la duración, y un panel con todas las líneas de un *correlation id* que pegás arriba, en «Correlation id».
+  Solo cuenta las solicitudes que pasaron por el gateway; los healthchecks de los contenedores no llevan id.
+- *Explore*, con la fuente de datos Loki, para consultas propias. Cada línea tiene la etiqueta `service` (el nombre
+  del servicio de Compose) y los campos JSON se leen con `| json`, por ejemplo:
+
+  ```logql
+  {service="sales"} | json | status >= 500
+  {service=~".+"} |= "<correlation id>"
+  ```
+
+**Máquinas con poca memoria.** Loki, Alloy y Grafana tienen límites de 256, 128 y 384 MiB (768 MiB en total), y
+ningún servicio depende de ellos: si tu máquina no da abasto, paralos sin afectar al resto del sistema y volvé a
+levantarlos cuando los necesites. Las líneas siguen disponibles en `docker compose logs`.
+
+```bash
+docker compose stop loki alloy grafana
+docker compose up -d --wait loki alloy grafana
+```
+
+`docker compose down -v` también borra los volúmenes `ticketera-loki-data` y `ticketera-alloy-data`: Loki vuelve a
+empezar vacío.
+
+**Alloy queda `unhealthy` o no llegan líneas nuevas.** Si el arranque satura la máquina, el daemon de Docker
+responde lento, Alloy pierde la conexión con su API («error while listing containers» en su log) y puede no
+recuperarse solo. Con el sistema ya estable, reinicialo: `docker compose restart alloy`. En una máquina de 6 GiB
+conviene además levantar primero el sistema sin la recolección y sumarla después:
+
+```bash
+docker compose up -d --wait database identity catalog sales payments frontend gateway
+docker compose up -d --wait loki alloy grafana
+```
+
+Alloy es el único contenedor que corre como root: lee los logs por el socket de Docker, montado en solo lectura, y
+no tiene capacidades, puertos publicados ni otra red que la de Loki. Es una excepción a DS-13, registrada en el ADR
+de D-23.
+
 ### Cambios en el realm
 
 El realm se define en `infra/keycloak/ticketera-realm.json` y no lleva secretos (DS-05, DS-20).
@@ -228,6 +286,16 @@ Dos reglas para estos archivos:
   `infra/gateway/templates/default.conf.template`, y un `location` que declara su propio `add_header` deja de
   heredar esos encabezados.
 - Cada ruta es un solo `location` que incluye `snippets/forwarded-headers.conf`.
+
+**Bitácora de solicitudes.** Un servicio backend escribe su línea por solicitud (D-23):
+
+- copiá `api/request_log.py` de otro servicio y agregá `RequestLogMiddleware` al final de `create_app`, con el
+  nombre del servicio, para que envuelva el ruteo y los manejadores de excepciones;
+- agregá `--no-access-log` al `command` de Uvicorn en `docker-compose.yml` y al `CMD` del Dockerfile;
+- cuando el servicio autentique, su adaptador de autenticación guarda el `sub` aceptado en
+  `request.state.user_id`; el middleware nunca lee el token;
+- sumá el servicio a `REQUEST_LOG_SERVICES` en `tests/smoke/request-log-checks.sh`, y copiá los tests de
+  `tests/unit/test_request_log.py` y `tests/acceptance/test_request_log_api.py`.
 
 **`depends_on` del gateway.** NGINX resuelve cada servicio al arrancar, así que el gateway espera a que los
 servicios a los que enruta estén sanos. Los grupos 3, 5 y 6 agregan su entrada al mismo `depends_on` del gateway

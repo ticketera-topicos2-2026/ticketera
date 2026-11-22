@@ -79,11 +79,11 @@
 
 ## 3. Request log middleware in sales (B, feature/e1-request-log-sales) [P1, after #32's implementation]
 
-- [ ] 3.1 Repeat 2.1 to 2.4 for `sales`, plus an acceptance test that an authenticated `CLIENT` request logs its
+- [x] 3.1 Repeat 2.1 to 2.4 for `sales`, plus an acceptance test that an authenticated `CLIENT` request logs its
   `sub` and a `CLIENT` call to an `ADMIN` endpoint logs `403` with that `sub` (Req request-log: The logged user is
   the token's sub - all scenarios; Every backend service writes one log line per request - Scenario: Request
   rejected by the service's access rules). Verify: the tests pass in `sales`; the smoke test passes.
-- [ ] 3.2 If the `sales` authentication adapter does not yet store the accepted `sub` in
+- [x] 3.2 If the `sales` authentication adapter does not yet store the accepted `sub` in
   `request.state.user_id`, add that line in a separate `feat(sales)` commit, agreed with C, after the red test of
   3.1 (RL-06). Verify: the test of 3.1 for `user_id` passes.
 

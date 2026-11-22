@@ -165,7 +165,7 @@
 - [x] 1.26 [P1] Add `test-other-event-owner` to the realm, pass `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` to the
   identity service with `${VAR:?message}` and add it to `.env.example` (IA-11). Verify: after `docker compose
   down -v` and `up --wait`, the tests of 1.23 and the checks of 1.25 pass and the full smoke test is green.
-- [ ] 1.27 [P1] Make `tests/api/run.sh` and `tests/smoke/measure-catalog-latency.sh` get real tokens from
+- [x] 1.27 [P1] Make `tests/api/run.sh` and `tests/smoke/measure-catalog-latency.sh` get real tokens from
   `ticketera-api-tests` (password grant, `openid` scope, passwords from `docker compose config`): `run.sh` gets the
   tokens of `test-event-owner`, `test-other-event-owner`, `test-admin` and `test-client` right before Bruno runs, as
   `ownerToken`, `otherOwnerToken`, `adminToken` and `clientToken`; the latency script renews the owner's token when

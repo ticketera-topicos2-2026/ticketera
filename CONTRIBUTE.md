@@ -269,6 +269,13 @@ Probá cada comando en local antes del pull request, por ejemplo `docker compose
 Para el frontend, los comandos de ESLint, `tsc --noEmit` y Vitest (por ejemplo `npx eslint .`,
 `npx tsc --noEmit` y `npx vitest run`).
 
+**Cobertura (D-18).** `domain` y `application` necesitan al menos 80 % de cobertura. `catalog` la mide con
+`pytest-cov`: su etiqueta es `ticketera.test: pytest --cov`, y `[tool.coverage]` en su `pyproject.toml` fija las
+capas, la cobertura de ramas, el mínimo (`fail_under = 80`) y el archivo de datos en `/tmp`, fuera de la carpeta
+montada. Con eso el job `quality` falla si la cobertura baja. Para sumarlo a otro servicio, copiá esa sección
+cambiando el nombre del paquete, agregá `pytest-cov` a sus dependencias de desarrollo y regenerá su lockfile con
+`docker compose run --rm <servicio> uv lock`.
+
 **Ruta del gateway.** Un archivo por servicio, `infra/gateway/routes/<servicio>.conf`, con un único `location`
 que incluye los encabezados de reenvío. La barra final de `proxy_pass` quita el prefijo `/api/<servicio>/`, y la
 ruta pública no lleva versión (ADR-0006):

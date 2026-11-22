@@ -64,7 +64,7 @@ change; IA-xx are the decisions of `e1-identity-access` and DS-xx those of `proj
 | RL-07 | `route` = template of the matched route (`scope["route"].path`); `null` when nothing matched | — | Raw path (identifiers of orders and events in the log; unbounded label values in queries) |
 | RL-08 | Allow-list of fields, built from scratch for each line; never `request.headers` or `scope` dumps | D-23, OWASP ASVS V7 | Deny-list of sensitive fields (a new header or field leaks until someone adds it) |
 | RL-09 | `duration_seconds` with millisecond precision in services and gateway | — | `duration_ms` (NGINX can only print `$request_time` in seconds, and the gateway and services must share units) |
-| RL-10 | Uvicorn runs with `--no-access-log`; the Python logger of the middleware writes to stdout with a lock, one `write` per line | — | Keeping both lines (twice the volume, and the Uvicorn line carries the query string) |
+| RL-10 | Uvicorn runs with `--no-access-log`; the middleware writes to stdout with a lock, one `write` per line | — | Keeping both lines (twice the volume, and the Uvicorn line carries the query string) |
 | RL-11 | Alloy + Loki + Grafana in the default `docker compose up`, with memory limits (Loki 320 MiB, Grafana 256 MiB, Alloy 128 MiB) and no `depends_on` from application containers | D-23, RB-09 | A Compose profile (a single `docker compose up` would no longer start the whole system, against RB-09); no limits (#24) |
 | RL-12 | Alloy reads container logs with `discovery.docker` and `loki.source.docker` through the Docker socket mounted read-only, filtered to this Compose project | D-23 | Loki Docker logging driver (a plugin installed on each member's Docker, outside the repository); a socket proxy (one more image to pin and run for a local environment; listed as the upgrade path in the ADR) |
 | RL-13 | Loki stream labels: only `service` (Compose service name); the JSON fields are parsed at query time with `| json` | — | Labels per status or route (high cardinality, which Loki discourages) |
@@ -111,10 +111,11 @@ collection stack, its access and its retention.
   re-raised so Starlette's error middleware answers it. `lifespan` and `websocket` scopes pass through. The app
   factory adds it last with `app.add_middleware`, so it wraps routing, dependencies and exception handlers.
 - **Writer (RL-10).** `write` is a function that serializes with `json.dumps(..., separators=(",", ":"),
-  ensure_ascii=True)` and writes the line through a `logging.Logger` named `request_log` with a single
-  `StreamHandler(sys.stdout)` and a bare `%(message)s` format. The handler lock keeps lines whole under
-  concurrency. Any exception inside `write` is caught and reported once to stderr without the line, so logging
-  never changes the response (spec: Logging never changes the response).
+  ensure_ascii=True)` and writes the line to `sys.stdout`, looked up at each call, under a module lock, with one
+  `write` and a `flush` per line. The lock keeps lines whole under concurrency. A `logging.StreamHandler` was
+  dropped because it keeps the stream it was created with, which the tests cannot capture. Any exception inside
+  `write` is caught and reported once to stderr without the line, so logging never changes the response (spec:
+  Logging never changes the response).
 - **User (RL-06).** The authentication adapter of the D-33 skeleton stores the accepted `sub` in
   `request.state.user_id` once it has decoded the token; FastAPI's `request.state` is backed by `scope["state"]`,
   which the middleware reads after the endpoint. A rejected token leaves it unset, so the `401` line has a `null`

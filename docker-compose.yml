@@ -134,7 +134,8 @@ services:
       # whitespace, with no shell. bin/lint also checks the hexagonal layers with import-linter (D-33).
       ticketera.lint: bin/lint
       ticketera.typecheck: mypy
-      ticketera.test: pytest
+      # --cov measures domain and application and fails below 80 % (D-18; [tool.coverage] in pyproject.toml).
+      ticketera.test: pytest --cov
     environment:
       # Its own database and role, created by infra/database/ (DS-02).
       DATABASE_URL: postgresql+psycopg://catalog:${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD in .env (copy .env.example to .env)}@database:5432/catalog

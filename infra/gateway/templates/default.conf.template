@@ -51,13 +51,16 @@ map "$request_method:$is_api_request" $is_api_preflight {
 }
 
 # Public requests skip the access check (IA-03; Req api-gateway: Public paths skip the access check): only GET and
-# HEAD of /api/<service>/health, with or without a query string. The decision is taken in the /_auth subrequest,
-# where $uri is /_auth, so it reads $request_method, always the main request's, and $request_uri, the raw URI that
-# the subrequest shares with the main request. The pattern allows no dot, percent sign or empty segment, so whenever
-# the raw URI matches, the path NGINX routes on is that same health path; any other spelling stays protected.
+# HEAD of /api/<service>/health and of the public catalog, /api/catalog/events and /api/catalog/events/<event id>
+# with the id a UUID in lower case (e1-event-catalog, EC-03), with or without a query string. The decision is taken
+# in the /_auth subrequest, where $uri is /_auth, so it reads $request_method, always the main request's, and
+# $request_uri, the raw URI that the subrequest shares with the main request. The patterns allow no dot, percent
+# sign or empty segment, so whenever the raw URI matches, the path NGINX routes on is that same public path; any
+# other spelling stays protected.
 map "$request_method:$request_uri" $is_public_request {
     default 0;
     "~^(GET|HEAD):/api/[a-z0-9-]+/health(\?.*)?$" 1;
+    "~^(GET|HEAD):/api/catalog/events(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?(\?.*)?$" 1;
 }
 
 # An Authorization header that holds a bearer token as RFC 6750 defines it, with the scheme in any case (IA-04).

@@ -110,7 +110,7 @@
   `/api/catalog/events/`, `/events/<uuid>/zones`, `/events/not-a-uuid` and `GET /api/sales/events` without a token
   answer `401` (Req api-gateway: Public paths skip the access check - the scenarios added by this change). Verify:
   the checks fail.
-- [ ] 5.2 Extend the public-path map of the gateway template with the strict catalog pattern
+- [x] 5.2 Extend the public-path map of the gateway template with the strict catalog pattern
   `^(GET|HEAD):/api/catalog/events(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?(\?.*)?$` (EC-03).
   Verify: the checks of 5.1 and every existing smoke check pass.
 

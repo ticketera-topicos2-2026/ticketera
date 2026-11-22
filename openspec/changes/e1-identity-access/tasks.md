@@ -154,7 +154,7 @@
   has a second EVENT_OWNER test user - Scenario: Second EVENT_OWNER test user; The realm definition contains no
   secrets - Scenario: Test user passwords in the realm definition; IA-11). Verify: only the new and changed tests
   fail on the current realm; every other test of `tests/platform` still passes.
-- [ ] 1.24 [P1] Refactor `identity-checks.sh` so that it looks up a test user's token by username and password
+- [x] 1.24 [P1] Refactor `identity-checks.sh` so that it looks up a test user's token by username and password
   variable instead of by platform role, with no change of behavior (IA-17). Verify: the full smoke test with the
   echo overlay and `--require-echo` is green, as before the refactor.
 - [ ] 1.25 [P1] Add smoke checks to `identity-checks.sh` (red): `test-other-event-owner` gets a token with its

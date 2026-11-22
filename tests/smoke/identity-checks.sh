@@ -179,6 +179,12 @@ test_username() {
   printf 'test-%s\n' "${name//_/-}"
 }
 
+# Prints the name of the environment variable that holds the password of the test user of a platform role, for
+# example TEST_USER_CLIENT_PASSWORD.
+test_password_variable() {
+  printf 'TEST_USER_%s_PASSWORD\n' "$1"
+}
+
 # Fails every check named after the reason.
 # Usage: fail_each <reason> <check name>...
 fail_each() {
@@ -200,15 +206,14 @@ password_grant() {
     --data-urlencode "username=$username" --data-urlencode password@- "$@" < <(printf '%s' "$password")
 }
 
-# Requests the tokens of the test user of a platform role from the API test client, with the password grant, the
-# openid scope and the password from the Compose configuration, and sets STATUS, BODY (the token response) and
-# ERROR; sets TOKEN_PROBLEM and fails when no token is issued. Extra arguments are passed to curl.
-# Usage: request_test_user_tokens <ADMIN|EVENT_OWNER|CLIENT> [curl arguments...]
-request_test_user_tokens() {
-  local role=$1 username password
-  shift
-  username=$(test_username "$role")
-  if ! password=$(identity_environment_value "TEST_USER_${role}_PASSWORD"); then
+# Requests the tokens of a test user from the API test client, with the password grant, the openid scope and the
+# password that the given environment variable holds in the Compose configuration, and sets STATUS, BODY (the token
+# response) and ERROR; sets TOKEN_PROBLEM and fails when no token is issued. Extra arguments are passed to curl.
+# Usage: request_user_tokens <username> <password variable> [curl arguments...]
+request_user_tokens() {
+  local username=$1 password_variable=$2 password
+  shift 2
+  if ! password=$(identity_environment_value "$password_variable"); then
     TOKEN_PROBLEM=$password
     return 1
   fi
@@ -219,20 +224,34 @@ request_test_user_tokens() {
   fi
 }
 
-# Prints an access token of the test user of a platform role, issued by the API test client (see
-# request_test_user_tokens). Prints the reason and fails when no token is issued.
-# Usage: api_test_token <ADMIN|EVENT_OWNER|CLIENT>
-api_test_token() {
+# Requests the tokens of the test user of a platform role (see request_user_tokens).
+# Usage: request_test_user_tokens <ADMIN|EVENT_OWNER|CLIENT> [curl arguments...]
+request_test_user_tokens() {
+  local role=$1
+  shift
+  request_user_tokens "$(test_username "$role")" "$(test_password_variable "$role")" "$@"
+}
+
+# Prints an access token of a test user, issued by the API test client (see request_user_tokens). Prints the reason
+# and fails when no token is issued.
+# Usage: user_token <username> <password variable>
+user_token() {
   local token
-  if ! request_test_user_tokens "$1"; then
+  if ! request_user_tokens "$1" "$2"; then
     printf '%s\n' "$TOKEN_PROBLEM"
     return 1
   fi
   if ! token=$(json_string_field access_token <<< "$BODY"); then
-    printf 'the token response of %s has no access token: %s\n' "$(test_username "$1")" "$token"
+    printf 'the token response of %s has no access token: %s\n' "$1" "$token"
     return 1
   fi
   printf '%s\n' "$token"
+}
+
+# Prints an access token of the test user of a platform role (see user_token).
+# Usage: api_test_token <ADMIN|EVENT_OWNER|CLIENT>
+api_test_token() {
+  user_token "$(test_username "$1")" "$(test_password_variable "$1")"
 }
 
 # Requests the administrator's tokens from admin-cli of the master realm, with the bootstrap administrator's
@@ -450,7 +469,7 @@ load_signin_page() {
 # Usage: expect_password_grant_refused <check name> <client id>
 expect_password_grant_refused() {
   local check=$1 client_id=$2 password error
-  if ! password=$(identity_environment_value TEST_USER_CLIENT_PASSWORD); then
+  if ! password=$(identity_environment_value "$(test_password_variable CLIENT)"); then
     fail "$check" "$password"
     return
   fi
@@ -804,12 +823,13 @@ check_session_addresses() {
 }
 
 # Req identity-provisioning: The realm has one test user per platform role - Scenario: Test user password missing
-# Each test user password in turn is set empty in the environment, which takes precedence over .env; Compose must
-# stop before creating any container and name it.
-check_missing_test_password() {
-  local check=$1 role name output
-  for role in "${PLATFORM_ROLES[@]}"; do
-    name="TEST_USER_${role}_PASSWORD"
+# Each given password variable in turn is set empty in the environment, which takes precedence over .env; Compose
+# must stop before creating any container and name it.
+# Usage: check_missing_test_passwords <check name> <password variable>...
+check_missing_test_passwords() {
+  local check=$1 name output
+  shift
+  for name in "$@"; do
     if output=$(env "$name=" docker compose config --quiet 2>&1); then
       fail "$check" "docker compose config succeeded with $name empty"
       return
@@ -921,7 +941,7 @@ check_signed_out_token() {
 # Usage: check_token_without_openid <check name> <url>
 check_token_without_openid() {
   local check=$1 url=$2 password token userinfo_status
-  if ! password=$(identity_environment_value TEST_USER_CLIENT_PASSWORD); then
+  if ! password=$(identity_environment_value "$(test_password_variable CLIENT)"); then
     fail "$check" "$password"
     return
   fi
@@ -1222,7 +1242,7 @@ check_identity_clients() {
 # The checks of the test users and their tokens (task 1.5).
 check_identity_tokens() {
   local client_user owner_user role index
-  local -a role_checks=()
+  local -a role_checks=() role_password_variables=()
   client_user=$(test_username CLIENT)
   owner_user=$(test_username EVENT_OWNER)
   local check_wrong="identity: a wrong password of $client_user gets invalid_grant"
@@ -1236,6 +1256,7 @@ check_identity_tokens() {
   local check_missing="identity: docker compose config fails and names an empty test user password"
   for role in "${PLATFORM_ROLES[@]}"; do
     role_checks+=("identity: $(test_username "$role") gets a token with its password and holds only $role")
+    role_password_variables+=("$(test_password_variable "$role")")
   done
 
   if [[ -n $identity_problem ]]; then
@@ -1252,7 +1273,7 @@ check_identity_tokens() {
   check_sub_after_sign_out "$check_sign_out"
   check_example_tokens "$check_same_sub" "$check_access" "$check_id"
   check_session_addresses "$check_address" "$check_forged"
-  check_missing_test_password "$check_missing"
+  check_missing_test_passwords "$check_missing" "${role_password_variables[@]}"
 }
 
 # The checks of the gateway's access check (task 1.8). The checks through the echo route need the echo service of

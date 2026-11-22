@@ -162,7 +162,7 @@
   with `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` empty fails and names it (Req identity-provisioning: The realm has a
   second EVENT_OWNER test user - all scenarios; IA-11). Verify: only these new checks fail; every pre-existing check
   still passes.
-- [ ] 1.26 [P1] Add `test-other-event-owner` to the realm, pass `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` to the
+- [x] 1.26 [P1] Add `test-other-event-owner` to the realm, pass `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` to the
   identity service with `${VAR:?message}` and add it to `.env.example` (IA-11). Verify: after `docker compose
   down -v` and `up --wait`, the tests of 1.23 and the checks of 1.25 pass and the full smoke test is green.
 - [ ] 1.27 [P1] Make `tests/api/run.sh` and `tests/smoke/measure-catalog-latency.sh` get real tokens from

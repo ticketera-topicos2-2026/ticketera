@@ -93,6 +93,8 @@ services:
       TEST_USER_ADMIN_PASSWORD: ${TEST_USER_ADMIN_PASSWORD:?set TEST_USER_ADMIN_PASSWORD in .env (copy .env.example to .env)}
       TEST_USER_EVENT_OWNER_PASSWORD: ${TEST_USER_EVENT_OWNER_PASSWORD:?set TEST_USER_EVENT_OWNER_PASSWORD in .env (copy .env.example to .env)}
       TEST_USER_CLIENT_PASSWORD: ${TEST_USER_CLIENT_PASSWORD:?set TEST_USER_CLIENT_PASSWORD in .env (copy .env.example to .env)}
+      # The second EVENT_OWNER test user, for the checks of ownership in the API tests (IA-11).
+      TEST_USER_OTHER_EVENT_OWNER_PASSWORD: ${TEST_USER_OTHER_EVENT_OWNER_PASSWORD:?set TEST_USER_OTHER_EVENT_OWNER_PASSWORD in .env (copy .env.example to .env)}
     volumes:
       # Realm definition with the platform roles (task 2.9; Req identity-provisioning).
       - ./infra/keycloak:/opt/keycloak/data/import:ro

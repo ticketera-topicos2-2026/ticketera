@@ -143,6 +143,25 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "test-other-event-owner",
+      "enabled": true,
+      "email": "test-other-event-owner@example.com",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Other Event Owner",
+      "requiredActions": [],
+      "realmRoles": [
+        "EVENT_OWNER"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${TEST_USER_OTHER_EVENT_OWNER_PASSWORD}",
+          "temporary": false
+        }
+      ]
     }
   ]
 }

@@ -15,7 +15,8 @@
 # right password to work first. The markers below come from the pages of Keycloak 26.8 and its login theme.
 #
 # Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10 and 1.25 (design: Test Strategy,
-# platform/identity-provisioning, identity/access-token, platform/api-gateway).
+# platform/identity-provisioning, identity/access-token, platform/api-gateway), and the public catalog paths of
+# change e1-event-catalog, task 5.1 (EC-03).
 
 readonly REALM_PATH="/auth/realms/ticketera"
 readonly MASTER_REALM_PATH="/auth/realms/master"
@@ -36,6 +37,18 @@ readonly SALES_NOT_FOUND_BODY='{"detail":"Not Found"}'
 readonly UNKNOWN_EXAMPLE_PATH="/api/unknown/example"
 # A path of the test-only route tests/smoke/gateway/latency.conf other than its health path (task 1.9).
 readonly LATENCY_ROUTE_EXAMPLE_PATH="/api/smoke-latency/example"
+# Public catalog paths (e1-event-catalog, EC-03): the list, one event (an id no event has, which catalog answers
+# 404) and the paths that only look like them, which stay protected.
+readonly CATALOG_LIST_PATH="/api/catalog/events?type=CONCERT&limit=10"
+readonly CATALOG_EVENT_PATH="/api/catalog/events/3f2a9c0d-4b5e-4f70-8192-a3b4c5d6e7f8"
+readonly -a CATALOG_PROTECTED_REQUESTS=(
+  "GET /api/catalog/manage/events"
+  "POST /api/catalog/events"
+  "GET /api/catalog/events/"
+  "GET /api/catalog/events/3f2a9c0d-4b5e-4f70-8192-a3b4c5d6e7f8/zones"
+  "GET /api/catalog/events/not-a-uuid"
+  "GET /api/sales/events"
+)
 # Pairs of simultaneous requests of two users in the concurrency check.
 readonly CONCURRENT_ROUNDS=10
 # Paths that only look like a public health path, or reach a protected path through /auth/; curl sends them as
@@ -1093,6 +1106,54 @@ check_health_with_malformed_token() {
   fi
 }
 
+# Prints the Content-Type of the last response of http_headers, in lower case, or nothing when it has none.
+response_content_type() {
+  local -a values
+  mapfile -t values < <(response_header_values Content-Type)
+  printf '%s\n' "${values[0],,}"
+}
+
+# Req api-gateway: Public paths skip the access check - Scenarios: Public catalog without a token; Public event
+# without a token (e1-event-catalog)
+# catalog answers every request it receives in JSON, an error included (a HEAD has the JSON Content-Type and no
+# body), and the gateway answers its own 401 with an HTML page, so a JSON answer shows that catalog received the
+# request.
+# Usage: check_reaches_catalog <check name> <method> <path>
+check_reaches_catalog() {
+  local check=$1 method=$2 path=$3 content_type
+  local -a arguments=()
+  if [[ $method == HEAD ]]; then
+    arguments=(--head)
+  fi
+  http_headers "$method" "http://localhost:${gateway_port}${path}" "${arguments[@]}"
+  content_type=$(response_content_type)
+  if [[ $STATUS == 000 ]]; then
+    fail "$check" "$(last_response)"
+  elif [[ $content_type != application/json* ]]; then
+    fail "$check" "expected an answer of catalog, got $STATUS with Content-Type '${content_type:-none}'"
+  else
+    pass "$check"
+  fi
+}
+
+# Req api-gateway: Public paths skip the access check - Scenarios: Management path without a token; Write method
+# on the public catalog path; Path that only starts like a public catalog path; Public catalog path of another
+# service (e1-event-catalog)
+# catalog answers its own 401 too, with a Bearer challenge and a JSON body, so the check requires the gateway's
+# 401: a Bearer challenge and no JSON Content-Type. A too broad public pattern, which forwarded the request to
+# catalog, would therefore fail it.
+# Usage: check_gateway_rejects <check name> <method> <raw path>
+check_gateway_rejects() {
+  local check=$1 method=$2 path=$3 content_type
+  http_headers "$method" "http://localhost:${gateway_port}${path}" --path-as-is
+  content_type=$(response_content_type)
+  if [[ $content_type == application/json* ]]; then
+    fail "$check" "the service answered $STATUS: the gateway forwarded $method $path without a token"
+  else
+    expect_bearer_challenge "$check" "$method $path without a token"
+  fi
+}
+
 # Req api-gateway: A request with more than one Authorization header is rejected - Scenario: Two Authorization
 # headers
 # Sent through the echo route, whose service answers every request it receives with 200, so a 400 shows that the
@@ -1445,6 +1506,35 @@ check_public_paths() {
   check_not_public "$check_later" "$LATENCY_ROUTE_EXAMPLE_PATH"
 }
 
+# The checks of the public catalog paths (e1-event-catalog, task 5.1; EC-03): GET and HEAD of the list and of one
+# event reach catalog without a token; the management paths, a write method and the paths that only look public
+# get the gateway's 401.
+check_public_catalog_paths() {
+  local request method path index
+  local -a reach_checks=() reject_checks=()
+  for request in "GET $CATALOG_LIST_PATH" "HEAD $CATALOG_LIST_PATH" "GET $CATALOG_EVENT_PATH" \
+    "HEAD $CATALOG_EVENT_PATH"; do
+    reach_checks+=("identity: $request without a token reaches catalog")
+  done
+  for request in "${CATALOG_PROTECTED_REQUESTS[@]}"; do
+    reject_checks+=("identity: $request without a token gets the gateway's 401")
+  done
+
+  if [[ -n $identity_problem ]]; then
+    fail_each "$identity_problem" "${reach_checks[@]}" "${reject_checks[@]}"
+    return
+  fi
+
+  check_reaches_catalog "${reach_checks[0]}" GET "$CATALOG_LIST_PATH"
+  check_reaches_catalog "${reach_checks[1]}" HEAD "$CATALOG_LIST_PATH"
+  check_reaches_catalog "${reach_checks[2]}" GET "$CATALOG_EVENT_PATH"
+  check_reaches_catalog "${reach_checks[3]}" HEAD "$CATALOG_EVENT_PATH"
+  for index in "${!CATALOG_PROTECTED_REQUESTS[@]}"; do
+    read -r method path <<< "${CATALOG_PROTECTED_REQUESTS[index]}"
+    check_gateway_rejects "${reject_checks[index]}" "$method" "$path"
+  done
+}
+
 # Runs every identity check; called by main of smoke-test.sh after the other checks. The expired-token check runs
 # last (see check_expired_token).
 run_identity_checks() {
@@ -1453,5 +1543,6 @@ run_identity_checks() {
   check_second_event_owner
   check_identity_access
   check_public_paths
+  check_public_catalog_paths
   check_expired_token "identity: an expired token gets 401 with a Bearer challenge"
 }

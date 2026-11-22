@@ -105,7 +105,7 @@
 
 ## 5. Gateway public paths (B; reviewed by A) [P1]
 
-- [ ] 5.1 Write the smoke checks (red) in `tests/smoke/identity-checks.sh`: `GET` and `HEAD` on the public catalog
+- [x] 5.1 Write the smoke checks (red) in `tests/smoke/identity-checks.sh`: `GET` and `HEAD` on the public catalog
   paths without a token reach `catalog`; `GET /api/catalog/manage/events`, `POST /api/catalog/events`,
   `/api/catalog/events/`, `/events/<uuid>/zones`, `/events/not-a-uuid` and `GET /api/sales/events` without a token
   answer `401` (Req api-gateway: Public paths skip the access check - the scenarios added by this change). Verify:

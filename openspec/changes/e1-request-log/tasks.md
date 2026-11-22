@@ -131,7 +131,7 @@
 
 ## 5. API tests (B, with group 4 or later) [P2]
 
-- [ ] 5.1 Write `tests/api/platform/` in Bruno: the response carries `X-Correlation-ID`, and a forged one is
+- [x] 5.1 Write `tests/api/platform/` in Bruno: the response carries `X-Correlation-ID`, and a forged one is
   replaced (Req request-correlation: The gateway gives every request a correlation id - Scenario: Forwarded
   request; The correlation id is never taken from the client - Scenario: Client sends its own correlation id).
   Verify: the collection passes with the runner of D-24.

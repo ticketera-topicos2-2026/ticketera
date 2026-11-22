@@ -148,7 +148,7 @@
   of group 3 (502 handling at server level) and the AI usage. Verify: the entry is in the pull request.
 - [ ] 1.22 [P1] After the merge, send the team message: copy the four `TEST_USER_*_PASSWORD` lines to `.env` and
   run `docker compose down -v` before `up`. Verify: the message is linked in the team log.
-- [ ] 1.23 [P1] Extend `tests/platform/test_realm_definition.py` (red) to a second EVENT_OWNER test user,
+- [x] 1.23 [P1] Extend `tests/platform/test_realm_definition.py` (red) to a second EVENT_OWNER test user,
   `test-other-event-owner`: exactly four test users, this one with a complete profile, no required actions, only
   `EVENT_OWNER` and the placeholder `${TEST_USER_OTHER_EVENT_OWNER_PASSWORD}` (Req identity-provisioning: The realm
   has a second EVENT_OWNER test user - Scenario: Second EVENT_OWNER test user; The realm definition contains no

@@ -1,4 +1,5 @@
-"""Static tests of the realm definition, infra/keycloak/ticketera-realm.json (e1-identity-access, task 1.3).
+"""Static tests of the realm definition, infra/keycloak/ticketera-realm.json (e1-identity-access, tasks 1.3 and
+1.23).
 
 Requirements verified: identity-provisioning, the clients, test users and settings of the `ticketera` realm, and
 api-gateway, the access token lifespan that the expired-token check relies on (IA-10, IA-11, IA-18). These tests
@@ -26,13 +27,14 @@ API_TESTS_CLIENT_ID = "ticketera-api-tests"
 ADMIN_CLI_CLIENT_ID = "admin-cli"
 REALM_ROLE_MAPPER = "oidc-usermodel-realm-role-mapper"
 
-# The test user of each platform role, and the environment variable placeholder of its password.
-TEST_USER_ROLES = {"test-admin": "ADMIN", "test-event-owner": "EVENT_OWNER", "test-client": "CLIENT"}
-
-
-def password_placeholder(role: str) -> str:
-    """Returns the placeholder of a test user's password, for example ${TEST_USER_CLIENT_PASSWORD}."""
-    return "${TEST_USER_" + role + "_PASSWORD}"
+# The test users of the realm, by username: its only platform role and the environment variable that holds its
+# password. One per platform role, and a second EVENT_OWNER for the checks of ownership (IA-11).
+TEST_USERS = {
+    "test-admin": ("ADMIN", "TEST_USER_ADMIN_PASSWORD"),
+    "test-event-owner": ("EVENT_OWNER", "TEST_USER_EVENT_OWNER_PASSWORD"),
+    "test-client": ("CLIENT", "TEST_USER_CLIENT_PASSWORD"),
+    "test-other-event-owner": ("EVENT_OWNER", "TEST_USER_OTHER_EVENT_OWNER_PASSWORD"),
+}
 
 
 class RealmDefinitionTest(unittest.TestCase):
@@ -201,12 +203,15 @@ class RealmDefinitionTest(unittest.TestCase):
         Scenario: CLIENT test user.
         Req: The realm has one test user per platform role (identity-provisioning).
 
-        Case: the realm declares exactly the users test-admin, test-event-owner and test-client, each enabled and
-        holding only the realm role of its name (IA-11).
+        Scenario: Second EVENT_OWNER test user.
+        Req: The realm has a second EVENT_OWNER test user (identity-provisioning).
+
+        Case: the realm declares exactly the users test-admin, test-event-owner, test-client and
+        test-other-event-owner, each enabled and holding only its platform role (IA-11).
         """
         usernames = [user.get("username") for user in self.realm.get("users", [])]
-        self.assertCountEqual(usernames, TEST_USER_ROLES)
-        for username, role in TEST_USER_ROLES.items():
+        self.assertCountEqual(usernames, TEST_USERS)
+        for username, (role, _) in TEST_USERS.items():
             with self.subTest(username=username):
                 user = self.user(username)
                 self.assertIs(user.get("enabled"), True, "enabled")
@@ -216,10 +221,13 @@ class RealmDefinitionTest(unittest.TestCase):
         """Scenario: First sign-in needs no extra step.
         Req: The realm has one test user per platform role (identity-provisioning).
 
-        Case: each test user has an email under example.com, a first and a last name and emailVerified true, as
-        the declarative user profile requires, and no required actions (IA-11).
+        Scenario: Second EVENT_OWNER test user.
+        Req: The realm has a second EVENT_OWNER test user (identity-provisioning).
+
+        Case: each test user, test-other-event-owner included, has an email under example.com, a first and a last
+        name and emailVerified true, as the declarative user profile requires, and no required actions (IA-11).
         """
-        for username in TEST_USER_ROLES:
+        for username in TEST_USERS:
             with self.subTest(username=username):
                 user = self.user(username)
                 self.assertTrue(str(user.get("email", "")).endswith("@example.com"), "email under example.com")
@@ -233,12 +241,13 @@ class RealmDefinitionTest(unittest.TestCase):
         Req: The realm definition contains no secrets (identity-provisioning).
 
         Case: each test user has one credential, a password that is not temporary and whose value is the
-        placeholder of its role, such as ${TEST_USER_CLIENT_PASSWORD} (IA-11).
+        placeholder of its variable, such as ${TEST_USER_CLIENT_PASSWORD} or ${TEST_USER_OTHER_EVENT_OWNER_PASSWORD}
+        (IA-11).
         """
-        for username, role in TEST_USER_ROLES.items():
+        for username, (_, password_variable) in TEST_USERS.items():
             with self.subTest(username=username):
                 credentials = self.user(username).get("credentials", [])
-                expected = [{"type": "password", "value": password_placeholder(role), "temporary": False}]
+                expected = [{"type": "password", "value": "${" + password_variable + "}", "temporary": False}]
                 self.assertEqual(credentials, expected)
 
 

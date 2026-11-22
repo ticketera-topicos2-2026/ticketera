@@ -149,9 +149,12 @@
 
 ## 9. Documentation and team log (B)
 
-- [ ] 9.1 Update `CONTRIBUTE.md` (Spanish): how an `ADMIN` loads the `sales` inventory of a published event using
+- [x] 9.1 Update `CONTRIBUTE.md` (Spanish): how an `ADMIN` loads the `sales` inventory of a published event using
   the catalog's seat ids (`<zone code>-<n>` as `seat_id`, the zone code as `category`). Verify: reviewed in the
-  pull request.
-- [ ] 9.2 Write the team log entry `docs/bitacora/<date>-e1-event-catalog.md`: what was built, the latency
+  pull request. Done: section «Catálogo de eventos e inventario de `sales`», checked end to end on 2026-11-21
+  (catalog event published, its seat ids loaded by an ADMIN, `sales` lists them as AVAILABLE); unnumbered zones
+  are not loadable yet, because `sales` sells numbered seats only in Stage I.
+- [x] 9.2 Write the team log entry `docs/bitacora/<date>-e1-event-catalog.md`: what was built, the latency
   measured, the mockups and screenshots, the open points (S-03, Event Storming) and who completed each part.
-  Verify: the entry exists.
+  Verify: the entry exists. Done: `docs/bitacora/2026-11-21-e1-event-catalog.md`; the screenshots of the screens
+  come with group 8.

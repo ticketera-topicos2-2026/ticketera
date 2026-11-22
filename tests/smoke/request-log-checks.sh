@@ -18,8 +18,8 @@ readonly UNAVAILABLE_PATH="/smoke-test/unavailable/"
 readonly ACCESS_CHECK_PATH="/api/sales/example"
 readonly GATEWAY_LOG_SCHEMA="tests/platform/gateway-log.schema.json"
 readonly SERVICE_LOG_SCHEMA="tests/platform/request-log.schema.json"
-# Backend services that already write the request log (task group 2); sales joins in task group 3.
-readonly REQUEST_LOG_SERVICES="catalog payments"
+# Backend services that write the request log (task groups 2 and 3).
+readonly REQUEST_LOG_SERVICES="catalog payments sales"
 # A Uvicorn access line: client address, then the quoted request line and the status code.
 readonly UVICORN_ACCESS_LINE='"[A-Z]+ [^"]* HTTP/[0-9.]+" [0-9]{3}'
 

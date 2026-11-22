@@ -1,3 +1,9 @@
-name: Sales API
-version: "1"
-type: collection
+{
+  "version": "1",
+  "name": "Sales API",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}

@@ -59,17 +59,17 @@ change; DS-xx are the decisions of `project-bootstrap`.
 
 | # | Decision | Trace | Alternatives considered (reason rejected) |
 | --- | --- | --- | --- |
-| IA-01 | Token validation at the gateway with `auth_request` to an internal location that calls the identity service's `userinfo` endpoint; services trust the forwarded token | D-03 [ADR-0002][adr-0002], D-04 [ADR-0003][adr-0003], [ADR-0007][adr-0007] | njs JWT check, OpenResty, introspection, JWKS check in each service, NGINX Plus `auth_jwt`, caching (see Alternatives Considered) |
+| IA-01 | Token validation at the gateway with `auth_request` to an internal location that calls the identity service's `userinfo` endpoint; services trust the forwarded token | D-03 [ADR-0002][adr-0002], D-04 [ADR-0003][adr-0003], [ADR-0010][adr-0010] | njs JWT check, OpenResty, introspection, JWKS check in each service, NGINX Plus `auth_jwt`, caching (see Alternatives Considered) |
 | IA-02 | `auth_request` set once at server level; `/auth/` opts out with `auth_request off` | D-04 [ADR-0003][adr-0003] | `auth_request` in each route file (a new route without it would be open) |
 | IA-03 | Public health check inside the auth location, on the method and the raw request URI with a strict pattern | — | Map on `$uri` (in the subrequest it is `/_auth`); per-path `location` blocks for health (need variable `proxy_pass`, rejected by DS-07) |
 | IA-04 | Local `401` without a `Bearer <token>` header; every `userinfo` 4xx mapped to `401`; every failure to reach it mapped to `502` | — | Passing the identity service's status through (`403 insufficient_scope` would look like a role denial) |
 | IA-05 | Identity timeouts: connect 1 s, read 3 s, for the auth location and for `/auth/` | DS-15 | Connect 3 s and read 5 s from the exploration (up to 8 s, breaks the 5-second limit) |
 | IA-06 | `proxy_connect_timeout 3s` and `error_page 500 502 504 =502 @upstream_unavailable` move to server level and leave the route files | DS-07, DS-15 | Keep them per route (each new route must remember them, and the auth failure answers `500` in routes that declare their own `error_page`) |
 | IA-07 | Preflight answer adds `Access-Control-Allow-Methods` and `Access-Control-Allow-Headers` through maps, sent only on preflights | DS-09 | Static headers on every response (noise on every API answer) |
-| IA-08 | Gateway log format without query string or referrer; gateway error log at level `crit` | — | Keep `main` (logs `id_token_hint` and query tokens); reject token-like query parameters (incomplete: any name can carry one) |
+| IA-08 | Gateway access log in `ticketera_json` of `e1-request-log`, without query string or referrer; gateway error log at level `crit` | — | Keep `main` (logs `id_token_hint` and query tokens); keep the error log at `notice` (writes the request line, query string included, on every upstream failure); reject token-like query parameters (incomplete: any name can carry one) |
 | IA-09 | `KC_PROXY_HEADERS=xforwarded`; the auth location includes the forwarding snippet too | DS-08 | `KC_PROXY_TRUSTED_ADDRESSES` with the backend subnet (Compose assigns it dynamically) |
 | IA-10 | Realm clients: public `ticketera-frontend` (code flow, PKCE `S256`, exact redirect URIs from `FRONTEND_ORIGIN`), public `ticketera-api-tests` (password grant only), `admin-cli` redefined without direct grants | D-03 [ADR-0002][adr-0002] | Confidential clients (a secret in the repository or in every member's `.env`); services checking `azp` instead of disabling `admin-cli` grants (one more rule in every service) |
-| IA-11 | Test users with complete profiles and `${TEST_USER_<ROLE>_PASSWORD}` placeholders; realm `${FRONTEND_ORIGIN}` placeholders | DS-05, DS-16 | Users created by a script after startup (state outside the realm definition; `down -v` would need a second step) |
+| IA-11 | Four test users (one per platform role and a second `EVENT_OWNER` for ownership tests) with complete profiles and `${TEST_USER_*_PASSWORD}` placeholders; realm `${FRONTEND_ORIGIN}` placeholders | DS-05, DS-16 | Users created by a script after startup (state outside the realm definition; `down -v` would need a second step) |
 | IA-12 | Realm secret check reads credential objects field by field | DS-20 | Removing `credentials` from the secret keys (lets exported password hashes through) |
 | IA-13 | Frontend OIDC with `oidc-client-ts` and a small own `AuthProvider`; routing with React Router in declarative mode | D-01, D-16 | `keycloak-js`, `react-oidc-context`, own PKCE code; TanStack Router, wouter (see Alternatives Considered) |
 | IA-14 | Tokens kept in memory; renewal with the refresh token; page reload restored by a silent sign-in in a hidden frame | — | `sessionStorage` (default of the library) or `localStorage` (readable by any injected script) |
@@ -82,11 +82,10 @@ change; DS-xx are the decisions of `project-bootstrap`.
 [adr-0002]: /docs/adr/adr-0002-identidad-keycloak.md
 [adr-0003]: /docs/adr/adr-0003-api-gateway-nginx.md
 [adr-0005]: /docs/adr/adr-0005-arquitectura-hexagonal.md
-[adr-0007]: /docs/adr/adr-0007-validacion-de-tokens-en-el-gateway.md
+[adr-0010]: /docs/adr/adr-0010-validacion-de-tokens-en-el-gateway.md
 
-ADR-0007 (token validation at the gateway with `auth_request` and `userinfo`) does not exist yet: a task of this
-change writes it with the `create-architectural-decision-record` skill (D-27). Its number and slug are fixed when
-it is written, and this link is updated if they change.
+ADR-0010 (token validation at the gateway with `auth_request` and `userinfo`) records IA-01. Task 1.19 wrote it
+with the `create-architectural-decision-record` skill (D-27), with the number that ADR-0011 reserved for it.
 
 ### Decision notes: gateway
 
@@ -132,12 +131,15 @@ it is written, and this link is updated if they change.
   preflights and an empty value otherwise; NGINX sends no header whose value is empty. They are added with
   `add_header ... always` next to the existing CORS headers, so a `401` also carries
   `Access-Control-Allow-Origin` for the frontend's origin. Route files keep using no `add_header`.
-- **Logs (IA-08).** The template defines `log_format ticketera` with `$request_method $uri $server_protocol`
-  instead of `$request`, and without `$http_referer`; the server uses it for `access_log`. No variable carrying a
-  header value or the query string is logged. NGINX error log lines always include the full request line, query
-  string included, and the referrer, so the server sets `error_log ... crit`. Upstream failures still show in the
-  access log as `502`. `e1-request-log` (B) owns the final format and adds the correlation id; it must keep this
-  rule: no `$request`, `$args`, `$query_string`, `$request_uri`, `$http_authorization` or `$http_referer`.
+- **Logs (IA-08).** The access log uses `ticketera_json`, the format of `e1-request-log` (RL-01, RL-09): it
+  writes `$uri` instead of `$request` and no referrer, so no query string reaches it. NGINX error log lines always
+  include the full request line, query string included, and on an upstream failure also the upstream address with
+  its query string. The probe of task 1.15 found, at level `error`, the access token of a query string in the
+  lines of a refused connection and of a stopped identity service, and the ID token of `id_token_hint` in those of
+  a sign-out while the identity service was stopped. So the template sets `error_log ... crit` in the http
+  context, for both servers; upstream failures still show in the access log as `502`. The template's comment keeps
+  the rule for any later format: no `$request`, `$args`, `$query_string`, `$request_uri`, `$http_authorization`
+  or `$http_referer`.
 - **Client address (IA-09).** `KC_PROXY_HEADERS=xforwarded` makes Keycloak use `X-Forwarded-For`. That is safe
   because only the gateway reaches Keycloak (backend network) and the gateway replaces those headers (DS-08).
   Including the forwarding snippet in `/_auth` keeps a forged `X-Forwarded-For` out of the subrequest too.
@@ -161,16 +163,23 @@ it is written, and this link is updated if they change.
   `master` realm's `admin-cli`, used by the bootstrap administrator, is untouched.
 - **Realm settings.** `displayName: "GoPass"`, `registrationAllowed: false` (stated explicitly), default token
   lifespans (access token 5 minutes) for the frontend.
-- **Test users (IA-11).** `test-admin`, `test-event-owner` and `test-client`, each with `enabled: true`,
-  `emailVerified: true`, `email` under `example.com`, `firstName` "Test", `lastName` naming the role, no required
-  actions, the single realm role of its name and one credential
-  `{"type": "password", "value": "${TEST_USER_<ROLE>_PASSWORD}", "temporary": false}`. The Keycloak 26
-  declarative user profile requires `email`, `firstName` and `lastName`; without them, or with
+- **Test users (IA-11).** `test-admin`, `test-event-owner`, `test-client` and `test-other-event-owner`, each with
+  `enabled: true`, `emailVerified: true`, `email` under `example.com`, `firstName` "Test", `lastName` naming the
+  role, no required actions, a single realm role (that of its name; `EVENT_OWNER` for `test-other-event-owner`) and
+  one credential `{"type": "password", "value": "${TEST_USER_<NAME>_PASSWORD}", "temporary": false}`, where
+  `<NAME>` is `ADMIN`, `EVENT_OWNER`, `CLIENT` or `OTHER_EVENT_OWNER`. `test-other-event-owner` exists so that API
+  tests can check that an `EVENT_OWNER` cannot reach the events of another one (catalog's Bruno test 05). The
+  Keycloak 26 declarative user profile requires `email`, `firstName` and `lastName`; without them, or with
   `emailVerified: false`, the first sign-in shows an update-profile form and the password grant fails with
   "Account is not fully set up". Usernames are not secret and are documented in `CONTRIBUTE.md`.
-- **Variables.** `.env.example` gains `TEST_USER_ADMIN_PASSWORD`, `TEST_USER_EVENT_OWNER_PASSWORD` and
-  `TEST_USER_CLIENT_PASSWORD` with placeholder values in the style of the existing ones. The identity service
-  receives them and `FRONTEND_ORIGIN` with `${VAR:?message}` (DS-16), so startup stops and names a missing value.
+  Because each test user lists its `realmRoles`, Keycloak does not grant it `default-roles-ticketera`, so it holds
+  no `account` role and the Keycloak account console (`/auth/realms/ticketera/account`) fails after sign-in (its
+  profile request gets `401`); the project does not use that console, whose job the frontend's "My account" page
+  does.
+- **Variables.** `.env.example` gains `TEST_USER_ADMIN_PASSWORD`, `TEST_USER_EVENT_OWNER_PASSWORD`,
+  `TEST_USER_CLIENT_PASSWORD` and `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` with placeholder values in the style of the
+  existing ones. The identity service receives them and `FRONTEND_ORIGIN` with `${VAR:?message}` (DS-16), so
+  startup stops and names a missing value.
   Keycloak substitutes `${VAR}` placeholders in the realm file at import time. The frontend receives
   `VITE_OIDC_AUTHORITY` (`http://localhost:${GATEWAY_PORT}/auth/realms/ticketera`) and `VITE_OIDC_CLIENT_ID`
   (`ticketera-frontend`) from Compose.
@@ -488,7 +497,7 @@ sequenceDiagram
 | Spoofing | Password grant through the built-in `admin-cli` or the frontend client | Both have direct access grants off (IA-10) |
 | Spoofing | Password guessing through `ticketera-api-tests` | Accepted for local development: the gateway listens on `127.0.0.1` only; a production mode would not import the client |
 | Spoofing | An intercepted authorization code | PKCE `S256` required; exact redirect URIs (IA-10) |
-| Tampering | A compromised container on the backend network sends forged tokens straight to a service | Accepted residual risk: services do not check signatures; network segmentation (DS-23) and only two published ports limit it; JWKS checks in services are the upgrade path (ADR-0007) |
+| Tampering | A compromised container on the backend network sends forged tokens straight to a service | Accepted residual risk: services do not check signatures; network segmentation (DS-23) and only two published ports limit it; JWKS checks in services are the upgrade path (ADR-0010) |
 | Tampering | Path or method tricks reach a protected route as if it were public | Method-aware public check on the raw URI with a strict pattern; `/auth/` opted out on the normalized URI (IA-03) |
 | Tampering | Open redirect through the sign-in return address | Only same-origin relative paths are followed |
 | Repudiation | Rejected requests leave no trace | The gateway access log records every `401` and `502` without tokens; the identity service records the real client address (IA-09); the service request log comes in `e1-request-log` |
@@ -531,7 +540,7 @@ Each scenario gets one test, in the place that can observe it. Tokens come from 
 | `platform/identity-provisioning`, realm secrets | `tests/platform/test_check_realm_secrets.py` | New fixtures (IA-12) |
 | `identity/access-token` | `tests/smoke/identity-checks.sh` and the Bruno collection | `sub` present, stable across sign-in and sign-out, different between users; roles per test user; two sessions of the same user: the `sub` of an example access token of the frontend client, generated by the admin API's scope evaluation, equals the `sub` of a `ticketera-api-tests` token of the same user |
 | `identity/user-authentication` | Vitest + React Testing Library, with a mocked `UserManager` and mocked `fetch` | Every scenario: sign-in redirect and return, `access_denied`, unmatched callback, session and role guards, "My account" roles, header, `Bearer` only on protected calls, renewal success and failure, single-flight `401`, sign-out form `POST` with no token in any URL, status page public and working with the identity service down |
-| Bruno (D-24) | `tests/api/identity/`, run locally | Token requests per role and claims, `401` for a protected path without and with an invalid token, public health; passwords from environment variables, never in the collection |
+| Bruno (D-24) | `tests/api/identity/`, run locally | Token requests per role and claims, `401` for a protected path without and with an invalid token, public health; passwords from environment variables, never in the collection. `tests/api/run.sh` gives every collection real tokens of the four test users from `ticketera-api-tests` (task 1.27) |
 
 Checked by hand in a browser and recorded as evidence in the team log, because they need a real browser and a real
 identity service: sign-in from `/account` and back, sign-out ending the identity session (the next sign-in asks
@@ -549,13 +558,13 @@ lifespan (IA-18) adds only the time left after the other checks.
   lower the level locally while debugging, without committing it.
 - [The silent sign-in frame is blocked by a browser setting or a future Keycloak header] → The provider falls back
   to a top-level redirect with `prompt=none`; a reload then costs one visible redirect, not a password prompt.
-- [Two changes edit the gateway template] → `e1-request-log` and this change rebase on whichever merges first; the
-  log rule of IA-08 is written in the template's comments so the rebase keeps it.
+- [Two changes edit the gateway template] → Resolved: `e1-request-log` merged first (#37), and this branch took it
+  from `main` before changing the template again; the template's comment keeps the log rule of IA-08.
 - [Moving the route lines edits files of B and C] → Small, mechanical diffs reviewed by B (CODEOWNERS `/infra/`);
   the smoke test checks a stopped service and the identity service down on every route.
 - [The smoke test gets longer] → Restarting the identity service adds about one minute; the expiry wait overlaps
   the other checks. The CI time limit (15 minutes) is checked when the group is done.
-- [Services trust the gateway] → Residual risk recorded in STRIDE and ADR-0007.
+- [Services trust the gateway] → Residual risk recorded in STRIDE and ADR-0010.
 
 ## Migration Plan
 
@@ -566,14 +575,14 @@ lifespan (IA-18) adds only the time left after the other checks.
    the one merged last also carries `Closes #28`:
    - **Backend**, reviewed by B: realm, gateway, `scripts/check_realm_secrets.py`, `docker-compose.yml` (the
      frontend's `VITE_OIDC_*` variables included, so the frontend pull request does not touch it), `.env.example`,
-     smoke and realm tests, the low-fidelity mockups; ADR-0007; the `CONTRIBUTE.md` section on the test users and
+     smoke and realm tests, the low-fidelity mockups; ADR-0010; the `CONTRIBUTE.md` section on the test users and
      `docker compose down -v`; its sign-in steps and its team log entry.
    - **Frontend and API tests**, reviewed by C: the GoPass base as its first sub-tasks, then the authentication
      screens, the Bruno collection with its command in `CONTRIBUTE.md`, and the latency measurement; its sign-in
      steps in `CONTRIBUTE.md` and its team log entry.
    The frontend's manual evidence needs the backend merged, or its branch running on top of the backend branch.
-3. When the backend pull request merges, a message to the team asks every member to copy the three
-   `TEST_USER_<ROLE>_PASSWORD` lines from `.env.example` to `.env` (Compose stops otherwise) and to run
+3. When the backend pull request merges, a message to the team asks every member to copy the four
+   `TEST_USER_*_PASSWORD` lines from `.env.example` to `.env` (Compose stops otherwise) and to run
    `docker compose down -v` before `docker compose up`, because an existing realm is never re-imported.
    `CONTRIBUTE.md` documents both, the test usernames and how to sign in.
 4. Feature changes start using tokens from `ticketera-api-tests` in their API tests, and copy the token-claims

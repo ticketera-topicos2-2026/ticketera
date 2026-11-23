@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="mockup-height" content="1120">
+  <title>GoPass · Inicio de sesión (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../catalog/src/gopass.css">
+  <link rel="stylesheet" href="identity.css">
+</head>
+<body>
+  <!-- Flujo de inicio de sesión con código de autorización y PKCE (spec identity/user-authentication: A person signs in
+       through the identity service - all scenarios; design IA-13). -->
+  <main style="padding: 8px 0 24px;">
+    <h1 style="margin: 32px 64px 0;">Inicio de sesión</h1>
+    <p class="muted" style="margin: 6px 64px 28px;">Desde el botón del encabezado, o al abrir una página protegida sin sesión, hasta el servicio de identidad y de vuelta.</p>
+
+    <div class="flow">
+      <div>
+        <div class="step"><span class="num">1</span>Página sin sesión</div>
+        <div class="frame mini">
+          <div class="frame-bar"><span class="url">localhost:5173/account</span></div>
+          <div class="frame-body">
+            <header class="header">
+              <div class="brand">GoPass</div>
+              <nav class="nav"><a href="#">Estado</a></nav>
+              <button class="btn primary">Iniciar sesión</button>
+            </header>
+            <div class="content">
+              <h2>Redirigiendo…</h2>
+              <div class="skeleton"></div><div class="skeleton short"></div>
+            </div>
+          </div>
+        </div>
+        <p class="step-note">Clic en «Iniciar sesión», o abrir <code>/account</code> sin sesión. La página no se muestra y no llama a ninguna API protegida.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div>
+        <div class="step"><span class="num">2</span>Servicio de identidad</div>
+        <div class="frame">
+          <div class="frame-bar"><span class="url">localhost:18080/auth/realms/ticketera/protocol/openid-connect/auth?…</span></div>
+          <div class="frame-body">
+            <div class="kc">
+              <div>
+                <div class="kc-title">GOPASS</div>
+                <div class="kc-card">
+                  <h4>Sign in to your account</h4>
+                  <div class="kc-label">Username or email</div><div class="kc-input"></div>
+                  <div class="kc-label">Password</div><div class="kc-input"></div>
+                  <div class="kc-button">Sign In</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="step-note">Página propia de Keycloak, con su tema: GoPass solo pone el nombre. Sin registro. La contraseña nunca pasa por el frontend.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div>
+        <div class="step"><span class="num">3</span>Vuelta al frontend</div>
+        <div class="frame mini">
+          <div class="frame-bar"><span class="url">localhost:5173/signin-callback?code=…&amp;state=…</span></div>
+          <div class="frame-body">
+            <header class="header">
+              <div class="brand">GoPass</div>
+              <nav class="nav"></nav>
+            </header>
+            <div class="content center-panel" style="padding-top: 70px;">
+              <div class="spinner"></div>
+              <h2>Iniciando sesión…</h2>
+            </div>
+          </div>
+        </div>
+        <p class="step-note">El frontend canjea el código (PKCE) y borra <code>code</code> y <code>state</code> de la dirección.</p>
+      </div>
+      <div class="arrow">→</div>
+      <div>
+        <div class="step"><span class="num">4</span>De vuelta, con sesión</div>
+        <div class="frame mini">
+          <div class="frame-bar"><span class="url">localhost:5173/account</span></div>
+          <div class="frame-body">
+            <header class="header">
+              <div class="brand">GoPass</div>
+              <nav class="nav"><a class="active" href="#">Mi cuenta</a></nav>
+              <div class="user"><div style="text-align:right;"><div style="font-weight:600;">Test Client</div><span class="role">CLIENT</span></div><div class="avatar">TC</div></div>
+            </header>
+            <div class="content">
+              <h2>Mi cuenta</h2>
+              <div class="skeleton"></div><div class="skeleton short"></div>
+            </div>
+          </div>
+        </div>
+        <p class="step-note">Vuelve a la página de origen, solo si es una ruta relativa del mismo sitio; si no, a <code>/</code>.</p>
+      </div>
+    </div>
+
+    <h2 style="margin: 48px 64px 6px;">Cuando el inicio de sesión no se completa</h2>
+    <p class="muted" style="margin: 0 64px 18px;">En los dos casos no queda ninguna sesión.</p>
+    <div class="row" style="padding: 0 64px;">
+      <section class="card pad grow">
+        <div class="center-panel" style="padding: 18px 0;">
+          <div class="icon-circle warning-bg">!</div>
+          <h2>No se completó el inicio de sesión</h2>
+          <p class="muted" style="margin-top: 8px;">Cancelaste el inicio de sesión o el servicio de identidad no lo permitió.</p>
+          <div class="actions"><button class="btn primary">Intentar de nuevo</button><button class="btn">Volver al inicio</button></div>
+        </div>
+        <p class="muted small" style="text-align:center;">El servicio de identidad volvió con <code>error=access_denied</code>.</p>
+      </section>
+      <section class="card pad grow">
+        <div class="center-panel" style="padding: 18px 0;">
+          <div class="icon-circle error-bg">×</div>
+          <h2>No se completó el inicio de sesión</h2>
+          <p class="muted" style="margin-top: 8px;">La respuesta no corresponde a ningún inicio de sesión pendiente.</p>
+          <div class="actions"><button class="btn primary">Volver al inicio</button></div>
+        </div>
+        <p class="muted small" style="text-align:center;">Se llegó a <code>/signin-callback</code> sin un inicio de sesión en curso, o con un <code>state</code> que no coincide.</p>
+      </section>
+    </div>
+  </main>
+
+  <aside class="note"><b>Mockup</b> · Código de autorización con PKCE S256 (cliente ticketera-frontend) · Los tokens quedan solo en memoria · La página de Keycloak sale en inglés porque el realm no habilita otros idiomas</aside>
+</body>
+</html>

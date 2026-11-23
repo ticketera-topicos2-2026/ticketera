@@ -83,6 +83,18 @@ services:
       # Bootstrap administrator, created only on the first start, when the master realm does not exist yet.
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:?set KC_BOOTSTRAP_ADMIN_USERNAME in .env (copy .env.example to .env)}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?set KC_BOOTSTRAP_ADMIN_PASSWORD in .env (copy .env.example to .env)}
+      # The identity service takes the client address from X-Forwarded-For: only the gateway reaches it, and the
+      # gateway always replaces that header (IA-09, DS-08).
+      KC_PROXY_HEADERS: xforwarded
+      # Values of the ${...} placeholders of the realm definition, substituted when the realm is imported: the
+      # frontend client accepts only addresses under FRONTEND_ORIGIN, and each test user gets its password. The
+      # realm is imported only when it does not exist, so a change needs "docker compose down -v" (IA-10, IA-11).
+      FRONTEND_ORIGIN: ${FRONTEND_ORIGIN:?set FRONTEND_ORIGIN in .env (copy .env.example to .env)}
+      TEST_USER_ADMIN_PASSWORD: ${TEST_USER_ADMIN_PASSWORD:?set TEST_USER_ADMIN_PASSWORD in .env (copy .env.example to .env)}
+      TEST_USER_EVENT_OWNER_PASSWORD: ${TEST_USER_EVENT_OWNER_PASSWORD:?set TEST_USER_EVENT_OWNER_PASSWORD in .env (copy .env.example to .env)}
+      TEST_USER_CLIENT_PASSWORD: ${TEST_USER_CLIENT_PASSWORD:?set TEST_USER_CLIENT_PASSWORD in .env (copy .env.example to .env)}
+      # The second EVENT_OWNER test user, for the checks of ownership in the API tests (IA-11).
+      TEST_USER_OTHER_EVENT_OWNER_PASSWORD: ${TEST_USER_OTHER_EVENT_OWNER_PASSWORD:?set TEST_USER_OTHER_EVENT_OWNER_PASSWORD in .env (copy .env.example to .env)}
     volumes:
       # Realm definition with the platform roles (task 2.9; Req identity-provisioning).
       - ./infra/keycloak:/opt/keycloak/data/import:ro
@@ -267,6 +279,10 @@ services:
     environment:
       # Public address of the gateway, which the browser calls (DS-09, DS-15).
       VITE_API_BASE_URL: http://localhost:${GATEWAY_PORT:?set GATEWAY_PORT in .env (copy .env.example to .env)}
+      # Sign-in through the identity service (IA-13): the ticketera realm, reached through the gateway, and the
+      # frontend client of the realm definition.
+      VITE_OIDC_AUTHORITY: http://localhost:${GATEWAY_PORT:?set GATEWAY_PORT in .env (copy .env.example to .env)}/auth/realms/ticketera
+      VITE_OIDC_CLIENT_ID: ticketera-frontend
       # Polling fallback when file events do not reach the container (DS-17).
       VITE_USE_POLLING: ${VITE_USE_POLLING:-false}
     volumes:

@@ -17,16 +17,16 @@
 
 ## 1. Backend (A, feature/e1-identity-access-backend)
 
-- [ ] 1.1 [P1] Write the realm secret check tests (red): new fixtures for a user credential whose `value` is a
+- [x] 1.1 [P1] Write the realm secret check tests (red): new fixtures for a user credential whose `value` is a
   `${NAME}` placeholder (passes), an exported hash with `secretData` and `credentialData` (fails, naming the
   field) and a placeholder with a default (fails); `literal-user-credentials.json` keeps failing (Req
   continuous-integration: The quality check rejects literal secrets in the realm definition - Scenario: Realm
   definition with a placeholder; IA-12). Verify: the placeholder fixture fails with today's script.
-- [ ] 1.2 [P1] Make `scripts/check_realm_secrets.py` read each object of a `credentials` list field by field:
+- [x] 1.2 [P1] Make `scripts/check_realm_secrets.py` read each object of a `credentials` list field by field:
   `value` must be exactly a placeholder, and any key other than `type`, `value`, `temporary` and `userLabel` is a
   literal (IA-12). Verify: the tests of 1.1 and the existing ones pass with
   `python -I -B -m unittest discover -s tests/platform`; the check passes on the current realm.
-- [ ] 1.3 [P1] Write `tests/platform/test_realm_definition.py` (red, `unittest`): the frontend client is public,
+- [x] 1.3 [P1] Write `tests/platform/test_realm_definition.py` (red, `unittest`): the frontend client is public,
   code flow only, PKCE `S256`, exact redirect URIs `${FRONTEND_ORIGIN}/signin-callback` and
   `${FRONTEND_ORIGIN}/silent-callback`, web origin `${FRONTEND_ORIGIN}`, post-logout URI `${FRONTEND_ORIGIN}/`, no
   direct grants, no lightweight tokens, realm roles mapped to the ID token; `ticketera-api-tests` is public, direct
@@ -38,7 +38,7 @@
   password grant; The realm has one test user per platform role; Users cannot register themselves; The sign-in page
   carries the GoPass name; The realm definition contains no secrets - Scenario: Test user passwords in the realm
   definition; IA-10, IA-11, IA-18). Verify: the tests fail on the current realm.
-- [ ] 1.4 [P1] Create `tests/smoke/identity-checks.sh`, sourced by `smoke-test.sh`, with a helper that gets tokens
+- [x] 1.4 [P1] Create `tests/smoke/identity-checks.sh`, sourced by `smoke-test.sh`, with a helper that gets tokens
   from `ticketera-api-tests` (scope `openid`, passwords from the Compose configuration), and write its realm client
   checks (red): password grant refused with `unauthorized_client` for the frontend client and for `admin-cli` of
   `ticketera`; `admin-cli` of `master` still issues the administrator's token; authorization requests of the
@@ -50,7 +50,7 @@
   The built-in admin client of the realm allows no password grant - both scenarios; Users cannot register
   themselves - both scenarios; The sign-in page carries the GoPass name; IA-17). Verify: the checks fail against
   the current realm.
-- [ ] 1.5 [P1] Write the user and token checks in `identity-checks.sh` (red): each test user gets a token with the
+- [x] 1.5 [P1] Write the user and token checks in `identity-checks.sh` (red): each test user gets a token with the
   password from `.env` and holds only its role (which also proves no extra first sign-in step); wrong password
   gives `invalid_grant`; `sub` non-empty, equal after sign-in, sign-out (form `POST` to the logout endpoint with
   the refresh token) and sign-in, and different between `CLIENT` and `EVENT_OWNER`; the `sub` of an example access
@@ -64,82 +64,144 @@
   the client's address - both scenarios; Req access-token: The access token identifies the user - all scenarios;
   The access token carries the user's platform roles - all scenarios). Verify: the checks fail against the current
   realm and Compose file.
-- [ ] 1.6 [P1] Write the realm in `infra/keycloak/ticketera-realm.json`: `ticketera-frontend` with its ID-token
+- [x] 1.6 [P1] Write the realm in `infra/keycloak/ticketera-realm.json`: `ticketera-frontend` with its ID-token
   roles mapper, `ticketera-api-tests`, `admin-cli` without direct grants, `displayName`, `registrationAllowed`, the
   three test users with complete profiles and `${TEST_USER_<ROLE>_PASSWORD}` placeholders (IA-10, IA-11, IA-18).
   Verify: the tests of 1.3 and the realm secret check pass.
-- [ ] 1.7 [P1] Pass `FRONTEND_ORIGIN` and the three `TEST_USER_<ROLE>_PASSWORD` variables to the identity service
+- [x] 1.7 [P1] Pass `FRONTEND_ORIGIN` and the three `TEST_USER_<ROLE>_PASSWORD` variables to the identity service
   with `${VAR:?message}`, set `KC_PROXY_HEADERS=xforwarded`, add the placeholders to `.env.example`, and give the
   frontend `VITE_OIDC_AUTHORITY` and `VITE_OIDC_CLIENT_ID` (IA-09, IA-11). Verify: after `docker compose down -v`
   and `up --wait`, the checks of 1.4 and 1.5 pass.
-- [ ] 1.8 [P1] Write the access check tests in `identity-checks.sh` (red), and make the existing forwarding checks
-  of `smoke-test.sh` send a token: `401` with `WWW-Authenticate: Bearer` without a token, with `Basic`, with
-  `Bearer x` and with an altered payload; an expired token (obtained at the start of the script, checked last);
-  the token of a signed-out session; a token issued without `openid`; a token only in the query string; each test
-  user's token forwarded with `Authorization` unchanged through the echo route; `GET /api/sales/example` with a
-  token answered by `sales`; the echo route without a token gets `401`; `/healthz` gets `200` and
-  `/api/unknown/example` gets `404` without a token; concurrent requests of two users through the echo route each
-  carry their own header; two `Authorization` headers get `400` (Req api-gateway: Each backend service has one
+- [x] 1.8 [P1] Write the access check tests in `identity-checks.sh` (red), and make the existing forwarding checks
+  of `smoke-test.sh` send a token: a control that an API test token with `openid` gets `200` from `userinfo`;
+  `401` with `WWW-Authenticate: Bearer` without a token, with `Basic`, with `Bearer x` and with an altered payload;
+  an expired token (obtained at the start of the script, checked last); the token of a signed-out session; a token
+  issued without `openid`; a token only in the query string; each test user's token forwarded with
+  `Authorization` unchanged through the echo route; `GET /api/sales/example` with a token answered by `sales`; the
+  echo route without a token gets `401`; `/healthz` gets `200` and `/api/unknown/example` gets `404` without a
+  token; concurrent requests of two users through the echo route each carry their own header; two `Authorization`
+  headers get `400`; paths that only look public get `401` without a token, sent as written:
+  `/api/sales/healthx`, `/api/sales/heal%74h`, `/api/sales/health%2F`, `/api/sales/%2e%2e/sales/health`,
+  `/api/sales/../sales/health` and `/auth/../api/sales/example`. The `401` and `400` cases go through the echo
+  route, which answers every request it receives with `200`, and the paths that look public go to `sales`, which
+  never answers `401`, so no check reads a service log (Req api-gateway: Each backend service has one
   route - Scenario: Authenticated request routed to the sales service; Requests forwarded on paths that are not
   public require a valid access token - all scenarios except Route added later; A token rejected by the identity
   service is answered 401; A request with more than one Authorization header is rejected; Tokens are accepted only
-  in the Authorization header). Verify: every check that depends on the access check fails.
-- [ ] 1.9 [P1] Add the test-only route `tests/smoke/gateway/latency.conf` (`/api/smoke-latency/` to the echo
+  in the Authorization header; Public paths skip the access check - Scenario: Path that only starts like a health
+  path; IA-03). Verify: every check that depends on the access check fails.
+- [x] 1.9 [P1] Add the test-only route `tests/smoke/gateway/latency.conf` (`/api/smoke-latency/` to the echo
   service, declaring nothing about access) and write the public path tests (red): `GET` and `HEAD` on health
   without a token; health with `Bearer x` answers as without a token; the realm discovery document without a token
   gets `200`; `POST /api/sales/health`, `GET /api/sales/health/` and `GET /api/sales/health/extra` without a token
   get `401`; `/api/smoke-latency/example` without a token gets `401` (Req api-gateway: Public paths skip the access
   check - all scenarios; Requests forwarded on paths that are not public require a valid access token - Scenario:
   Route added later; IA-03, IA-17). Verify: the `401` checks fail before 1.10.
-- [ ] 1.10 [P1] Implement the access check in the gateway template: `auth_request /_auth` at server level; the
+- [x] 1.10 [P1] Implement the access check in the gateway template: `auth_request /_auth` at server level; the
   internal `/_auth` location with the public map on `$request_method` and `$request_uri`, the local `401`, every
   `userinfo` 4xx mapped to `401`, no body, `GET`, cleared `Content-Type` and `Cookie`, the forwarding snippet;
-  `auth_request off` in `location /auth/` of `identity.conf` (IA-01 to IA-04, IA-09). Verify: the checks of 1.8
-  (except the expired token, which needs 1.6 too) and 1.9 pass; the bootstrap checks of `smoke-test.sh` still pass.
-- [ ] 1.11 [P1] Write the identity-unavailable tests at the end of `identity-checks.sh` (red): with the identity
+  `auth_request off` in `location /auth/` of `identity.conf`; exactly one `WWW-Authenticate` challenge on every
+  `401`; and a check in `identity-checks.sh` that a valid token with `PUT` (with a body) and `DELETE` through the
+  echo route gets `200` (IA-01 to IA-04, IA-09). Verify: the checks of 1.8 (except the expired token, which needs
+  1.6 too) and 1.9 pass; the bootstrap checks of `smoke-test.sh` still pass.
+- [x] 1.11 [P1] Write the identity-unavailable tests at the end of `identity-checks.sh` (red): with the identity
   service stopped, a protected request with a token gets `502` in under 5 s and does not reach the service; the
   discovery document gets `502` in under 5 s; `Basic` and no-token requests still get `401`; `/api/sales/health`
-  and `/healthz` get `200`; then the identity service is started and waited healthy (Req api-gateway: An
-  unavailable identity service is answered 502 - all scenarios; Requests forwarded on paths that are not public
-  require a valid access token - Scenario: Authorization header that is not a bearer token). Verify: the `502`
-  checks fail (routes answer `500`, `/auth/` waits 60 s).
-- [ ] 1.12 [P1] Set connect 1 s and read 3 s in `/_auth` and `/auth/`; move `proxy_connect_timeout 3s` and
+  and `/healthz` get `200`; then the identity service is started and waited healthy. The same checks run with the
+  identity service paused, which accepts connections and never answers: the requirement covers an identity service
+  that does not answer, and IA-05 bounds this hung case with the read timeout. Each `502` check reports the time
+  measured, every request is capped at 10 s, and the identity service is always restored, from an EXIT trap too,
+  with a gateway restart if the gateway cannot reach it again (DS-07) (Req api-gateway: An unavailable identity
+  service is answered 502 - all scenarios; Requests forwarded on paths that are not public require a valid access
+  token - Scenario: Authorization header that is not a bearer token; IA-05). Verify: the `502` checks fail, with no
+  answer within the 10 s cap, and every other check passes.
+- [x] 1.12 [P1] Set connect 1 s and read 3 s in `/_auth` and `/auth/`; move `proxy_connect_timeout 3s` and
   `error_page 500 502 504 =502 @upstream_unavailable` to server level, and remove them and the named locations from
   `catalog.conf`, `sales.conf` and `payments.conf` (IA-05, IA-06). Verify: the checks of 1.11 and the existing
   stopped-service checks pass.
-- [ ] 1.13 [P1] Write the CORS tests (red): a preflight of `/api/sales/example` from `FRONTEND_ORIGIN` without a
+- [x] 1.13 [P1] Write the CORS tests (red): a preflight of `/api/sales/example` from `FRONTEND_ORIGIN` without a
   token, asking for `DELETE` and `authorization`, `content-type`, `idempotency-key`, gets `204` allowing them and
   does not reach `sales`; a `401` to the frontend's origin carries `Access-Control-Allow-Origin` (Req api-gateway:
   The frontend can call the API from the browser - Scenarios: CORS preflight from the frontend's address; Rejected
   request from the frontend's address). Verify: the `Allow-Methods` and `Allow-Headers` checks fail.
-- [ ] 1.14 [P1] Add the preflight maps and `add_header ... always` for `Access-Control-Allow-Methods` and
+- [x] 1.14 [P1] Add the preflight maps and `add_header ... always` for `Access-Control-Allow-Methods` and
   `Access-Control-Allow-Headers` (IA-07). Verify: the checks of 1.13 and the existing CORS checks pass.
-- [ ] 1.15 [P1] Write the log tests (red): after the other checks, `docker compose logs gateway` contains none of
-  the tokens used, including a query-string token sent while the identity service is stopped and a sign-out
-  request under `/auth/` with `id_token_hint` in its query string (Req api-gateway: The gateway never writes a
-  token to its logs - all scenarios). Verify: the query-string and `id_token_hint` checks fail with the `main`
-  format.
-- [ ] 1.16 [P1] Define `log_format ticketera` without query string or referrer, use it for `access_log`, set
-  `error_log ... crit`, and write the rule for `e1-request-log` in a comment (IA-08). Verify: the checks of 1.15
-  pass.
+- [x] 1.15 [P1] Write the log tests (red) in `identity-checks.sh`: each token is sent once, in a known place, and
+  no line that `docker compose logs gateway` wrote since the checks started contains it: valid and altered tokens
+  in the `Authorization` header; a token only in the query string, answered `401`; a sign-out request under
+  `/auth/` with `id_token_hint` in its query string; a query-string token on the test route whose connection is
+  refused (`/smoke-test/unavailable/`); and, with the identity service stopped (in the window of the checks of
+  1.11), a query-string token next to a header token and a sign-out request with `id_token_hint`. No token reaches
+  a command line and no log line is printed with a token in it (Req api-gateway: The gateway never writes a token
+  to its logs - all scenarios; IA-08). Verify: the three checks of an upstream failure (refused connection; identity
+  stopped with a query-string token; identity stopped with `id_token_hint`) fail, because the error log at `notice`
+  writes the request line, query string included, at level `error`; every other check passes, since
+  `ticketera_json` keeps the query string out of the access log.
+- [x] 1.16 [P1] Set `error_log /var/log/nginx/error.log crit;` in the http context of the template, so it covers
+  both servers, with a comment on why (IA-08). In the pinned image that file is a link to `/dev/stderr`, so the
+  lines that remain still reach `docker compose logs`. The access log keeps `ticketera_json` of `e1-request-log`,
+  which already leaves out the query string and the referrer, and the template already holds the rule of IA-08 in
+  a comment. Verify: the checks of 1.15 pass, and the `502` answers still show in the access log (the gateway log
+  checks of `e1-request-log` pass).
 - [ ] 1.17 [P1] Run the whole system locally with the echo overlay. Verify: `smoke-test.sh --require-echo`
   (identity checks included), `database-isolation.sh` and the `tests/platform` tests pass; then the `quality`,
   `smoke-test` and `openspec-validate` checks are green on the pull request and the CI stays within 15 minutes.
-- [ ] 1.18 [P1] Draw low-fidelity mockups in `docs/mockups/identity/` with the GoPass palette (D-38): the sign-in
+- [x] 1.18 [P1] Draw low-fidelity mockups in `docs/mockups/identity/` with the GoPass palette (D-38): the sign-in
   flow, the header with the signed-in user and the sign-out action, the "My account" page and the access-denied
   page; they guide the screens of group 2. Verify: the mockups are in the pull request and the reviewer sees each
   screen of `specs/identity/user-authentication`.
-- [ ] 1.19 [P1] Write ADR-0007 (token validation at the gateway with `auth_request` and `userinfo`, services
-  trusting the forwarded token) with the `create-architectural-decision-record` skill, add it to the index in
-  `docs/adr/README.md`, and fix the link in `design.md` if the number or slug changed (D-27; IA-01). Verify: the
-  ADR is in the pull request and the link resolves.
-- [ ] 1.20 [P1] Write the `CONTRIBUTE.md` section (Spanish): the test users and their roles, the three new `.env`
+- [x] 1.19 [P1] Write ADR-0010 (token validation at the gateway with `auth_request` and `userinfo`, services
+  trusting the forwarded token; the number that ADR-0011 reserved for it) with the
+  `create-architectural-decision-record` skill, add it to the index in `docs/adr/README.md`, and fix the links in
+  `design.md` and `proposal.md` if its slug differs from `adr-0010-validacion-de-tokens-en-el-gateway` (D-27;
+  IA-01). Verify: the ADR is in the pull request and the link resolves.
+- [x] 1.20 [P1] Write the `CONTRIBUTE.md` section (Spanish): the test users and their roles, the four new `.env`
   variables, `docker compose down -v` after realm changes, and getting a token from `ticketera-api-tests`.
   Verify: a reviewer follows it from a fresh clone.
-- [ ] 1.21 [P1] Write the team log entry for this group with the red and green evidence, the closed pending item
+- [x] 1.21 [P1] Write the team log entry for this group with the red and green evidence, the closed pending item
   of group 3 (502 handling at server level) and the AI usage. Verify: the entry is in the pull request.
-- [ ] 1.22 [P1] After the merge, send the team message: copy the three `TEST_USER_<ROLE>_PASSWORD` lines to
-  `.env` and run `docker compose down -v` before `up`. Verify: the message is linked in the team log.
+- [ ] 1.22 [P1] After the merge, send the team message: copy the four `TEST_USER_*_PASSWORD` lines to `.env` and
+  run `docker compose down -v` before `up`. Verify: the message is linked in the team log.
+- [x] 1.23 [P1] Extend `tests/platform/test_realm_definition.py` (red) to a second EVENT_OWNER test user,
+  `test-other-event-owner`: exactly four test users, this one with a complete profile, no required actions, only
+  `EVENT_OWNER` and the placeholder `${TEST_USER_OTHER_EVENT_OWNER_PASSWORD}` (Req identity-provisioning: The realm
+  has a second EVENT_OWNER test user - Scenario: Second EVENT_OWNER test user; The realm definition contains no
+  secrets - Scenario: Test user passwords in the realm definition; IA-11). Verify: only the new and changed tests
+  fail on the current realm; every other test of `tests/platform` still passes.
+- [x] 1.24 [P1] Refactor `identity-checks.sh` so that it looks up a test user's token by username and password
+  variable instead of by platform role, with no change of behavior (IA-17). Verify: the full smoke test with the
+  echo overlay and `--require-echo` is green, as before the refactor.
+- [x] 1.25 [P1] Add smoke checks to `identity-checks.sh` (red): `test-other-event-owner` gets a token with its
+  password and holds only `EVENT_OWNER`; its `sub` differs from that of `test-event-owner`; `docker compose config`
+  with `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` empty fails and names it (Req identity-provisioning: The realm has a
+  second EVENT_OWNER test user - all scenarios; IA-11). Verify: only these new checks fail; every pre-existing check
+  still passes.
+- [x] 1.26 [P1] Add `test-other-event-owner` to the realm, pass `TEST_USER_OTHER_EVENT_OWNER_PASSWORD` to the
+  identity service with `${VAR:?message}` and add it to `.env.example` (IA-11). Verify: after `docker compose
+  down -v` and `up --wait`, the tests of 1.23 and the checks of 1.25 pass and the full smoke test is green.
+- [x] 1.27 [P1] Make `tests/api/run.sh` and `tests/smoke/measure-catalog-latency.sh` get real tokens from
+  `ticketera-api-tests` (password grant, `openid` scope, passwords from `docker compose config`): `run.sh` gets the
+  tokens of `test-event-owner`, `test-other-event-owner`, `test-admin` and `test-client` right before Bruno runs, as
+  `ownerToken`, `otherOwnerToken`, `adminToken` and `clientToken`; the latency script renews the owner's token when
+  less than 15 s of it is left (IA-18). When a token request fails, either script stops at once with a message that
+  names the username, and neither ever prints a password or a token. `run.sh` runs its `docker compose` commands
+  from the repository root, so a relative `COMPOSE_FILE` works. Verify: `run.sh sales`, run first on the database
+  left by the `down -v` of 1.26, is reported for information; then the static tests, the full smoke test with
+  `--require-echo`, `run.sh catalog` and `run.sh platform` pass, and the latency script, run last, passes.
+  Afterwards `run.sh catalog` test 10 is expected to fail until the next `docker compose down -v`: the public
+  catalog sorts by `starts_at`, so the latency events push the new event out of the first 100 (known issue,
+  reported to Ariel, not changed here).
+- [x] 1.28 [P1] Add tests to `tests/platform/test_check_realm_secrets.py`, with realm fixtures, for three cases of
+  a credential object that no test covers yet: a `value` with text around the placeholder is rejected; a
+  credential with no `value` is accepted; an empty or a null `value` is rejected (Req identity-provisioning: The
+  realm definition contains no secrets - Scenario: Test user passwords in the realm definition; IA-12). They pin the
+  current behavior of `scripts/check_realm_secrets.py`, so they pass at once. Verify: the new tests and the rest of
+  `tests/platform` pass in the container.
+- [x] 1.29 [P1] Add a check to `identity-checks.sh` that a request from `FRONTEND_ORIGIN` that is not a preflight,
+  the `401` of `GET /api/sales/example` without a token, carries neither `Access-Control-Allow-Methods` nor
+  `Access-Control-Allow-Headers` (Req api-gateway: The frontend can call the API from the browser; IA-07: those two
+  headers go only with the answer to a preflight). It guards the maps of 1.14 against static headers, so it passes
+  at once. Verify: the full smoke test with the echo overlay and `--require-echo` is green.
 
 ## 2. Frontend and API tests (A, feature/e1-identity-access-frontend)
 

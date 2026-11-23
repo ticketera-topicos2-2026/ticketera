@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="mockup-height" content="700">
+  <title>GoPass · Acceso denegado (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../catalog/src/gopass.css">
+  <link rel="stylesheet" href="identity.css">
+</head>
+<body>
+  <!-- Una página que requiere el rol ADMIN, abierta por un CLIENT con sesión (spec identity/user-authentication: Pages are
+       guarded by role - Scenarios: CLIENT opens an ADMIN page; EVENT_OWNER opens an ADMIN page). -->
+  <header class="header">
+    <div class="brand">GoPass</div>
+    <nav class="nav"><a href="#">Estado del sistema</a><a href="#">Mi cuenta</a></nav>
+    <div class="user">
+      <div style="text-align:right;"><div style="font-weight:600;">Test Client</div><span class="role">CLIENT</span></div>
+      <div class="avatar">TC</div>
+      <button class="btn">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="card pad" style="padding: 56px 24px;">
+      <div class="center-panel">
+        <div class="icon-circle brand-bg">🔒</div>
+        <h1 style="font-size: 28px;">No tenés permiso para ver esta página</h1>
+        <p class="muted" style="margin-top: 10px;">Esta página es para el rol <b>ADMIN</b>. Tu cuenta tiene el rol <b>CLIENT</b>.</p>
+        <div class="actions"><button class="btn primary">Ir a Mi cuenta</button><button class="btn">Volver al inicio</button></div>
+      </div>
+    </section>
+
+    <p class="muted small" style="margin-top:16px;">Se muestra en lugar de la página pedida, en la misma dirección, y esa página no llama a su API. Un EVENT_OWNER ve lo mismo con su rol; un ADMIN ve la página.</p>
+  </main>
+
+  <aside class="note"><b>Mockup</b> · 403 del frontend (RequireRole): da forma a la interfaz, pero el permiso real lo verifica el servicio, que responde 403 · Sin sesión, la página lleva al inicio de sesión en vez de mostrar esto</aside>
+</body>
+</html>

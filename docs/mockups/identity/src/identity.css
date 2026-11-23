@@ -1,0 +1,81 @@
+/* Styles of the identity mockups that the catalog ones do not have (change e1-identity-access, task 1.18): browser
+   frames for the sign-in flow, the identity service's sign-in page and the centered panels. The palette, fonts and
+   shared components come from ../../catalog/src/gopass.css (D-38), linked before this file. Mockups only. */
+
+.variant {
+  margin: 32px 64px 12px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+}
+.nav a.btn-link { padding: 24px 0; }
+.header .btn { height: 38px; }
+
+/* Browser frames of the sign-in flow */
+/* minmax(0, 1fr): the four frames share the width equally, whatever the length of an address bar. */
+.flow {
+  display: grid; align-items: start; padding: 0 64px;
+  grid-template-columns: minmax(0, 1fr) 36px minmax(0, 1fr) 36px minmax(0, 1fr) 36px minmax(0, 1fr);
+}
+.arrow { align-self: center; text-align: center; font-size: 26px; font-weight: 800; color: var(--secondary); }
+.step { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.step .num {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 6px; border-radius: 50%;
+  background: var(--gradient); color: #fff; font-size: 12px;
+}
+.frame { border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+.frame-bar {
+  display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 10px;
+  background: #f1f5f9; border-bottom: 1px solid var(--border);
+}
+.frame-bar::before { content: "● ● ●"; font-size: 9px; letter-spacing: 2px; color: #cbd5e1; }
+.url {
+  flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  padding: 1px 8px; border: 1px solid var(--border); border-radius: 6px; background: #fff;
+  font: 11px ui-monospace, "SFMono-Regular", Menlo, monospace; color: var(--muted);
+}
+.frame-body { height: 300px; }
+.step-note { margin-top: 10px; font-size: 13px; color: var(--muted); }
+
+/* Smaller header and content inside a frame */
+.mini .header { height: 48px; padding: 0 14px; gap: 14px; }
+.mini .brand { font-size: 17px; }
+.mini .nav { gap: 14px; font-size: 12px; }
+.mini .nav a { padding: 15px 0; white-space: nowrap; }
+.mini .btn { height: 30px; padding: 0 10px; font-size: 12px; border-radius: 8px; white-space: nowrap; }
+.mini .avatar { width: 28px; height: 28px; font-size: 11px; }
+.mini .user { gap: 8px; font-size: 12px; white-space: nowrap; }
+.mini .role { font-size: 9px; }
+.mini .content { padding: 18px 16px; }
+.mini h2 { font-size: 17px; }
+.skeleton { height: 10px; border-radius: 5px; background: #e2e8f0; margin-top: 10px; }
+.skeleton.short { width: 55%; }
+
+/* The identity service's sign-in page (its own theme; the realm's display name is GoPass) */
+.kc { height: 100%; background: #f2f2f2; display: grid; place-items: center; }
+.kc-title { font: 600 15px "Inter", sans-serif; color: #333; letter-spacing: 0.08em; margin-bottom: 12px; text-align: center; }
+.kc-card { width: 230px; background: #fff; border-top: 4px solid #0066cc; padding: 16px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15); }
+.kc-card h4 { font: 600 14px "Inter", sans-serif; text-align: center; margin-bottom: 12px; }
+.kc-label { font-size: 11px; color: #333; margin-top: 8px; }
+.kc-input { height: 26px; border: 1px solid #bbb; margin-top: 3px; }
+.kc-button { height: 28px; margin-top: 14px; background: #0066cc; color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 600; }
+
+/* Centered panels: callback, errors, access denied */
+.center-panel { text-align: center; max-width: 600px; margin: 0 auto; }
+.icon-circle {
+  width: 64px; height: 64px; margin: 0 auto 18px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 28px; font-weight: 800; color: #fff;
+}
+.icon-circle.brand-bg { background: var(--gradient); }
+.icon-circle.error-bg { background: var(--error); }
+.icon-circle.warning-bg { background: var(--warning); }
+.actions { display: flex; gap: 12px; justify-content: center; margin-top: 24px; }
+.spinner {
+  width: 34px; height: 34px; margin: 0 auto 14px; border-radius: 50%;
+  border: 4px solid #e0e7ff; border-top-color: var(--primary);
+}
+
+/* "Mi cuenta" */
+.profile { display: flex; gap: 24px; align-items: center; }
+.profile .avatar { width: 72px; height: 72px; font-size: 26px; }
+.facts { display: grid; grid-template-columns: 180px 1fr; row-gap: 14px; margin-top: 24px; }
+.facts dt { color: var(--muted); font-weight: 500; }
+.facts dd { font-weight: 600; margin: 0; }

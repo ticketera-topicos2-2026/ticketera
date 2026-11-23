@@ -1,6 +1,8 @@
 {
   "realm": "ticketera",
   "enabled": true,
+  "displayName": "GoPass",
+  "registrationAllowed": false,
   "roles": {
     "realm": [
       {
@@ -16,5 +18,150 @@
         "description": "Browses published events and buys tickets."
       }
     ]
-  }
+  },
+  "clients": [
+    {
+      "clientId": "ticketera-frontend",
+      "name": "GoPass frontend",
+      "description": "The React frontend: authorization code flow with PKCE S256, from FRONTEND_ORIGIN only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "${FRONTEND_ORIGIN}/signin-callback",
+        "${FRONTEND_ORIGIN}/silent-callback"
+      ],
+      "webOrigins": [
+        "${FRONTEND_ORIGIN}"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "client.use.lightweight.access.token.enabled": "false",
+        "post.logout.redirect.uris": "${FRONTEND_ORIGIN}/"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm roles in the ID token",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "realm_access.roles",
+            "multivalued": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "ticketera-api-tests",
+      "name": "API tests",
+      "description": "API tests only: password grant for the test users; access tokens last 60 seconds.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "client.use.lightweight.access.token.enabled": "false",
+        "access.token.lifespan": "60"
+      }
+    },
+    {
+      "clientId": "admin-cli",
+      "name": "${client_admin-cli}",
+      "description": "Built-in client, declared here so that it issues no token with the password grant.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "username": "test-admin",
+      "enabled": true,
+      "email": "test-admin@example.com",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Admin",
+      "requiredActions": [],
+      "realmRoles": [
+        "ADMIN"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${TEST_USER_ADMIN_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "test-event-owner",
+      "enabled": true,
+      "email": "test-event-owner@example.com",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Event Owner",
+      "requiredActions": [],
+      "realmRoles": [
+        "EVENT_OWNER"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${TEST_USER_EVENT_OWNER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "test-client",
+      "enabled": true,
+      "email": "test-client@example.com",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Client",
+      "requiredActions": [],
+      "realmRoles": [
+        "CLIENT"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${TEST_USER_CLIENT_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "test-other-event-owner",
+      "enabled": true,
+      "email": "test-other-event-owner@example.com",
+      "emailVerified": true,
+      "firstName": "Test",
+      "lastName": "Other Event Owner",
+      "requiredActions": [],
+      "realmRoles": [
+        "EVENT_OWNER"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${TEST_USER_OTHER_EVENT_OWNER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    }
+  ]
 }

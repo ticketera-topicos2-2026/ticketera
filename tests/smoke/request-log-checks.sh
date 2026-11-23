@@ -65,7 +65,7 @@ expect_correlated_answer() {
 # Req request-correlation: The gateway forwards the correlation id to the service - Scenario: Correlation id seen
 # by the service (through the echo route, which includes the same forwarding snippet as every real route)
 check_correlation_ids() {
-  local first second check
+  local first second check token
 
   if [[ -n $gateway_port_problem ]]; then
     fail "correlation: the gateway answers with correlation ids" "$gateway_port_problem"
@@ -86,8 +86,15 @@ check_correlation_ids() {
     skip "$check" "$ACCESS_CHECK_PATH answers $STATUS without a token: the access check of e1-identity-access is not in place yet"
   fi
 
+  # The test routes need a token since e1-identity-access: the request carries the access token of the CLIENT test
+  # user on curl's standard input (api_test_token, tests/smoke/identity-checks.sh), as check_forwarding does.
   if [[ $'\n'$compose_service_lines == *$'\n'"$ECHO_SERVICE"$'\t'* ]]; then
-    expect_correlated_answer "correlation: 502 answer has an $CORRELATION_HEADER" 502 "$UNAVAILABLE_PATH"
+    if ! token=$(api_test_token CLIENT); then
+      fail "correlation: 502 answer has an $CORRELATION_HEADER" "no access token for $UNAVAILABLE_PATH: $token"
+    else
+      expect_correlated_answer "correlation: 502 answer has an $CORRELATION_HEADER" 502 "$UNAVAILABLE_PATH" \
+        --header @- < <(printf 'Authorization: Bearer %s\n' "$token")
+    fi
   else
     skip_or_fail_forwarding "the $ECHO_SERVICE service is not in the compose configuration (add tests/smoke/compose.echo.yml)" \
       "correlation: 502 answer has an $CORRELATION_HEADER"
@@ -141,7 +148,7 @@ check_concurrent_correlation_ids() {
 check_forged_correlation_id() {
   local check_replaced="correlation: a forged $CORRELATION_HEADER is replaced in the response"
   local check_forwarded="correlation: the service receives the gateway's id, not the forged one"
-  local id
+  local id token
 
   http_headers GET "http://localhost:${gateway_port}/api/catalog/health" \
     --header "$CORRELATION_HEADER: $FORGED_CORRELATION_ID"
@@ -159,10 +166,17 @@ check_forged_correlation_id() {
       "$check_forwarded"
     return
   fi
+  # The echo route needs a token since e1-identity-access: the request carries the access token of the CLIENT test
+  # user on curl's standard input (api_test_token, tests/smoke/identity-checks.sh), as check_forwarding does.
+  if ! token=$(api_test_token CLIENT); then
+    fail "$check_forwarded" "no access token for the echo route: $token"
+    return
+  fi
   # http_get keeps the body, where the echo service lists the headers it received; the response header is read
   # with --dump-header into the temporary directory.
-  http_get "http://localhost:${gateway_port}${ECHO_PATH}" --header "$CORRELATION_HEADER: $FORGED_CORRELATION_ID" \
-    --dump-header "$temp_dir/echo-headers"
+  http_get "http://localhost:${gateway_port}${ECHO_PATH}" --header @- \
+    --header "$CORRELATION_HEADER: $FORGED_CORRELATION_ID" --dump-header "$temp_dir/echo-headers" \
+    < <(printf 'Authorization: Bearer %s\n' "$token")
   HEADERS=$(tr -d '\r' < "$temp_dir/echo-headers" 2> /dev/null)
   id=$(last_correlation_id)
   if [[ $STATUS != 200 ]]; then

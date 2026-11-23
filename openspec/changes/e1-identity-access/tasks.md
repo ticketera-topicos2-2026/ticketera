@@ -150,10 +150,10 @@
   flow, the header with the signed-in user and the sign-out action, the "My account" page and the access-denied
   page; they guide the screens of group 2. Verify: the mockups are in the pull request and the reviewer sees each
   screen of `specs/identity/user-authentication`.
-- [ ] 1.19 [P1] Write ADR-0012 (token validation at the gateway with `auth_request` and `userinfo`, services
-  trusting the forwarded token; the team's rule gives it the next free number after ADR-0011) with the
+- [x] 1.19 [P1] Write ADR-0010 (token validation at the gateway with `auth_request` and `userinfo`, services
+  trusting the forwarded token; the number that ADR-0011 reserved for it) with the
   `create-architectural-decision-record` skill, add it to the index in `docs/adr/README.md`, and fix the links in
-  `design.md` and `proposal.md` if its slug differs from `adr-0012-validacion-de-tokens-en-el-gateway` (D-27;
+  `design.md` and `proposal.md` if its slug differs from `adr-0010-validacion-de-tokens-en-el-gateway` (D-27;
   IA-01). Verify: the ADR is in the pull request and the link resolves.
 - [ ] 1.20 [P1] Write the `CONTRIBUTE.md` section (Spanish): the test users and their roles, the four new `.env`
   variables, `docker compose down -v` after realm changes, and getting a token from `ticketera-api-tests`.

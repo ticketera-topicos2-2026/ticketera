@@ -59,7 +59,7 @@ change; DS-xx are the decisions of `project-bootstrap`.
 
 | # | Decision | Trace | Alternatives considered (reason rejected) |
 | --- | --- | --- | --- |
-| IA-01 | Token validation at the gateway with `auth_request` to an internal location that calls the identity service's `userinfo` endpoint; services trust the forwarded token | D-03 [ADR-0002][adr-0002], D-04 [ADR-0003][adr-0003], [ADR-0012][adr-0012] | njs JWT check, OpenResty, introspection, JWKS check in each service, NGINX Plus `auth_jwt`, caching (see Alternatives Considered) |
+| IA-01 | Token validation at the gateway with `auth_request` to an internal location that calls the identity service's `userinfo` endpoint; services trust the forwarded token | D-03 [ADR-0002][adr-0002], D-04 [ADR-0003][adr-0003], [ADR-0010][adr-0010] | njs JWT check, OpenResty, introspection, JWKS check in each service, NGINX Plus `auth_jwt`, caching (see Alternatives Considered) |
 | IA-02 | `auth_request` set once at server level; `/auth/` opts out with `auth_request off` | D-04 [ADR-0003][adr-0003] | `auth_request` in each route file (a new route without it would be open) |
 | IA-03 | Public health check inside the auth location, on the method and the raw request URI with a strict pattern | — | Map on `$uri` (in the subrequest it is `/_auth`); per-path `location` blocks for health (need variable `proxy_pass`, rejected by DS-07) |
 | IA-04 | Local `401` without a `Bearer <token>` header; every `userinfo` 4xx mapped to `401`; every failure to reach it mapped to `502` | — | Passing the identity service's status through (`403 insufficient_scope` would look like a role denial) |
@@ -82,11 +82,10 @@ change; DS-xx are the decisions of `project-bootstrap`.
 [adr-0002]: /docs/adr/adr-0002-identidad-keycloak.md
 [adr-0003]: /docs/adr/adr-0003-api-gateway-nginx.md
 [adr-0005]: /docs/adr/adr-0005-arquitectura-hexagonal.md
-[adr-0012]: /docs/adr/adr-0012-validacion-de-tokens-en-el-gateway.md
+[adr-0010]: /docs/adr/adr-0010-validacion-de-tokens-en-el-gateway.md
 
-ADR-0012 (token validation at the gateway with `auth_request` and `userinfo`) does not exist yet: a task of this
-change writes it with the `create-architectural-decision-record` skill (D-27). Its number is the next free one
-after ADR-0011, as the team agreed; its slug is fixed when it is written, and this link is updated if it changes.
+ADR-0010 (token validation at the gateway with `auth_request` and `userinfo`) records IA-01. Task 1.19 wrote it
+with the `create-architectural-decision-record` skill (D-27), with the number that ADR-0011 reserved for it.
 
 ### Decision notes: gateway
 
@@ -498,7 +497,7 @@ sequenceDiagram
 | Spoofing | Password grant through the built-in `admin-cli` or the frontend client | Both have direct access grants off (IA-10) |
 | Spoofing | Password guessing through `ticketera-api-tests` | Accepted for local development: the gateway listens on `127.0.0.1` only; a production mode would not import the client |
 | Spoofing | An intercepted authorization code | PKCE `S256` required; exact redirect URIs (IA-10) |
-| Tampering | A compromised container on the backend network sends forged tokens straight to a service | Accepted residual risk: services do not check signatures; network segmentation (DS-23) and only two published ports limit it; JWKS checks in services are the upgrade path (ADR-0012) |
+| Tampering | A compromised container on the backend network sends forged tokens straight to a service | Accepted residual risk: services do not check signatures; network segmentation (DS-23) and only two published ports limit it; JWKS checks in services are the upgrade path (ADR-0010) |
 | Tampering | Path or method tricks reach a protected route as if it were public | Method-aware public check on the raw URI with a strict pattern; `/auth/` opted out on the normalized URI (IA-03) |
 | Tampering | Open redirect through the sign-in return address | Only same-origin relative paths are followed |
 | Repudiation | Rejected requests leave no trace | The gateway access log records every `401` and `502` without tokens; the identity service records the real client address (IA-09); the service request log comes in `e1-request-log` |
@@ -565,7 +564,7 @@ lifespan (IA-18) adds only the time left after the other checks.
   the smoke test checks a stopped service and the identity service down on every route.
 - [The smoke test gets longer] → Restarting the identity service adds about one minute; the expiry wait overlaps
   the other checks. The CI time limit (15 minutes) is checked when the group is done.
-- [Services trust the gateway] → Residual risk recorded in STRIDE and ADR-0012.
+- [Services trust the gateway] → Residual risk recorded in STRIDE and ADR-0010.
 
 ## Migration Plan
 
@@ -576,7 +575,7 @@ lifespan (IA-18) adds only the time left after the other checks.
    the one merged last also carries `Closes #28`:
    - **Backend**, reviewed by B: realm, gateway, `scripts/check_realm_secrets.py`, `docker-compose.yml` (the
      frontend's `VITE_OIDC_*` variables included, so the frontend pull request does not touch it), `.env.example`,
-     smoke and realm tests, the low-fidelity mockups; ADR-0012; the `CONTRIBUTE.md` section on the test users and
+     smoke and realm tests, the low-fidelity mockups; ADR-0010; the `CONTRIBUTE.md` section on the test users and
      `docker compose down -v`; its sign-in steps and its team log entry.
    - **Frontend and API tests**, reviewed by C: the GoPass base as its first sub-tasks, then the authentication
      screens, the Bruno collection with its command in `CONTRIBUTE.md`, and the latency measurement; its sign-in

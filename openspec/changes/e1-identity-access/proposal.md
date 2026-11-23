@@ -62,7 +62,7 @@ feature changes can protect their endpoints, and ADR-0003 left the token validat
     Stage I change with FastAPI endpoints (PLAN 7.3). Until that runner exists, the collection runs locally with
     a command documented in `CONTRIBUTE.md`; it runs in CI once the runner exists.
 - **Docs**:
-  - ADR-0007, token validation at the gateway (written as a task of this change; see Impact).
+  - ADR-0012, token validation at the gateway (written as a task of this change; see Impact).
   - `CONTRIBUTE.md`: test users, signing in, and `docker compose down -v` after realm changes.
   - The team log.
 
@@ -131,7 +131,7 @@ implementation task tested against that requirement.
 - **Other feature changes:** their API tests get tokens from `ticketera-api-tests` and the test users.
 - **Team log:** closes the pending item of group 3, where to handle the `502` of `sales` and `payments`: it moves
   to the server level of the gateway.
-- **ADR:** ADR-0007 (token validation at the gateway with `auth_request` and `userinfo`) is a task of this
+- **ADR:** ADR-0012 (token validation at the gateway with `auth_request` and `userinfo`) is a task of this
   change, written with the `create-architectural-decision-record` skill; `design.md` links it (D-27). No ADR
   file is written during planning.
 

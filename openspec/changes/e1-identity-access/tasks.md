@@ -126,14 +126,23 @@
   request from the frontend's address). Verify: the `Allow-Methods` and `Allow-Headers` checks fail.
 - [x] 1.14 [P1] Add the preflight maps and `add_header ... always` for `Access-Control-Allow-Methods` and
   `Access-Control-Allow-Headers` (IA-07). Verify: the checks of 1.13 and the existing CORS checks pass.
-- [ ] 1.15 [P1] Write the log tests (red): after the other checks, `docker compose logs gateway` contains none of
-  the tokens used, including a query-string token sent while the identity service is stopped and a sign-out
-  request under `/auth/` with `id_token_hint` in its query string (Req api-gateway: The gateway never writes a
-  token to its logs - all scenarios). Verify: the query-string and `id_token_hint` checks fail with the `main`
-  format.
-- [ ] 1.16 [P1] Define `log_format ticketera` without query string or referrer, use it for `access_log`, set
-  `error_log ... crit`, and write the rule for `e1-request-log` in a comment (IA-08). Verify: the checks of 1.15
-  pass.
+- [ ] 1.15 [P1] Write the log tests (red) in `identity-checks.sh`: each token is sent once, in a known place, and
+  no line that `docker compose logs gateway` wrote since the checks started contains it: valid and altered tokens
+  in the `Authorization` header; a token only in the query string, answered `401`; a sign-out request under
+  `/auth/` with `id_token_hint` in its query string; a query-string token on the test route whose connection is
+  refused (`/smoke-test/unavailable/`); and, with the identity service stopped (in the window of the checks of
+  1.11), a query-string token next to a header token and a sign-out request with `id_token_hint`. No token reaches
+  a command line and no log line is printed with a token in it (Req api-gateway: The gateway never writes a token
+  to its logs - all scenarios; IA-08). Verify: the three checks of an upstream failure (refused connection; identity
+  stopped with a query-string token; identity stopped with `id_token_hint`) fail, because the error log at `notice`
+  writes the request line, query string included, at level `error`; every other check passes, since
+  `ticketera_json` keeps the query string out of the access log.
+- [ ] 1.16 [P1] Set `error_log /var/log/nginx/error.log crit;` in the http context of the template, so it covers
+  both servers, with a comment on why (IA-08). In the pinned image that file is a link to `/dev/stderr`, so the
+  lines that remain still reach `docker compose logs`. The access log keeps `ticketera_json` of `e1-request-log`,
+  which already leaves out the query string and the referrer, and the template already holds the rule of IA-08 in
+  a comment. Verify: the checks of 1.15 pass, and the `502` answers still show in the access log (the gateway log
+  checks of `e1-request-log` pass).
 - [ ] 1.17 [P1] Run the whole system locally with the echo overlay. Verify: `smoke-test.sh --require-echo`
   (identity checks included), `database-isolation.sh` and the `tests/platform` tests pass; then the `quality`,
   `smoke-test` and `openspec-validate` checks are green on the pull request and the CI stays within 15 minutes.
@@ -141,10 +150,11 @@
   flow, the header with the signed-in user and the sign-out action, the "My account" page and the access-denied
   page; they guide the screens of group 2. Verify: the mockups are in the pull request and the reviewer sees each
   screen of `specs/identity/user-authentication`.
-- [ ] 1.19 [P1] Write ADR-0007 (token validation at the gateway with `auth_request` and `userinfo`, services
-  trusting the forwarded token) with the `create-architectural-decision-record` skill, add it to the index in
-  `docs/adr/README.md`, and fix the link in `design.md` if the number or slug changed (D-27; IA-01). Verify: the
-  ADR is in the pull request and the link resolves.
+- [ ] 1.19 [P1] Write ADR-0012 (token validation at the gateway with `auth_request` and `userinfo`, services
+  trusting the forwarded token; the team's rule gives it the next free number after ADR-0011) with the
+  `create-architectural-decision-record` skill, add it to the index in `docs/adr/README.md`, and fix the links in
+  `design.md` and `proposal.md` if its slug differs from `adr-0012-validacion-de-tokens-en-el-gateway` (D-27;
+  IA-01). Verify: the ADR is in the pull request and the link resolves.
 - [ ] 1.20 [P1] Write the `CONTRIBUTE.md` section (Spanish): the test users and their roles, the four new `.env`
   variables, `docker compose down -v` after realm changes, and getting a token from `ticketera-api-tests`.
   Verify: a reviewer follows it from a fresh clone.
@@ -181,6 +191,17 @@
   Afterwards `run.sh catalog` test 10 is expected to fail until the next `docker compose down -v`: the public
   catalog sorts by `starts_at`, so the latency events push the new event out of the first 100 (known issue,
   reported to Ariel, not changed here).
+- [ ] 1.28 [P1] Add tests to `tests/platform/test_check_realm_secrets.py`, with realm fixtures, for three cases of
+  a credential object that no test covers yet: a `value` with text around the placeholder is rejected; a
+  credential with no `value` is accepted; an empty or a null `value` is rejected (Req identity-provisioning: The
+  realm definition contains no secrets - Scenario: Test user passwords in the realm definition; IA-12). They pin the
+  current behavior of `scripts/check_realm_secrets.py`, so they pass at once. Verify: the new tests and the rest of
+  `tests/platform` pass in the container.
+- [ ] 1.29 [P1] Add a check to `identity-checks.sh` that a request from `FRONTEND_ORIGIN` that is not a preflight,
+  the `401` of `GET /api/sales/example` without a token, carries neither `Access-Control-Allow-Methods` nor
+  `Access-Control-Allow-Headers` (Req api-gateway: The frontend can call the API from the browser; IA-07: those two
+  headers go only with the answer to a preflight). It guards the maps of 1.14 against static headers, so it passes
+  at once. Verify: the full smoke test with the echo overlay and `--require-echo` is green.
 
 ## 2. Frontend and API tests (A, feature/e1-identity-access-frontend)
 

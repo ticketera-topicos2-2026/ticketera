@@ -1,7 +1,7 @@
 # 2026-11-23 · e1-identity-access: backend (grupo 1)
 
 - **Autor**: Eduardo Piray (Integrante A)
-- **Issue / pull request**: #28 · pull request del backend, rama `feature/e1-identity-access-backend` (este);
+- **Issue / pull request**: #28 · pull request del backend #54, rama `feature/e1-identity-access-backend`;
   incluye el grupo 5 de `e1-event-catalog` (#35)
 
 ## Qué se hizo
@@ -87,7 +87,11 @@ cambio que los pone en verde.
   | `tests/api/run.sh catalog` y `platform` | 13 de 13 y 2 de 2 | 22 s y 25 s |
   | Latencia del catálogo público, al final | p50 de 12 ms, p95 de 15 ms (límite 300 ms) | 8 s |
 
-  La CI del pull request completa la verificación de la 1.17.
+  La CI de #54 completó la verificación de la 1.17, en la
+  [ejecución 45170591103](https://github.com/ticketera-topicos2-2026/ticketera/actions/runs/45170591103)
+  sobre `cf695e3`: `openspec-validate` (15 s), `quality` (1 min 58 s) y `smoke-test` (4 min 16 s) en verde, 4 min
+  21 s en total, dentro de los 15 minutos. Después de integrar, la CI de `main` (`24ce957`) también pasó, en 4 min
+  20 s.
 
 ### Hallazgos
 
@@ -102,8 +106,6 @@ cambio que los pone en verde.
 
 ## Pendientes
 
-- **1.17:** se marca cuando la CI del pull request esté en verde, dentro de los 15 minutos.
-- **1.22:** después de integrar, el mensaje al equipo (abajo) enlazado en la bitácora.
 - **Grupos 2 y 3 del change:** el frontend y el cierre, en sus propios pull requests.
 - **Limitaciones conocidas:**
   - NGINX resuelve cada servicio solo al arrancar (DS-07): si un contenedor vuelve con otra dirección, el gateway
@@ -116,6 +118,18 @@ cambio que los pone en verde.
 - **Para el responsable de `e1-request-log`:** en `tests/smoke/request-log-checks.sh` quedan un comentario y una
   rama de omisión que ya no se usan (cerca de la línea 80), y `tests/smoke/log-collection-checks.sh` corta el
   script si falla `docker` (línea 139).
+
+### Mensaje al equipo (1.22)
+
+Enviado el 23/11/2026 al grupo de WhatsApp del equipo, después de integrar #54:
+
+> Ya está integrado el PR #54 (identidad). Para que les siga andando el entorno:
+> 1. `git switch main && git pull`
+> 2. Agregar al `.env` las 4 líneas `TEST_USER_*_PASSWORD` de `.env.example`
+> 3. `docker compose down -v` y `docker compose up -d --wait` (borra las bases)
+>
+> Los pasos detallados están en CONTRIBUTE.md, «Usuarios de prueba y tokens». Si `up --wait` falla con alloy
+> unhealthy: `docker compose restart alloy`.
 
 ### Para Ariel y Gustavo
 

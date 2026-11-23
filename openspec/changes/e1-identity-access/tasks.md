@@ -143,7 +143,7 @@
   which already leaves out the query string and the referrer, and the template already holds the rule of IA-08 in
   a comment. Verify: the checks of 1.15 pass, and the `502` answers still show in the access log (the gateway log
   checks of `e1-request-log` pass).
-- [ ] 1.17 [P1] Run the whole system locally with the echo overlay. Verify: `smoke-test.sh --require-echo`
+- [x] 1.17 [P1] Run the whole system locally with the echo overlay. Verify: `smoke-test.sh --require-echo`
   (identity checks included), `database-isolation.sh` and the `tests/platform` tests pass; then the `quality`,
   `smoke-test` and `openspec-validate` checks are green on the pull request and the CI stays within 15 minutes.
 - [x] 1.18 [P1] Draw low-fidelity mockups in `docs/mockups/identity/` with the GoPass palette (D-38): the sign-in
@@ -160,7 +160,7 @@
   Verify: a reviewer follows it from a fresh clone.
 - [x] 1.21 [P1] Write the team log entry for this group with the red and green evidence, the closed pending item
   of group 3 (502 handling at server level) and the AI usage. Verify: the entry is in the pull request.
-- [ ] 1.22 [P1] After the merge, send the team message: copy the four `TEST_USER_*_PASSWORD` lines to `.env` and
+- [x] 1.22 [P1] After the merge, send the team message: copy the four `TEST_USER_*_PASSWORD` lines to `.env` and
   run `docker compose down -v` before `up`. Verify: the message is linked in the team log.
 - [x] 1.23 [P1] Extend `tests/platform/test_realm_definition.py` (red) to a second EVENT_OWNER test user,
   `test-other-event-owner`: exactly four test users, this one with a complete profile, no required actions, only

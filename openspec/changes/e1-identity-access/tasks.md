@@ -126,7 +126,7 @@
   request from the frontend's address). Verify: the `Allow-Methods` and `Allow-Headers` checks fail.
 - [x] 1.14 [P1] Add the preflight maps and `add_header ... always` for `Access-Control-Allow-Methods` and
   `Access-Control-Allow-Headers` (IA-07). Verify: the checks of 1.13 and the existing CORS checks pass.
-- [ ] 1.15 [P1] Write the log tests (red) in `identity-checks.sh`: each token is sent once, in a known place, and
+- [x] 1.15 [P1] Write the log tests (red) in `identity-checks.sh`: each token is sent once, in a known place, and
   no line that `docker compose logs gateway` wrote since the checks started contains it: valid and altered tokens
   in the `Authorization` header; a token only in the query string, answered `401`; a sign-out request under
   `/auth/` with `id_token_hint` in its query string; a query-string token on the test route whose connection is

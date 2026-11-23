@@ -14,7 +14,7 @@
 # wrong password. So each check asserts the answer of an existing client, and the wrong-password check needs the
 # right password to work first. The markers below come from the pages of Keycloak 26.8 and its login theme.
 #
-# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13 and 1.25 (design: Test Strategy,
+# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13, 1.15 and 1.25 (design: Test Strategy,
 # platform/identity-provisioning, identity/access-token, platform/api-gateway), and the public catalog paths of
 # change e1-event-catalog, task 5.1 (EC-03).
 
@@ -55,6 +55,16 @@ readonly PREFLIGHT_METHOD="DELETE"
 readonly PREFLIGHT_HEADERS="authorization,content-type,idempotency-key"
 readonly -a CORS_ALLOWED_METHODS=(GET HEAD POST PUT PATCH DELETE)
 readonly -a CORS_ALLOWED_HEADERS=(Authorization Content-Type Idempotency-Key)
+# The checks that no token reaches the gateway logs (task 1.15): the test route whose connection is refused (see
+# tests/smoke/gateway/unavailable.conf), the sign-out path, the answer each request must get for its check to prove
+# something, and the pattern of a JWT, which hides every token in a log line before the line is printed.
+readonly TOKEN_LOG_REFUSED_PATH="/smoke-test/unavailable/"
+readonly LOGOUT_PATH="$REALM_PATH/protocol/openid-connect/logout"
+declare -rA TOKEN_LOG_EXPECTED_STATUS=(
+  [header_valid]=404 [header_altered]=401 [query]=401 [signout]=200 [refused_query]=502 [stopped_query]=502
+  [stopped_signout]=502
+)
+readonly JWT_PATTERN='eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]*(\.[A-Za-z0-9_-]*)?'
 # The identity service made unavailable by the last checks (task 1.11): the limit of the spec for the 502, and how
 # long the restore waits for the service to be healthy again and for the gateway to reach it.
 readonly IDENTITY_SERVICE="identity"
@@ -188,6 +198,12 @@ CLAIM_EXPIRY=""
 declare -A test_user_subs=()
 # Set by check_second_owner_token: the sub of the API test token of the second EVENT_OWNER test user.
 second_owner_sub=""
+# Set by send_tokens_for_log_checks and send_tokens_while_identity_stopped (task 1.15): when the requests began, as
+# a Unix time for "docker compose logs --since"; the token, the description and the answer of each request, by key;
+# and why the tokens could not be obtained.
+token_log_since=""
+token_log_problem=""
+declare -A log_tokens=() log_requests=() log_statuses=()
 # Set by timed_request: the status and the seconds the request took.
 ELAPSED=""
 # Set by restore_identity_service: what the restore had to do, or why it failed.
@@ -1444,6 +1460,9 @@ check_while_identity_unavailable() {
   expect_bearer_challenge "$check_none" "a request without a token"
   expect_status "$check_health" 200 /api/sales/health
   expect_status "$check_healthz" 200 /healthz
+  if [[ $mode == stopped ]]; then
+    send_tokens_while_identity_stopped
+  fi
 
   if restore_identity_service; then
     pass "$check_restored: $RESTORE_REPORT"
@@ -1516,6 +1535,89 @@ check_rejected_request_origin() {
     fail "$check" "expected 401 for a request without a token, $(last_response)"
   else
     expect_allowed_origin "$check" "$identity_frontend_origin" "the 401"
+  fi
+}
+
+# Sends a GET request whose URL, and bearer token when one is given, reach curl in a configuration file of mode
+# 600, never on its command line, and sets STATUS (000 when no answer came within REQUEST_TIMEOUT_SECONDS).
+# Usage: token_request <url> [bearer token]
+token_request() {
+  local url=$1 token=${2:-} config="$temp_dir/token-request.cfg"
+  if ! (
+    umask 077
+    printf 'url = "%s"\n' "$url" > "$config" &&
+      { [[ -z $token ]] || printf 'header = "Authorization: Bearer %s"\n' "$token" >> "$config"; }
+  ); then
+    STATUS=000
+    return
+  fi
+  STATUS=$(curl --silent --noproxy '*' --max-time "$REQUEST_TIMEOUT_SECONDS" --output /dev/null \
+    --write-out '%{http_code}' --config "$config")
+  rm -f "$config"
+}
+
+# Sends one request of the log checks and keeps its description and its answer under its key; the token of that key
+# goes in the path, and the token of another key, when given, in the Authorization header.
+# Usage: send_logged_request <key> <description> <path with the token> [key of the header token]
+send_logged_request() {
+  local key=$1 description=$2 path=$3 header_key=${4:-}
+  token_request "http://localhost:${gateway_port}${path}" "${header_key:+${log_tokens[$header_key]}}"
+  log_requests[$key]=$description
+  log_statuses[$key]=$STATUS
+}
+
+# Prints two fragments of a token that no other token shares: 32 characters from the middle of its payload and the
+# first 32 of its signature. NGINX cuts an error log line at about 2 KB, so a fragment still matches a token cut
+# short, where the whole token would not.
+token_fragments() {
+  local payload=${1#*.} signature=${1##*.}
+  payload=${payload%%.*}
+  printf '%s\n%s\n' "${payload:$((${#payload} / 2)):32}" "${signature:0:32}"
+}
+
+# Prints a log line with every JWT replaced by <token>, cut to 300 characters; prints a notice instead when the line
+# still holds a fragment of a token of the log checks, so a token never reaches the output.
+redact_tokens() {
+  local line key fragment
+  line=$(sed -E "s/$JWT_PATTERN/<token>/g" <<< "$1" | cut -c1-300)
+  for key in "${!log_tokens[@]}"; do
+    while IFS= read -r fragment; do
+      if [[ -n $fragment && $line == *"$fragment"* ]]; then
+        printf '(line withheld: it still holds part of a token)'
+        return
+      fi
+    done < <(token_fragments "${log_tokens[$key]}")
+  done
+  printf '%s' "$line"
+}
+
+# Checks that each request of the given keys got the answer its check needs, then that no line of the gateway logs
+# read by check_tokens_not_in_logs holds a fragment of its token. A failure names the lines without the token.
+# Usage: expect_tokens_not_logged <check name> <key>...
+expect_tokens_not_logged() {
+  local check=$1 key fragment
+  local -a lines
+  shift
+  for key in "$@"; do
+    if [[ -z ${log_statuses[$key]:-} ]]; then
+      fail "$check" "the request with the $key token was not sent"
+      return
+    elif [[ ${log_statuses[$key]} != "${TOKEN_LOG_EXPECTED_STATUS[$key]}" ]]; then
+      fail "$check" "${log_requests[$key]} got ${log_statuses[$key]}, expected ${TOKEN_LOG_EXPECTED_STATUS[$key]}"
+      return
+    fi
+  done
+  mapfile -t lines < <(
+    for key in "$@"; do
+      while IFS= read -r fragment; do
+        [[ -z $fragment ]] || grep --fixed-strings -- "$fragment" "$temp_dir/gateway.log"
+      done < <(token_fragments "${log_tokens[$key]}")
+    done | sort -u
+  )
+  if ((${#lines[@]} == 0)); then
+    pass "$check"
+  else
+    fail "$check" "the token is in ${#lines[@]} gateway log lines, the first: $(redact_tokens "${lines[0]}")"
   fi
 }
 
@@ -1777,6 +1879,106 @@ check_identity_cors() {
   check_rejected_request_origin "$check_rejected"
 }
 
+# Sends the requests of the log checks while the identity service is up (task 1.15). Each token is sent once, in
+# the request of its key, and comes from a new session of the CLIENT test user; the tokens of the two requests sent
+# while the identity service is stopped are obtained here too (see send_tokens_while_identity_stopped). The test
+# route whose connection is refused needs the echo service of tests/smoke/compose.echo.yml.
+send_tokens_for_log_checks() {
+  local key token replacement=X
+  if [[ -n $identity_problem ]]; then
+    token_log_problem=$identity_problem
+    return
+  elif [[ -z $temp_dir ]]; then
+    token_log_problem="the temporary directory could not be created"
+    return
+  fi
+  for key in header_valid header_altered query refused_query stopped_query; do
+    if ! token=$(api_test_token CLIENT); then
+      token_log_problem="no access token for the log checks: $token"
+      return
+    fi
+    log_tokens[$key]=$token
+  done
+  for key in signout stopped_signout; do
+    if ! request_test_user_tokens CLIENT; then
+      token_log_problem="no ID token for the log checks: $TOKEN_PROBLEM"
+      return
+    elif ! token=$(json_string_field id_token <<< "$BODY"); then
+      token_log_problem="the token response of the log checks has no ID token: $token"
+      return
+    fi
+    log_tokens[$key]=$token
+  done
+  # An altered token: one character of its signature changed.
+  token=${log_tokens[header_altered]}
+  [[ ${token: -5:1} != X ]] || replacement=Y
+  log_tokens[header_altered]="${token:0:${#token}-5}${replacement}${token: -4}"
+
+  token_log_since=$(($(date +%s) - 2))
+  send_logged_request header_valid "GET $SALES_EXAMPLE_PATH with a valid token in the Authorization header" \
+    "$SALES_EXAMPLE_PATH" header_valid
+  send_logged_request header_altered "GET $SALES_EXAMPLE_PATH with an altered token in the Authorization header" \
+    "$SALES_EXAMPLE_PATH" header_altered
+  send_logged_request query "GET $SALES_EXAMPLE_PATH with a token only in the query string" \
+    "$SALES_EXAMPLE_PATH?access_token=${log_tokens[query]}"
+  send_logged_request signout "the sign-out address with id_token_hint" \
+    "$LOGOUT_PATH?id_token_hint=${log_tokens[signout]}"
+  if [[ -z $(echo_route_problem) ]]; then
+    send_logged_request refused_query "GET $TOKEN_LOG_REFUSED_PATH with a token in the query string" \
+      "$TOKEN_LOG_REFUSED_PATH?access_token=${log_tokens[refused_query]}" header_valid
+  fi
+}
+
+# Sends the two requests of the log checks while the identity service is stopped (task 1.15), from the window of
+# check_while_identity_unavailable: a query-string token next to a header token, which makes the access check wait
+# for the identity service, and the sign-out address, which /auth/ forwards to it.
+send_tokens_while_identity_stopped() {
+  [[ -z $token_log_problem && -n ${log_tokens[stopped_query]:-} ]] || return
+  send_logged_request stopped_query "identity stopped: GET $SALES_EXAMPLE_PATH with a token in the query string" \
+    "$SALES_EXAMPLE_PATH?access_token=${log_tokens[stopped_query]}" header_valid
+  send_logged_request stopped_signout "identity stopped: the sign-out address with id_token_hint" \
+    "$LOGOUT_PATH?id_token_hint=${log_tokens[stopped_signout]}"
+}
+
+# Req api-gateway: The gateway never writes a token to its logs - Scenarios: Requests with a token; Token in the
+# query string; Sign-out address with an ID token
+# The checks that no token reaches the gateway logs (task 1.15; IA-08), run after the identity service is back. The
+# access log never holds a query string (ticketera_json), but an error log line holds the request line, and on an
+# upstream failure the upstream address, both with their query string: the last three checks send their token while
+# an upstream fails. Every line the gateway wrote since the requests began is searched.
+check_tokens_not_in_logs() {
+  local echo_problem
+  local check_header="identity: logs: valid and altered tokens of the Authorization header are not in the logs"
+  local check_query="identity: logs: a token only in the query string, answered 401, is not in the logs"
+  local check_signout="identity: logs: the ID token of a sign-out address is not in the logs"
+  local check_refused="identity: logs: a query-string token of a refused connection is not in the logs"
+  local check_stopped_query="identity: logs: identity stopped: a query-string token is not in the logs"
+  local check_stopped_signout="identity: logs: identity stopped: the ID token of a sign-out is not in the logs"
+  local -a checks=("$check_header" "$check_query" "$check_signout" "$check_refused" "$check_stopped_query"
+    "$check_stopped_signout")
+
+  if [[ -n $token_log_problem ]]; then
+    fail_each "$token_log_problem" "${checks[@]}"
+    return
+  elif ! docker compose logs --no-color --since "$token_log_since" gateway > "$temp_dir/gateway.log" \
+    2> /dev/null; then
+    fail_each "the gateway logs could not be read" "${checks[@]}"
+    return
+  fi
+
+  expect_tokens_not_logged "$check_header" header_valid header_altered
+  expect_tokens_not_logged "$check_query" query
+  expect_tokens_not_logged "$check_signout" signout
+  echo_problem=$(echo_route_problem)
+  if [[ -n $echo_problem ]]; then
+    skip_or_fail_forwarding "$echo_problem" "$check_refused"
+  else
+    expect_tokens_not_logged "$check_refused" refused_query
+  fi
+  expect_tokens_not_logged "$check_stopped_query" stopped_query
+  expect_tokens_not_logged "$check_stopped_signout" stopped_signout
+}
+
 # The checks with the identity service unavailable (task 1.11), first stopped and then paused. They run last: they
 # stop the identity service, and the EXIT trap restores it if the run ends while it is unavailable.
 check_identity_unavailable() {
@@ -1806,7 +2008,8 @@ check_identity_unavailable() {
 
 # Runs every identity check; called by main of smoke-test.sh after the other checks. The expired-token check is the
 # last of the access checks (see check_expired_token), and the checks with the identity service unavailable run
-# after it, at the very end.
+# after it; the log checks send their requests before them and during the stopped window, and read the gateway logs
+# at the very end.
 run_identity_checks() {
   check_identity_clients
   check_identity_tokens
@@ -1815,6 +2018,8 @@ run_identity_checks() {
   check_public_paths
   check_public_catalog_paths
   check_identity_cors
+  send_tokens_for_log_checks
   check_expired_token "identity: an expired token gets 401 with a Bearer challenge"
   check_identity_unavailable
+  check_tokens_not_in_logs
 }

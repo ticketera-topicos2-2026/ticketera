@@ -5,12 +5,15 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/events?type=CONCERT&limit=100
+  url: {{baseUrl}}/events?type=CONCERT&starts_from={{startsAt}}&starts_to={{startsAt}}
   body: none
   auth: none
 }
 
 script:post-response {
+  // The page is filtered to the exact start of the event of test 01, to the millisecond, so other published
+  // concerts never push it out of the page, however many there are: those of earlier runs of this collection (since
+  // e1-identity-access every run uses the same test users) or the 100 of the latency measurement.
   test("the published event is listed", () => {
     expect(res.body.items.map((item) => item.id)).to.include(bru.getVar("eventId"));
   });

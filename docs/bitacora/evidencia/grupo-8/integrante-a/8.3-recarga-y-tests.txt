@@ -1,0 +1,42 @@
+# 8.3 · Integrante A · 2026-11-23T14:09:35+00:00
+código clonado en /home/edu_v/dev/onboarding-grupo-8/ticketera-clean (sistema de archivos de WSL, no /mnt/c)
+
+## Backend (catalog, uvicorn --reload), cinco mediciones
+guardado: services/catalog/src/catalog/api/app.py (title="catalog" → "catalog-recarga-8-3")
+Desde #54 el gateway exige un token en /api/catalog/openapi.json (401 sin token), así que se consulta
+/openapi.json dentro del contenedor catalog (127.0.0.1:8000) cada 0,1 s; el tiempo va del guardado al título nuevo.
+  medición 1: cambio servido en 3.9 s · revertido servido en 3.6 s
+  medición 2: cambio servido en 3.1 s · revertido servido en 3.1 s
+  medición 3: cambio servido en 3.8 s · revertido servido en 3.5 s
+  medición 4: cambio servido en 3.1 s · revertido servido en 3.2 s
+  medición 5: cambio servido en 3.7 s · revertido servido en 3.5 s
+
+## Frontend (Vite), cinco mediciones, 3 s entre guardados
+guardado: frontend/src/App.tsx (texto del pie), servido por Vite en http://localhost:5173/src/App.tsx; antes de cada guardado se
+comprueba que el texto nuevo todavía no se sirve.
+  medición 1: cambio servido en 0.0 s · revertido servido en 0.0 s
+  medición 2: cambio servido en 0.0 s · revertido servido en 0.0 s
+  medición 3: cambio servido en 0.0 s · revertido servido en 0.0 s
+  medición 4: cambio servido en 0.0 s · revertido servido en 0.1 s
+  medición 5: cambio servido en 0.0 s · revertido servido en 0.0 s
+archivos modificados en el clon después de revertir: 0
+Nota: un primer intento guardaba el cambio inmediatamente después de servirse la reversión, sin pausa; en 2 de 3
+mediciones Vite no sirvió el segundo guardado en 60 s. Con 3 s entre guardados, como al editar a mano, 5 de 5.
+
+## Tests de un servicio con docker compose
+Python del host: /usr/bin/python3 (Python 3.14.4); dependencias del proyecto en el host:
+  fastapi: no instalado
+  sqlalchemy: no instalado
+  pytest: no instalado
+$ docker compose -p ticketera-clean run --rm --no-deps catalog pytest
+================== 149 passed, 1 skipped, 1 warning in 15.73s ==================
+exit 0 en 22 s
+$ docker compose -p ticketera-clean run --rm --no-deps frontend npx vitest run
+ Test Files  1 passed (1)
+      Tests  7 passed (7)
+exit 0 en 16 s
+archivos sin seguimiento en el clon: 0
+archivos de root en el clon: 1
+  el único es ./frontend/node_modules: directorio vacío (0 entradas) de root creado a las 13:22:33, durante el primer
+  up (punto de montaje del volumen anónimo de node_modules del frontend), ignorado por Git. Los tests no crearon
+  archivos de root.

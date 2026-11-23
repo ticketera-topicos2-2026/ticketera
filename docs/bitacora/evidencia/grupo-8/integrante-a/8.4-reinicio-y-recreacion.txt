@@ -1,0 +1,110 @@
+# 8.4 · Integrante A · 2026-11-23T14:35:55+00:00
+clon: 34b84d0 test(catalog): filter the public list of test 10 to the start of its own event (#57) · proyecto ticketera-clean
+Marcas: una fila en una tabla nueva de la base catalog (onboarding_marca) y un usuario marca-8-4-a en el realm ticketera,
+creado con kcadm.sh dentro del contenedor identity (la contraseña del administrador no sale del contenedor).
+La ejecución se hizo en dos tramos: el primero se detuvo desde fuera mientras esperaba la muestra de 3 min después del
+reinicio simple; el segundo («Continuación») tomó esa muestra a su tiempo real y siguió con down -v.
+
+## Marcas
+  bases: catalog,keycloak,payments,sales
+  marca en catalog: 8.4 Integrante A
+  realm ticketera: 200
+  usuario de marca en el realm: 1
+  roles del realm: ADMIN,CLIENT,EVENT_OWNER
+  usuarios de prueba del realm: test-admin,test-client,test-event-owner,test-other-event-owner
+
+## Reinicio simple: docker compose down (sin -v) y up
+$ docker compose -p ticketera-clean down
+  volúmenes del clon después de down: ticketera-clean_ticketera-alloy-data,ticketera-clean_ticketera-db-data,ticketera-clean_ticketera-loki-data
+$ docker compose -p ticketera-clean up -d --wait --wait-timeout 300
+  up --wait: exit 0 en 61 s
+  alloy Up 36 seconds (healthy)
+  catalog Up 50 seconds (healthy)
+  database Up 57 seconds (healthy)
+  frontend Up 56 seconds (healthy)
+  gateway Up 14 seconds (healthy)
+  grafana Up 36 seconds (healthy)
+  identity Up 51 seconds (healthy)
+  loki Up 57 seconds (healthy)
+  payments Up 50 seconds (healthy)
+  sales Up 51 seconds (healthy)
+  bases: catalog,keycloak,payments,sales
+  marca en catalog: 8.4 Integrante A
+  realm ticketera: 200
+  usuario de marca en el realm: 1
+  roles del realm: ADMIN,CLIENT,EVENT_OWNER
+  usuarios de prueba del realm: test-admin,test-client,test-event-owner,test-other-event-owner
+
+## Continuación (opción B): la ejecución anterior se detuvo desde fuera mientras esperaba la muestra de 3 min
+  eventos de salud de alloy registrados en segundo plano desde 2026-11-23T14:44:15+00:00 (líneas [evento ...])
+  la recaída del primer arranque no se pudo sacar de docker events (Docker solo guarda los eventos recientes);
+  cotas verificadas: healthy hacia las 13:24:30 y unhealthy a más tardar a las 13:36:27 (13,5 min tras iniciar
+  alloy a las 13:22:54). Ventana de la muestra tardía: 15 min después de cada up.
+  up del reinicio simple: 14:36:19 (fin de 8.4-up.log menos sus 61 s)
+
+## Reinicio simple: muestras
+  muestra a los 476 s del up (2026-11-23T14:44:15+00:00):
+    alloy: CPU 4.50% · memoria 90.6MiB / 128MiB · salud healthy (fallos seguidos 0)
+    loki: CPU 1.53% · memoria 62.17MiB / 256MiB · salud healthy
+    pedido por el gateway: /api/catalog/health → 200; 15 s después:
+    etiquetas en Loki: {"status":"success","data":["service","service_name"]}
+    {service="catalog"}, últimos 10 min: 2 streams, 55 líneas
+  muestra a los 899 s del up (2026-11-23T14:51:19+00:00):
+    alloy: CPU 39.15% · memoria 126.3MiB / 128MiB · salud healthy (fallos seguidos 0)
+    loki: CPU 1.57% · memoria 62.75MiB / 256MiB · salud healthy
+    pedido por el gateway: /api/catalog/health → 200; 15 s después:
+    etiquetas en Loki: {"status":"success","data":["service","service_name"]}
+    {service="catalog"}, últimos 10 min: 1 streams, 60 líneas
+
+## docker compose down -v y up
+  control negativo, volúmenes del repositorio de trabajo antes (línea base de las 14:40:40: los tres con CreatedAt 2026-11-23T11:38:14Z):
+    ticketera_ticketera-alloy-data · CreatedAt 2026-11-23T11:38:14Z
+    ticketera_ticketera-db-data · CreatedAt 2026-11-23T11:38:14Z
+    ticketera_ticketera-loki-data · CreatedAt 2026-11-23T11:38:14Z
+  volúmenes del clon antes:
+    ticketera-clean_ticketera-alloy-data · CreatedAt 2026-11-23T13:22:24Z
+    ticketera-clean_ticketera-db-data · CreatedAt 2026-11-23T13:22:24Z
+    ticketera-clean_ticketera-loki-data · CreatedAt 2026-11-23T13:22:24Z
+$ docker compose -p ticketera-clean down -v
+  [evento 14:51:39] alloy die ticketera-clean-alloy-1
+  volúmenes del repositorio de trabajo después:
+    ticketera_ticketera-alloy-data · CreatedAt 2026-11-23T11:38:14Z
+    ticketera_ticketera-db-data · CreatedAt 2026-11-23T11:38:14Z
+    ticketera_ticketera-loki-data · CreatedAt 2026-11-23T11:38:14Z
+  volúmenes del clon después: ninguno
+$ docker compose -p ticketera-clean up -d --wait --wait-timeout 300
+  [evento 14:52:07] alloy start ticketera-clean-alloy-1
+  [evento 14:52:17] alloy health_status: healthy ticketera-clean-alloy-1
+  up --wait: exit 0 en 81 s
+  alloy Up 57 seconds (healthy)
+  catalog Up About a minute (healthy)
+  database Up About a minute (healthy)
+  frontend Up About a minute (healthy)
+  gateway Up 11 seconds (healthy)
+  grafana Up 57 seconds (healthy)
+  identity Up About a minute (healthy)
+  loki Up About a minute (healthy)
+  payments Up About a minute (healthy)
+  sales Up About a minute (healthy)
+  bases: catalog,keycloak,payments,sales
+  marca en catalog: no existe
+  realm ticketera: 200
+  usuario de marca en el realm: 0
+  roles del realm: ADMIN,CLIENT,EVENT_OWNER
+  usuarios de prueba del realm: test-admin,test-client,test-event-owner,test-other-event-owner
+
+## Después de down -v: muestras
+  muestra a los 180 s del up (2026-11-23T14:54:42+00:00):
+    alloy: CPU 0.63% · memoria 93.01MiB / 128MiB · salud healthy (fallos seguidos 0)
+    loki: CPU 1.85% · memoria 69.34MiB / 256MiB · salud healthy
+    pedido por el gateway: /api/catalog/health → 200; 15 s después:
+    etiquetas en Loki: {"status":"success","data":["service","service_name"]}
+    {service="catalog"}, últimos 10 min: 2 streams, 27 líneas
+  muestra a los 900 s del up (2026-11-23T15:06:42+00:00):
+    alloy: CPU 2.29% · memoria 97.12MiB / 128MiB · salud healthy (fallos seguidos 0)
+    loki: CPU 2.38% · memoria 71.29MiB / 256MiB · salud healthy
+    pedido por el gateway: /api/catalog/health → 200; 15 s después:
+    etiquetas en Loki: {"status":"success","data":["service","service_name"]}
+    {service="catalog"}, últimos 10 min: 1 streams, 59 líneas
+
+fin: 2026-11-23T15:07:03+00:00

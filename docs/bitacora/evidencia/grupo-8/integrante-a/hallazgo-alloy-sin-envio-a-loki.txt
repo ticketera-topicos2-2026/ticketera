@@ -1,0 +1,127 @@
+# Hallazgo · Alloy no envía los logs a Loki · Integrante A · 2026-11-23
+clon: ~/dev/onboarding-grupo-8/ticketera-clean en 34b84d0 test(catalog): filter the public list of test 10 to the start of its own event (#57) · proyecto de Compose: ticketera-clean (nombre de la carpeta)
+
+Resumen: en el primer arranque del clon, Loki no recibió ninguna línea. La causa supuesta al principio (el filtro de
+proyecto de Alloy) quedó descartada; lo observado es Alloy saturado de CPU con la memoria pegada a su GOMEMLIMIT.
+Sin diagnóstico más profundo ni propuesta de arreglo: corresponde a e1-request-log (integrante B) y decide el equipo.
+
+## 1. Síntoma: un pedido por el gateway y consulta a Loki de los últimos 10 minutos
+$ curl http://127.0.0.1:18080/api/catalog/health → 200 a las 2026-11-23T13:32:14+00:00
+$ (desde el contenedor loki, red observability, sin puerto publicado) query_range {service="catalog"}, últimos 10 min, a las 2026-11-23T13:32:51+00:00
+streams: 0 · líneas: 0
+La línea del request log sí está en la salida estándar de catalog:
+  {"timestamp":"2026-11-23T13:33:49.336+00:00","service":"catalog","correlation_id":null,"method":"GET","route":"/health","status":200,"duration_seconds":0.003,"user_id":null}
+
+## 2. Causa descartada: el filtro de proyecto de Alloy
+Hipótesis inicial: docker-compose.yml pasa COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-ticketera}, el .env del clon no
+define COMPOSE_PROJECT_NAME, así que Alloy filtraría por «ticketera» y descartaría los contenedores de ticketera-clean.
+  docker-compose.yml:394:      COMPOSE_PROJECT: ${COMPOSE_PROJECT_NAME:-ticketera}
+  config.alloy:17:    values = ["com.docker.compose.project=" + sys.env("COMPOSE_PROJECT")]
+COMPOSE_PROJECT_NAME en .env del clon: 0 líneas · en el shell: sin definir
+
+a) COMPOSE_PROJECT dentro del contenedor alloy del clon
+$ docker compose -p ticketera-clean exec alloy printenv COMPOSE_PROJECT
+ticketera-clean
+
+b) Etiqueta com.docker.compose.project de los contenedores del clon
+  /ticketera-clean-alloy-1: ticketera-clean
+  /ticketera-clean-catalog-1: ticketera-clean
+  /ticketera-clean-database-1: ticketera-clean
+  /ticketera-clean-frontend-1: ticketera-clean
+  /ticketera-clean-gateway-1: ticketera-clean
+  /ticketera-clean-grafana-1: ticketera-clean
+  /ticketera-clean-identity-1: ticketera-clean
+  /ticketera-clean-loki-1: ticketera-clean
+  /ticketera-clean-payments-1: ticketera-clean
+  /ticketera-clean-sales-1: ticketera-clean
+contenedores con proyecto «ticketera» en la máquina: 0
+
+Cómo resuelve Compose COMPOSE_PROJECT_NAME (docker compose config, sin levantar nada)
+  con -p ticketera-clean: ticketera-clean
+  sin -p (nombre de la carpeta): ticketera-clean
+
+Resultado: la hipótesis no se cumple. Compose define COMPOSE_PROJECT_NAME con el nombre del proyecto al interpolar el
+archivo, así que el filtro ya era ticketera-clean, con -p y sin -p.
+
+Control positivo descartado: la prueba prevista (recrear solo alloy con COMPOSE_PROJECT_NAME=ticketera-clean en el
+shell) no prueba nada, porque el filtro ya tenía ese valor. No se reinició alloy: las muestras de las 13:39 y de las
+14:29 son el estado final de este primer arranque, y el down/up de 8.4 lo recrea.
+
+## 3. Lo observado en Alloy (primer arranque)
+Loki sin etiquetas: Loki no recibió ninguna línea de ningún servicio.
+$ docker compose -p ticketera-clean exec loki wget -qO- .../loki/api/v1/labels
+{"status":"success"}
+Muestras de docker stats a las 2026-11-23T13:39:48+00:00 (cada 5 s):
+  ticketera-clean-alloy-1: CPU 171.70% · memoria 114.9MiB / 128MiB
+  ticketera-clean-alloy-1: CPU 809.84% · memoria 116.7MiB / 128MiB
+  ticketera-clean-alloy-1: CPU 104.83% · memoria 44.25MiB / 128MiB
+  salud: unhealthy · fallos seguidos: 37 · reinicios: 0 · OOMKilled: false
+    13:37:25 exit=-1 Health check exceeded timeout (5s)
+    13:37:56 exit=-1 Health check exceeded timeout (5s)
+    13:38:35 exit=-1 Health check exceeded timeout (5s)
+    13:39:07 exit=-1 Health check exceeded timeout (5s)
+    13:39:23 exit=-1 Health check exceeded timeout (5s)
+Error en el log de Alloy:
+  ts=2026-11-23T13:34:37.746443986Z level=error msg="final error sending batch, no retries left, dropping data" component_path=/ component_id=loki.write.local component=endpoint host=loki:3100 status=-1 tenant="" error="Post \"http://loki:3100/loki/api/v1/push\": context deadline exceeded"
+/metrics y la API de Alloy en 127.0.0.1:12345 no responden en 5 s (se acepta la conexión TCP).
+Muestra adicional 2026-11-23T14:29:44+00:00: alloy CPU 886.61% · memoria 115.6MiB / 128MiB · salud unhealthy;
+  loki CPU 0.55% · memoria 63.43MiB / 256MiB · salud healthy
+El servicio alloy y config.alloy son idénticos en ff10276 (el stack de trabajo, sano durante una hora) y en 34b84d0.
+
+## 4. Verificado
+- Alloy escribe en su log de arranque GOMEMLIMIT=120795955 (bytes): «GOMEMLIMIT is updated ... GOMEMLIMIT=120795955».
+- Ese valor es exactamente el 90 % de mem_limit 128m: 0,9 × 134217728 = 120795955,2 bytes = 115,2 MiB.
+- La documentación de Alloy dice: «The GOMEMLIMIT environment variable is either automatically set to 90% of an
+  available cgroup value using the automemlimit module» (Environment variables | Grafana Alloy documentation,
+  https://grafana.com/docs/alloy/latest/reference/cli/environment-variables/, consultada el 2026-11-23).
+- La memoria de Alloy estuvo en 113,7-116,7 MiB (de 128 MiB) en las muestras, con una lectura de 44,25 MiB; CPU de
+  105-887 %; healthcheck vencido a los 5 s; /metrics y la API sin responder; un lote descartado al enviar a Loki.
+- Loki tiene mem_limit 256m; usaba 62,5 MiB a las 13:38 (salud no registrada) y 63,4 MiB, sano, a las 14:29.
+- La memoria de alloy se acercó a su límite de 128 MiB aun estando sano: a los 899 s del reinicio simple (sección 6)
+  llegó a 126,3 MiB, el 98,7 % de mem_limit y por encima del GOMEMLIMIT de 115,2 MiB, sano y enviando a Loki.
+- docker stats informa la memoria del contenedor según el cgroup (incluye parte de la caché de archivos y memoria del
+  runtime de Go fuera del heap), no el heap de Go. La coincidencia de la meseta del primer arranque con el GOMEMLIMIT es
+  solo un indicio, no una medida del heap.
+
+## 5. Hipótesis (no verificada)
+Con el heap pegado al GOMEMLIMIT, el recolector de basura de Go corre sin parar y se come la CPU; eso explicaría que
+Alloy no atienda el healthcheck ni envíe a tiempo a Loki. No se midió el heap ni el recolector (por ejemplo, con
+GODEBUG=gctrace=1), y el reinicio simple llegó a 126,3 MiB estando sano, así que la memoria de docker stats no basta
+para sostenerla.
+Fuera de alcance aquí (límite de tiempo): más diagnóstico y cualquier arreglo.
+
+## 6. Muestras de 8.4
+Detalle completo en 8.4-reinicio-y-recreacion.txt. Cada muestra: docker stats --no-stream de alloy y loki, salud de
+ambos, un pedido a /api/catalog/health por el gateway y, 15 s después, las etiquetas de Loki y {service="catalog"} de
+los últimos 10 min. Las muestras tardías son a 15 min de cada up, por encima de la recaída del primer arranque (a más
+tardar 13,5 min después de iniciar alloy). Los cambios de salud de alloy se registraron con docker events desde las
+14:44:15 hasta el final.
+
+Reinicio simple (down sin -v; up a las 14:36:19):
+  476 s: alloy healthy, CPU 4.50 %, 90.6 MiB · loki healthy, 62.17 MiB · etiquetas service, service_name · catalog: 2 streams, 55 líneas
+  899 s: alloy healthy, CPU 39.15 %, 126.3 MiB · loki healthy, 62.75 MiB · etiquetas service, service_name · catalog: 1 stream, 60 líneas
+  eventos de alloy entre 14:44:15 y el down -v (14:51:39): ningún cambio de salud
+Después de down -v (volúmenes vacíos; up a las 14:51:42, alloy iniciado a las 14:52:07, healthy a las 14:52:17):
+  180 s: alloy healthy, CPU 0.63 %, 93.01 MiB · loki healthy, 69.34 MiB · etiquetas service, service_name · catalog: 2 streams, 27 líneas
+  900 s: alloy healthy, CPU 2.29 %, 97.12 MiB · loki healthy, 71.29 MiB · etiquetas service, service_name · catalog: 1 stream, 59 líneas
+  eventos de alloy hasta el final (15:07:03): ningún cambio de salud después de healthy
+
+## 7. Comparación de los tres arranques (solo hechos)
+| Arranque | Sanos (up --wait) | Recaída de alloy | CPU de alloy | Memoria de alloy (de 128 MiB) | Etiquetas en Loki |
+|---|---|---|---|---|---|
+| Primero (volúmenes vacíos, después del build) | los 10 a más tardar a los 101 s; up --wait exit 1 a los 72 s (alloy) | sí: unhealthy entre las 13:24:30 y las 13:36:27 (a más tardar 13,5 min tras iniciar alloy); seguía unhealthy a las 14:29 | 105-887 % | 113,7-116,7 MiB (una lectura de 44,25) | no (13:32, 13:39) |
+| Reinicio simple (volúmenes conservados) | exit 0 en 61 s | no a los 476 s ni a los 899 s (fallos seguidos 0); sin eventos entre 476 s y 15 min; entre 61 s y 476 s no hubo registro de eventos | 4,5 % (476 s) · 39,2 % (899 s) | 90,6 MiB (476 s) · 126,3 MiB (899 s) | sí (476 s, 899 s) |
+| Después de down -v (volúmenes vacíos) | exit 0 en 81 s; alloy healthy 10 s después de iniciar | no en 15 min (eventos: ningún cambio después de healthy) | 0,6 % (180 s) · 2,3 % (900 s) | 93,0 MiB (180 s) · 97,1 MiB (900 s) | sí (180 s, 900 s) |
+
+Hechos que salen de la tabla:
+- La recaída y la falta de envío a Loki se vieron solo en el primer arranque. Un arranque con volúmenes vacíos (después
+  de down -v) no la repitió en 15 min, así que los volúmenes vacíos por sí solos no la reproducen.
+- La demora de 58 s hasta la primera línea de Alloy se dio solo en el primer arranque, justo después del build;
+  después de down -v pasó a healthy 10 s después de iniciar.
+- A los 899 s del reinicio simple, Alloy usaba 126,3 MiB (98,7 % de mem_limit), por encima de su GOMEMLIMIT de
+  115,2 MiB, sano y enviando.
+
+Hipótesis (no verificadas): lo que distingue al primer arranque es que vino justo después de un build --no-cache, con
+la máquina más cargada, o que el volumen de lectura de logs inicial era mayor; ninguna de las dos se midió. Que la
+memoria del reinicio simple llegue a 126,3 MiB sugiere que una recaída podría darse más tarde de 15 min, pero tampoco
+se midió.

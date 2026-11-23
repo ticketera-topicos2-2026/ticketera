@@ -124,7 +124,7 @@
   does not reach `sales`; a `401` to the frontend's origin carries `Access-Control-Allow-Origin` (Req api-gateway:
   The frontend can call the API from the browser - Scenarios: CORS preflight from the frontend's address; Rejected
   request from the frontend's address). Verify: the `Allow-Methods` and `Allow-Headers` checks fail.
-- [ ] 1.14 [P1] Add the preflight maps and `add_header ... always` for `Access-Control-Allow-Methods` and
+- [x] 1.14 [P1] Add the preflight maps and `add_header ... always` for `Access-Control-Allow-Methods` and
   `Access-Control-Allow-Headers` (IA-07). Verify: the checks of 1.13 and the existing CORS checks pass.
 - [ ] 1.15 [P1] Write the log tests (red): after the other checks, `docker compose logs gateway` contains none of
   the tokens used, including a query-string token sent while the identity service is stopped and a sign-out

@@ -4,7 +4,8 @@
 # server; each ${NAME} that names an environment variable is replaced with its value.
 #
 # Change project-bootstrap, task group 2 (design: platform/api-gateway); the access check: change e1-identity-access,
-# task 1.10 (IA-01 to IA-04, IA-09); the identity timeouts and the failure mapping: task 1.12 (IA-05, IA-06).
+# task 1.10 (IA-01 to IA-04, IA-09); the identity timeouts and the failure mapping: task 1.12 (IA-05, IA-06); the
+# methods and headers of the preflight: task 1.14 (IA-07).
 
 # Hides the NGINX version in the Server header and in error pages, those of the 421 default server included: the
 # version is an internal detail that helps an attacker look up known vulnerabilities (design, Security Threat
@@ -48,6 +49,20 @@ map $is_api_request $cors_vary {
 map "$request_method:$is_api_request" $is_api_preflight {
     default 0;
     "OPTIONS:1" 1;
+}
+
+# The methods and headers that a preflight under /api/ allows (IA-07; Req api-gateway: The frontend can call the API
+# from the browser - Scenario: CORS preflight from the frontend's address). Any other request maps to an empty
+# value, which NGINX does not send, so these headers go only with the answer to a preflight. They grant nothing by
+# themselves: a browser also needs Access-Control-Allow-Origin, which only the frontend's origin gets.
+map $is_api_preflight $cors_allow_methods {
+    default "";
+    1 "GET, HEAD, POST, PUT, PATCH, DELETE";
+}
+
+map $is_api_preflight $cors_allow_headers {
+    default "";
+    1 "Authorization, Content-Type, Idempotency-Key";
 }
 
 # Public requests skip the access check (IA-03; Req api-gateway: Public paths skip the access check): only GET and
@@ -106,6 +121,8 @@ server {
     # inheriting these, so route files never use add_header.
     add_header Access-Control-Allow-Origin $cors_allow_origin always;
     add_header Vary $cors_vary always;
+    add_header Access-Control-Allow-Methods $cors_allow_methods always;
+    add_header Access-Control-Allow-Headers $cors_allow_headers always;
     add_header WWW-Authenticate $bearer_challenge always;
 
     # Access check (IA-01; Req api-gateway: Requests forwarded on paths that are not public require a valid access

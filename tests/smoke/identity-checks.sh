@@ -14,7 +14,7 @@
 # wrong password. So each check asserts the answer of an existing client, and the wrong-password check needs the
 # right password to work first. The markers below come from the pages of Keycloak 26.8 and its login theme.
 #
-# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10, 1.11 and 1.25 (design: Test Strategy,
+# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13 and 1.25 (design: Test Strategy,
 # platform/identity-provisioning, identity/access-token, platform/api-gateway), and the public catalog paths of
 # change e1-event-catalog, task 5.1 (EC-03).
 
@@ -49,6 +49,12 @@ readonly -a CATALOG_PROTECTED_REQUESTS=(
   "GET /api/catalog/events/not-a-uuid"
   "GET /api/sales/events"
 )
+# The CORS preflight of the spec (task 1.13): the method and the headers it asks for, written as a browser sends
+# them, and the methods and headers the requirement allows.
+readonly PREFLIGHT_METHOD="DELETE"
+readonly PREFLIGHT_HEADERS="authorization,content-type,idempotency-key"
+readonly -a CORS_ALLOWED_METHODS=(GET HEAD POST PUT PATCH DELETE)
+readonly -a CORS_ALLOWED_HEADERS=(Authorization Content-Type Idempotency-Key)
 # The identity service made unavailable by the last checks (task 1.11): the limit of the spec for the 502, and how
 # long the restore waits for the service to be healthy again and for the gateway to reach it.
 readonly IDENTITY_SERVICE="identity"
@@ -1446,6 +1452,73 @@ check_while_identity_unavailable() {
   fi
 }
 
+# Checks that the last response of http_headers has one header of the given name whose comma-separated list holds
+# every expected item. any-case compares as HTTP header names are compared; exact compares as methods are.
+# Usage: expect_listed <check name> <header name> <exact|any-case> <expected item>...
+expect_listed() {
+  local check=$1 header=$2 comparison=$3 item listed found
+  local -a values items missing=()
+  shift 3
+  mapfile -t values < <(response_header_values "$header")
+  if ((${#values[@]} != 1)); then
+    fail "$check" "expected one $header header, got ${#values[@]}${values[*]:+: ${values[*]}} ($(last_response))"
+    return
+  fi
+  IFS=',' read -ra items <<< "${values[0]}"
+  for item in "$@"; do
+    found=false
+    for listed in "${items[@]}"; do
+      listed=${listed#"${listed%%[![:space:]]*}"}
+      listed=${listed%"${listed##*[![:space:]]}"}
+      if [[ $listed == "$item" ]] || [[ $comparison == any-case && ${listed,,} == "${item,,}" ]]; then
+        found=true
+        break
+      fi
+    done
+    [[ $found == true ]] || missing+=("$item")
+  done
+  if ((${#missing[@]} > 0)); then
+    fail "$check" "$header is '${values[0]}', without ${missing[*]}"
+  else
+    pass "$check"
+  fi
+}
+
+# Req api-gateway: The frontend can call the API from the browser - Scenario: CORS preflight from the frontend's
+# address
+# The preflight asks for DELETE and the three headers, as a browser would before such a call. sales has no /example
+# route and never answers 204, so a 204 shows that the gateway answered the preflight itself and did not forward it
+# (IA-07). No service log is read.
+# Usage: check_preflight <check status> <check origin> <check methods> <check headers>
+check_preflight() {
+  local check_status=$1 check_origin=$2 check_methods=$3 check_headers=$4
+  http_headers OPTIONS "http://localhost:${gateway_port}${SALES_EXAMPLE_PATH}" \
+    --header "Origin: $identity_frontend_origin" --header "Access-Control-Request-Method: $PREFLIGHT_METHOD" \
+    --header "Access-Control-Request-Headers: $PREFLIGHT_HEADERS"
+  if [[ $STATUS == 204 ]]; then
+    pass "$check_status"
+  else
+    fail "$check_status" "expected the gateway's 204, $(last_response)"
+  fi
+  expect_allowed_origin "$check_origin" "$identity_frontend_origin" "the preflight"
+  expect_listed "$check_methods" Access-Control-Allow-Methods exact "${CORS_ALLOWED_METHODS[@]}"
+  expect_listed "$check_headers" Access-Control-Allow-Headers any-case "${CORS_ALLOWED_HEADERS[@]}"
+}
+
+# Req api-gateway: The frontend can call the API from the browser - Scenario: Rejected request from the frontend's
+# address
+# Usage: check_rejected_request_origin <check name>
+check_rejected_request_origin() {
+  local check=$1
+  http_headers GET "http://localhost:${gateway_port}${SALES_EXAMPLE_PATH}" \
+    --header "Origin: $identity_frontend_origin"
+  if [[ $STATUS != 401 ]]; then
+    fail "$check" "expected 401 for a request without a token, $(last_response)"
+  else
+    expect_allowed_origin "$check" "$identity_frontend_origin" "the 401"
+  fi
+}
+
 # The checks of the realm's clients and settings (task 1.4).
 check_identity_clients() {
   local check_frontend_grant="identity: $FRONTEND_CLIENT_ID refuses the password grant"
@@ -1685,6 +1758,25 @@ check_public_catalog_paths() {
   done
 }
 
+# The CORS checks of a protected path (task 1.13): the preflight and a 401, both from the frontend's origin. The
+# CORS checks of task 3.6 of project-bootstrap, on the public /api/catalog/health, are in smoke-test.sh.
+check_identity_cors() {
+  local check_status="identity: a preflight of $SALES_EXAMPLE_PATH from FRONTEND_ORIGIN gets 204 from the gateway"
+  local check_origin="identity: the preflight of $SALES_EXAMPLE_PATH allows FRONTEND_ORIGIN"
+  local check_methods="identity: the preflight of $SALES_EXAMPLE_PATH allows ${CORS_ALLOWED_METHODS[*]}"
+  local check_headers="identity: the preflight of $SALES_EXAMPLE_PATH allows the headers ${CORS_ALLOWED_HEADERS[*]}"
+  local check_rejected="identity: GET $SALES_EXAMPLE_PATH from FRONTEND_ORIGIN without a token gets 401 allowing it"
+
+  if [[ -n $identity_problem ]]; then
+    fail_each "$identity_problem" "$check_status" "$check_origin" "$check_methods" "$check_headers" \
+      "$check_rejected"
+    return
+  fi
+
+  check_preflight "$check_status" "$check_origin" "$check_methods" "$check_headers"
+  check_rejected_request_origin "$check_rejected"
+}
+
 # The checks with the identity service unavailable (task 1.11), first stopped and then paused. They run last: they
 # stop the identity service, and the EXIT trap restores it if the run ends while it is unavailable.
 check_identity_unavailable() {
@@ -1722,6 +1814,7 @@ run_identity_checks() {
   check_identity_access
   check_public_paths
   check_public_catalog_paths
+  check_identity_cors
   check_expired_token "identity: an expired token gets 401 with a Bearer challenge"
   check_identity_unavailable
 }

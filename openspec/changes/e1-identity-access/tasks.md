@@ -119,7 +119,7 @@
   `error_page 500 502 504 =502 @upstream_unavailable` to server level, and remove them and the named locations from
   `catalog.conf`, `sales.conf` and `payments.conf` (IA-05, IA-06). Verify: the checks of 1.11 and the existing
   stopped-service checks pass.
-- [ ] 1.13 [P1] Write the CORS tests (red): a preflight of `/api/sales/example` from `FRONTEND_ORIGIN` without a
+- [x] 1.13 [P1] Write the CORS tests (red): a preflight of `/api/sales/example` from `FRONTEND_ORIGIN` without a
   token, asking for `DELETE` and `authorization`, `content-type`, `idempotency-key`, gets `204` allowing them and
   does not reach `sales`; a `401` to the frontend's origin carries `Access-Control-Allow-Origin` (Req api-gateway:
   The frontend can call the API from the browser - Scenarios: CORS preflight from the frontend's address; Rejected

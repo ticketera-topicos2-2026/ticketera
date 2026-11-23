@@ -1,0 +1,146 @@
+# 8.1 · Integrante A · 2026-11-23T13:20:15+00:00
+host: Linux 6.18.58.1-microsoft-standard-WSL2 · Docker 29.9.2 · Compose 5.6.1
+
+$ free -h
+               total        used        free      shared  buff/cache   available
+Mem:            15Gi       2.2Gi        12Gi        53Mi       827Mi        13Gi
+Swap:          4.0Gi       124Ki       4.0Gi
+
+$ nproc
+16
+
+$ docker info (memoria y CPUs)
+MemTotal: 16621883392 bytes (15851 MiB) · NCPU: 16
+(integrante B: VM de WSL con 2852 MiB y 4 CPUs)
+
+.wslconfig:
+  no existe
+
+$ git clone https://github.com/ticketera-topicos2-2026/ticketera.git ~/dev/onboarding-grupo-8/ticketera-clean
+clone: 2 s
+commit: 34b84d0 test(catalog): filter the public list of test 10 to the start of its own event (#57)
+$ cp .env.example .env
+.env idéntico a .env.example
+
+## Imágenes base antes del build
+Las imágenes base ya estaban en esta máquina por el repositorio de trabajo, así que el tiempo de build no incluye
+descargarlas como le pasaría a un integrante nuevo. «presente» = en el almacén de imágenes de Docker; las «ausentes»
+solo se usan en FROM y estaban en la caché de BuildKit (ver las líneas resolve del build: ninguna capa descargada).
+  ausente:  busybox:1.37-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478
+  ausente:  ghcr.io/astral-sh/uv:0.9.9@sha256:f6e3549ed287fee0ddde2460a2a74a2d74366f84b04aaa34c1f19fec40da8652
+  presente: grafana/alloy:v1.22.0@sha256:9acc2529bc1edb7f5b2bd801dd8334ebc80c158e3a9e5526ecd7c9a273d43189
+  presente: grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf
+  ausente:  grafana/loki:3.7.10@sha256:b43c257ccfc925d4a50b8717cac61a3b51df8c48d01847936057e5c4075a24a7
+  presente: nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8
+  presente: node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5
+  presente: postgres:18-alpine@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95
+  ausente:  python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72
+  presente: quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0
+$ docker compose -p ticketera-clean --progress plain build --no-cache
+build: exit 0 en 35 s
+capas descargadas durante el build: 0 (las cinco bases de FROM se resolvieron en 0.1-0.2 s desde la caché local de BuildKit)
+  #17 resolve docker.io/library/node:24-alpine@sha256:116b800c3754b440ee0aa3ed2f20f5bf3d99a554bfd9adeea09ea8017f6e85f5 0.1s done
+  #27 resolve docker.io/library/python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72
+  #27 resolve docker.io/library/python:3.13-slim-bookworm@sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72 0.2s done
+  #28 resolve docker.io/library/busybox:1.37-musl@sha256:f6a95d611e0a8780fabdb2aec43e31275b2720dfefa3e41b16835bfc42454478 0.2s done
+  #29 resolve docker.io/grafana/loki:3.7.10@sha256:b43c257ccfc925d4a50b8717cac61a3b51df8c48d01847936057e5c4075a24a7 0.2s done
+  #30 resolve ghcr.io/astral-sh/uv:0.9.9@sha256:f6e3549ed287fee0ddde2460a2a74a2d74366f84b04aaa34c1f19fec40da8652 0.2s done
+
+$ docker compose -p ticketera-clean up -d --wait --wait-timeout 300
+ Volume ticketera-clean_ticketera-loki-data Created 
+ Volume ticketera-clean_ticketera-db-data Created 
+ Volume ticketera-clean_ticketera-alloy-data Created 
+ Network ticketera-clean_observability Created 
+ Network ticketera-clean_backend Created 
+ Network ticketera-clean_edge Created 
+ Container ticketera-clean-loki-1 Created 
+ Container ticketera-clean-database-1 Created 
+ Container ticketera-clean-frontend-1 Created 
+ Container ticketera-clean-identity-1 Created 
+ Container ticketera-clean-alloy-1 Created 
+ Container ticketera-clean-catalog-1 Created 
+ Container ticketera-clean-sales-1 Created 
+ Container ticketera-clean-grafana-1 Created 
+ Container ticketera-clean-payments-1 Created 
+ Container ticketera-clean-gateway-1 Created 
+ Container ticketera-clean-frontend-1 Started 
+ Container ticketera-clean-database-1 Started 
+ Container ticketera-clean-loki-1 Started 
+ Container ticketera-clean-database-1 Healthy 
+ Container ticketera-clean-identity-1 Started 
+ Container ticketera-clean-catalog-1 Started 
+ Container ticketera-clean-payments-1 Started 
+ Container ticketera-clean-sales-1 Started 
+ Container ticketera-clean-payments-1 Healthy 
+ Container ticketera-clean-catalog-1 Healthy 
+ Container ticketera-clean-sales-1 Healthy 
+ Container ticketera-clean-loki-1 Healthy 
+ Container ticketera-clean-alloy-1 Started 
+ Container ticketera-clean-grafana-1 Started 
+ Container ticketera-clean-identity-1 Healthy 
+ Container ticketera-clean-gateway-1 Started 
+ Container ticketera-clean-frontend-1 Healthy 
+container ticketera-clean-alloy-1 is unhealthy
+up --wait: exit 1 en 72 s (límite de la tarea: 300 s)
+
+$ docker compose -p ticketera-clean ps
+SERVICE    STATUS                             PORTS
+alloy      Up 42 seconds (unhealthy)          
+catalog    Up 57 seconds (healthy)            8000/tcp
+database   Up About a minute (healthy)        5432/tcp
+frontend   Up About a minute (healthy)        127.0.0.1:5173->5173/tcp
+gateway    Up 1 second (health: starting)     127.0.0.1:18080->8080/tcp
+grafana    Up 41 seconds (health: starting)   127.0.0.1:3000->3000/tcp
+identity   Up 57 seconds (healthy)            8080/tcp, 8443/tcp, 9000/tcp
+loki       Up About a minute (healthy)        3100/tcp
+payments   Up 57 seconds (healthy)            8000/tcp
+sales      Up 56 seconds (healthy)            8000/tcp
+
+## Causa del primer fallo
+alloy: contenedor iniciado 2026-11-23T13:22:54.397365321Z
+alloy-1  | 2026-11-23T13:23:52.494905416Z [controller-runtime] log.SetLogger(...) was never called; logs will not be displayed.
+alloy-1  | 2026-11-23T13:23:56.341726697Z ts=2026-11-23T13:23:53.687892956Z level=info msg="Alloy is starting"
+El proceso de Alloy tardó unos 58 s en escribir su primera línea. Su healthcheck no tiene start_period
+(interval 10s, timeout 5s, retries 3): llegó a 5 fallos «Connection refused» en 127.0.0.1:12345 → unhealthy → up --wait
+termina con error. Sin reinicios ni OOM (RestartCount 0, OOMKilled false); pasó a healthy sin intervención.
+Ningún servicio tiene depends_on de alloy, así que, a diferencia del caso de la base de datos del integrante B (#24),
+no se canceló ningún contenedor: los otros 9 siguieron arrancando y quedaron healthy (gateway arrancando al cortar).
+
+## Segunda ejecución: solo una nueva comprobación, sin reinicio (mismos contenedores y volúmenes)
+$ docker compose -p ticketera-clean up -d --wait --wait-timeout 300
+up --wait: exit 0 en 3 s
+SERVICE    STATUS                        PORTS
+alloy      Up About a minute (healthy)   
+catalog    Up About a minute (healthy)   8000/tcp
+database   Up 2 minutes (healthy)        5432/tcp
+frontend   Up 2 minutes (healthy)        127.0.0.1:5173->5173/tcp
+gateway    Up 58 seconds (healthy)       127.0.0.1:18080->8080/tcp
+grafana    Up About a minute (healthy)   127.0.0.1:3000->3000/tcp
+identity   Up About a minute (healthy)   8080/tcp, 8443/tcp, 9000/tcp
+loki       Up 2 minutes (healthy)        3100/tcp
+payments   Up About a minute (healthy)   8000/tcp
+sales      Up About a minute (healthy)   8000/tcp
+
+## Arranque de cada contenedor respecto del primer up (2026-11-23T13:22:24+00:00)
+  alloy: iniciado a +30 s
+  catalog: iniciado a +15 s
+  database: iniciado a +9 s
+  frontend: iniciado a +9 s
+  gateway: iniciado a +71 s
+  grafana: iniciado a +30 s
+  identity: iniciado a +15 s
+  loki: iniciado a +9 s
+  payments: iniciado a +15 s
+  sales: iniciado a +15 s
+Resultado: los 10 contenedores sanos a más tardar a las 13:24:05, 101 s después del primer up, sin intervención.
+El primer up --wait terminó con exit 1 a los 72 s por alloy; el segundo fue solo una comprobación (exit 0 en 3 s).
+Cumple el límite de 300 s, pero up --wait informó un fallo.
+
+## Rutas
+$ curl http://127.0.0.1:18080/healthz → 200
+/api/catalog/health → {"status":"ok","service":"catalog","database":"ok"} (200)
+/api/sales/health → {"status":"ok","service":"sales","database":"ok"} (200)
+/api/payments/health → {"status":"ok","service":"payments","database":"ok"} (200)
+realm ticketera → 200 http://localhost:18080/auth/realms/ticketera
+frontend → 200 http://localhost:5173/
+grafana /api/health → 200

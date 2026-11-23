@@ -1,0 +1,61 @@
+# 8.2 · Integrante A · 2026-11-23T14:33:47.363Z
+Chromium 158.0.8127.18 sin interfaz (Playwright), origen http://localhost:5173, API http://localhost:18080
+
+## Cómo corrió el navegador
+Playwright 1.65.0 (npm) y su chromium-headless-shell (Chromium 158.0.8127.18), instalados en una carpeta temporal fuera
+del clon y del repositorio, con PLAYWRIGHT_BROWSERS_PATH apuntando a esa carpeta. Al host (Ubuntu 26.04 en WSL) le
+faltaban cuatro bibliotecas: libnspr4.so, libnss3.so, libnssutil3.so y libasound.so.2. Se bajaron sus tres paquetes con
+`apt-get download libnspr4 libnss3 libasound2t64` (sin sudo), se extrajeron con `dpkg-deb -x` en esa carpeta y se
+cargaron con LD_LIBRARY_PATH. No se instaló nada en el sistema.
+
+## Resultado CORS: no hay errores de CORS
+Ni la página de estado ni la consola de administración muestran errores de CORS. La página de estado no tiene errores
+ni advertencias de consola; los únicos eventos son los tres ERR_ABORTED explicados en la nota de abajo.
+
+## Página de estado
+servicios: catalog=healthy (Disponible), sales=healthy (Disponible), payments=healthy (Disponible)
+mensaje «No se puede conectar con el gateway»: no
+respuestas de salud:
+  200 http://localhost:5173/src/health/checkServiceHealth.ts ACAO=http://localhost:5173
+  200 http://localhost:18080/api/catalog/health ACAO=http://localhost:5173
+  200 http://localhost:18080/api/payments/health ACAO=http://localhost:5173
+  200 http://localhost:18080/api/sales/health ACAO=http://localhost:5173
+errores y advertencias del navegador (CORS incluidos):
+  requestfailed: GET http://localhost:18080/api/catalog/health net::ERR_ABORTED
+  requestfailed: GET http://localhost:18080/api/sales/health net::ERR_ABORTED
+  requestfailed: GET http://localhost:18080/api/payments/health net::ERR_ABORTED
+
+## Consola de administración
+formulario de login en http://localhost:18080/auth/realms/master/protocol/openid-connect/auth (3.0 s desde /auth/admin/)
+login con KC_BOOTSTRAP_ADMIN_USERNAME / KC_BOOTSTRAP_ADMIN_PASSWORD del .env del clon → http://localhost:18080/auth/admin/master/console/
+errores y advertencias del navegador:
+  console.warning: An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.
+  console.warning: An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.
+  console.warning: An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.
+  console.warning: An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.
+  console.warning: An iframe which has both allow-scripts and allow-same-origin for its sandbox attribute can escape its sandboxing.
+  console.warning: For accessibility reasons an aria-label should be specified on nav groups if a title isn't
+  console.warning: For accessibility reasons an aria-label should be specified on nav groups if a title isn't
+
+Nota sobre los ERR_ABORTED: son la primera tanda de pedidos de salud, cancelada por la propia página. En desarrollo,
+StrictMode de React (frontend/src/main.tsx) monta App, ejecuta la limpieza del efecto y lo vuelve a montar; la limpieza
+llama a cancel.abort() (App.tsx) y Chromium informa esos pedidos cancelados como net::ERR_ABORTED. La segunda tanda
+responde 200 con Access-Control-Allow-Origin: http://localhost:5173. No hay errores de CORS en la consola.
+Las advertencias de la consola de administración son de la propia interfaz de Keycloak (iframes con allow-scripts y
+allow-same-origin, aria-label en grupos de navegación), no de la configuración del proyecto.
+El aviso amarillo «temporary admin user» es el esperado para el administrador de arranque (KC_BOOTSTRAP_ADMIN_*).
+La contraseña se leyó del .env del clon y se escribió en el formulario; no figura en ningún archivo de evidencia.
+
+## Comprobación complementaria con curl
+Comprobación de CORS con curl, con el encabezado Origin del frontend (http://localhost:5173), contra el gateway
+  HTTP/1.1 200 OK http://localhost:18080/api/catalog/health ACAO=http://localhost:5173 · {"status":"ok","service":"catalog","database":"ok"}
+  HTTP/1.1 200 OK http://localhost:18080/api/sales/health ACAO=http://localhost:5173 · {"status":"ok","service":"sales","database":"ok"}
+  HTTP/1.1 200 OK http://localhost:18080/api/payments/health ACAO=http://localhost:5173 · {"status":"ok","service":"payments","database":"ok"}
+Origen ajeno (http://evil.example):
+  HTTP/1.1 200 OK /api/catalog/health ACAO=
+Preflight (OPTIONS, Access-Control-Request-Method: GET):
+  HTTP/1.1 204 No Content
+  Access-Control-Allow-Origin: http://localhost:5173
+  Access-Control-Allow-Methods: GET, HEAD, POST, PUT, PATCH, DELETE
+  Access-Control-Allow-Headers: Authorization, Content-Type, Idempotency-Key
+Consola de administración: GET http://localhost:18080/auth/admin/ → 302 → http://localhost:18080/auth/admin/master/console/

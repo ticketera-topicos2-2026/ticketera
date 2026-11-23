@@ -146,7 +146,7 @@
 - [ ] 1.17 [P1] Run the whole system locally with the echo overlay. Verify: `smoke-test.sh --require-echo`
   (identity checks included), `database-isolation.sh` and the `tests/platform` tests pass; then the `quality`,
   `smoke-test` and `openspec-validate` checks are green on the pull request and the CI stays within 15 minutes.
-- [ ] 1.18 [P1] Draw low-fidelity mockups in `docs/mockups/identity/` with the GoPass palette (D-38): the sign-in
+- [x] 1.18 [P1] Draw low-fidelity mockups in `docs/mockups/identity/` with the GoPass palette (D-38): the sign-in
   flow, the header with the signed-in user and the sign-out action, the "My account" page and the access-denied
   page; they guide the screens of group 2. Verify: the mockups are in the pull request and the reviewer sees each
   screen of `specs/identity/user-authentication`.

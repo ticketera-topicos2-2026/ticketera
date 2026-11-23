@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="mockup-height" content="760">
+  <title>GoPass · Encabezado (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../catalog/src/gopass.css">
+  <link rel="stylesheet" href="identity.css">
+</head>
+<body>
+  <!-- El encabezado de todas las páginas (spec identity/user-authentication: The frontend shows who is signed in). -->
+  <main style="padding: 8px 0 24px;">
+    <h1 style="margin: 32px 64px 0;">Encabezado</h1>
+    <p class="muted" style="margin: 6px 64px 0;">Aparece en todas las páginas. Muestra quién inició sesión, o la acción para iniciarla.</p>
+
+    <div class="variant">Sin sesión</div>
+    <header class="header card" style="margin: 0 64px;">
+      <div class="brand">GoPass</div>
+      <nav class="nav"><a class="active" href="#">Estado del sistema</a></nav>
+      <button class="btn primary">Iniciar sesión</button>
+    </header>
+    <p class="muted small" style="margin: 8px 64px 0;">Ningún nombre de usuario. «Iniciar sesión» lleva a la página de inicio de sesión del servicio de identidad y vuelve a la página actual.</p>
+
+    <div class="variant">Con sesión · CLIENT</div>
+    <header class="header card" style="margin: 0 64px;">
+      <div class="brand">GoPass</div>
+      <nav class="nav"><a class="active" href="#">Estado del sistema</a><a href="#">Mi cuenta</a></nav>
+      <div class="user">
+        <div style="text-align:right;"><div style="font-weight:600;">Test Client</div><span class="role">CLIENT</span></div>
+        <div class="avatar">TC</div>
+        <button class="btn">Cerrar sesión</button>
+      </div>
+    </header>
+
+    <div class="variant">Con sesión · ADMIN</div>
+    <header class="header card" style="margin: 0 64px;">
+      <div class="brand">GoPass</div>
+      <nav class="nav"><a href="#">Estado del sistema</a><a class="active" href="#">Mi cuenta</a></nav>
+      <div class="user">
+        <div style="text-align:right;"><div style="font-weight:600;">Test Admin</div><span class="role">ADMIN</span></div>
+        <div class="avatar">TA</div>
+        <button class="btn">Cerrar sesión</button>
+      </div>
+    </header>
+    <p class="muted small" style="margin: 8px 64px 0;">El nombre es el claim <code>name</code> del token de ID, o <code>preferred_username</code> si no tiene. Solo se muestra el rol de plataforma (ADMIN, EVENT_OWNER o CLIENT), nunca los roles propios del servicio de identidad.</p>
+  </main>
+
+  <aside class="note"><b>Mockup</b> · Datos de los usuarios de prueba del realm · «Cerrar sesión» borra la sesión de la memoria y envía un formulario POST al endpoint de cierre de sesión, sin ningún token en la dirección (IA-15)</aside>
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="mockup-height" content="760">
+  <title>GoPass · Mi cuenta (mockup)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../catalog/src/gopass.css">
+  <link rel="stylesheet" href="identity.css">
+</head>
+<body>
+  <!-- Ruta /account, CLIENT con sesión (spec identity/user-authentication: Pages are guarded by session; The "My account"
+       page shows the signed-in user). -->
+  <header class="header">
+    <div class="brand">GoPass</div>
+    <nav class="nav"><a href="#">Estado del sistema</a><a class="active" href="#">Mi cuenta</a></nav>
+    <div class="user">
+      <div style="text-align:right;"><div style="font-weight:600;">Test Client</div><span class="role">CLIENT</span></div>
+      <div class="avatar">TC</div>
+      <button class="btn">Cerrar sesión</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="title-row">
+      <div>
+        <h1>Mi cuenta</h1>
+        <p class="muted">Los datos de tu cuenta en GoPass.</p>
+      </div>
+    </div>
+
+    <div class="row">
+      <section class="card pad grow">
+        <div class="profile">
+          <div class="avatar">TC</div>
+          <div>
+            <h2>Test Client</h2>
+            <p class="muted">test-client</p>
+          </div>
+        </div>
+        <dl class="facts">
+          <dt>Correo</dt><dd>test-client@example.com</dd>
+          <dt>Rol</dt><dd><span class="role">CLIENT</span></dd>
+        </dl>
+      </section>
+
+      <section class="card pad" style="width: 380px;">
+        <h3>Sesión</h3>
+        <p class="muted" style="margin-top: 8px;">Tu sesión se renueva sola mientras usás GoPass. Al cerrarla, la próxima vez te vamos a pedir la contraseña.</p>
+        <div class="actions" style="justify-content: flex-start;"><button class="btn danger-outline">Cerrar sesión</button></div>
+      </section>
+    </div>
+
+    <p class="muted small" style="margin-top:16px;">Solo se muestra el rol de plataforma: aunque el token traiga <code>offline_access</code>, <code>uma_authorization</code> o <code>default-roles-ticketera</code>, aquí se ve únicamente CLIENT. Para un ADMIN se ve únicamente ADMIN.</p>
+  </main>
+
+  <aside class="note"><b>Mockup</b> · Datos del token de ID (name, preferred_username, email, realm_access.roles filtrado a ADMIN, EVENT_OWNER y CLIENT) · Sin sesión, /account lleva al inicio de sesión y no se muestra</aside>
+</body>
+</html>

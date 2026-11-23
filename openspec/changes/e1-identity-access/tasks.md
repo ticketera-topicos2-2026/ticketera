@@ -197,7 +197,7 @@
   realm definition contains no secrets - Scenario: Test user passwords in the realm definition; IA-12). They pin the
   current behavior of `scripts/check_realm_secrets.py`, so they pass at once. Verify: the new tests and the rest of
   `tests/platform` pass in the container.
-- [ ] 1.29 [P1] Add a check to `identity-checks.sh` that a request from `FRONTEND_ORIGIN` that is not a preflight,
+- [x] 1.29 [P1] Add a check to `identity-checks.sh` that a request from `FRONTEND_ORIGIN` that is not a preflight,
   the `401` of `GET /api/sales/example` without a token, carries neither `Access-Control-Allow-Methods` nor
   `Access-Control-Allow-Headers` (Req api-gateway: The frontend can call the API from the browser; IA-07: those two
   headers go only with the answer to a preflight). It guards the maps of 1.14 against static headers, so it passes

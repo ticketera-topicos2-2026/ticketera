@@ -14,7 +14,7 @@
 # wrong password. So each check asserts the answer of an existing client, and the wrong-password check needs the
 # right password to work first. The markers below come from the pages of Keycloak 26.8 and its login theme.
 #
-# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13, 1.15 and 1.25 (design: Test Strategy,
+# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10, 1.11, 1.13, 1.15, 1.25 and 1.29 (design: Test Strategy,
 # platform/identity-provisioning, identity/access-token, platform/api-gateway), and the public catalog paths of
 # change e1-event-catalog, task 5.1 (EC-03).
 
@@ -1524,18 +1524,40 @@ check_preflight() {
   expect_listed "$check_headers" Access-Control-Allow-Headers any-case "${CORS_ALLOWED_HEADERS[@]}"
 }
 
+# Checks that the last response of http_headers has none of the given headers.
+# Usage: expect_no_headers <check name> <header name>...
+expect_no_headers() {
+  local check=$1 header found
+  local -a present=() values
+  shift
+  for header in "$@"; do
+    mapfile -t values < <(response_header_values "$header")
+    ((${#values[@]} == 0)) || present+=("$header: ${values[*]}")
+  done
+  if ((${#present[@]} == 0)); then
+    pass "$check"
+  else
+    found=$(printf '%s; ' "${present[@]}")
+    fail "$check" "the response has ${found%; }"
+  fi
+}
+
 # Req api-gateway: The frontend can call the API from the browser - Scenario: Rejected request from the frontend's
 # address
-# Usage: check_rejected_request_origin <check name>
+# The same 401 also guards IA-07 (task 1.29): Access-Control-Allow-Methods and Access-Control-Allow-Headers go only
+# with the answer to a preflight, so a request that is not one carries neither; static headers would.
+# Usage: check_rejected_request_origin <check origin> <check no preflight headers>
 check_rejected_request_origin() {
-  local check=$1
+  local check=$1 check_no_preflight_headers=$2
   http_headers GET "http://localhost:${gateway_port}${SALES_EXAMPLE_PATH}" \
     --header "Origin: $identity_frontend_origin"
   if [[ $STATUS != 401 ]]; then
-    fail "$check" "expected 401 for a request without a token, $(last_response)"
-  else
-    expect_allowed_origin "$check" "$identity_frontend_origin" "the 401"
+    fail_each "expected 401 for a request without a token, $(last_response)" "$check" \
+      "$check_no_preflight_headers"
+    return
   fi
+  expect_allowed_origin "$check" "$identity_frontend_origin" "the 401"
+  expect_no_headers "$check_no_preflight_headers" Access-Control-Allow-Methods Access-Control-Allow-Headers
 }
 
 # Sends a GET request whose URL, and bearer token when one is given, reach curl in a configuration file of mode
@@ -1860,23 +1882,24 @@ check_public_catalog_paths() {
   done
 }
 
-# The CORS checks of a protected path (task 1.13): the preflight and a 401, both from the frontend's origin. The
-# CORS checks of task 3.6 of project-bootstrap, on the public /api/catalog/health, are in smoke-test.sh.
+# The CORS checks of a protected path (tasks 1.13 and 1.29): the preflight and a 401, both from the frontend's
+# origin. The CORS checks of task 3.6 of project-bootstrap, on the public /api/catalog/health, are in smoke-test.sh.
 check_identity_cors() {
   local check_status="identity: a preflight of $SALES_EXAMPLE_PATH from FRONTEND_ORIGIN gets 204 from the gateway"
   local check_origin="identity: the preflight of $SALES_EXAMPLE_PATH allows FRONTEND_ORIGIN"
   local check_methods="identity: the preflight of $SALES_EXAMPLE_PATH allows ${CORS_ALLOWED_METHODS[*]}"
   local check_headers="identity: the preflight of $SALES_EXAMPLE_PATH allows the headers ${CORS_ALLOWED_HEADERS[*]}"
   local check_rejected="identity: GET $SALES_EXAMPLE_PATH from FRONTEND_ORIGIN without a token gets 401 allowing it"
+  local check_not_preflight="identity: that 401, not a preflight, has no Allow-Methods or Allow-Headers"
 
   if [[ -n $identity_problem ]]; then
     fail_each "$identity_problem" "$check_status" "$check_origin" "$check_methods" "$check_headers" \
-      "$check_rejected"
+      "$check_rejected" "$check_not_preflight"
     return
   fi
 
   check_preflight "$check_status" "$check_origin" "$check_methods" "$check_headers"
-  check_rejected_request_origin "$check_rejected"
+  check_rejected_request_origin "$check_rejected" "$check_not_preflight"
 }
 
 # Sends the requests of the log checks while the identity service is up (task 1.15). Each token is sent once, in

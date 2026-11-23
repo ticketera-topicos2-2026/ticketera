@@ -12,8 +12,6 @@ Navegador en Windows, origen http://localhost:15173, API Gateway http://localhos
 
 ## Consola de administración de Keycloak
 - URL: http://localhost:18080/auth/admin/
-- Login exitoso con credenciales de .env:
-  Usuario: admin (KC_BOOTSTRAP_ADMIN_USERNAME)
-  Contraseña: local-keycloak-admin-password (KC_BOOTSTRAP_ADMIN_PASSWORD)
+- Login exitoso con credenciales KC_BOOTSTRAP_ADMIN_USERNAME / KC_BOOTSTRAP_ADMIN_PASSWORD de .env (sin contraseñas en texto claro, RB-02)
 - Redirección correcta a la consola de administración en el realm master (/auth/admin/master/console/).
 

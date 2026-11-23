@@ -1,0 +1,36 @@
+# 8.3 · Integrante B · 2026-11-18T23:03:38+00:00
+código clonado en /home/asus/onboarding-grupo-8/ticketera-clean (sistema de archivos de WSL, no /mnt/c)
+
+## Backend (catalog, uvicorn --reload)
+guardado: services/catalog/src/catalog/api/app.py (title="catalog-recarga-8-3")
+servido por el gateway en /api/catalog/openapi.json después de 19.9 s (límite: 10 s)
+revertido; vuelve a «catalog» en 7.3 s
+
+## Frontend (Vite)
+guardado: frontend/src/App.tsx (texto del pie)
+servido por Vite en /src/App.tsx después de 3.1 s (límite: 10 s)
+revertido en 0.1 s
+
+## Tests de un servicio con docker compose
+$ docker compose run --rm --no-deps catalog pytest
+    _PortalFactoryType = Callable[[], AbstractContextManager[anyio.abc.BlockingPortal]]
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+16 passed, 1 skipped, 1 warning in 10.07s
+$ docker compose run --rm --no-deps frontend npx vitest run
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m7 passed[39m[22m[90m (7)[39m
+archivos nuevos de root en el clon: 0
+
+## Backend: tres mediciones más (2026-11-18T23:06:45+00:00)
+medición 1: 11.9 s · detección, proceso nuevo, listo:  
+medición 2: 7.0 s · detección, proceso nuevo, listo:  
+medición 3: 4.5 s · detección, proceso nuevo, listo:  
+revertido: 0 archivos modificados
+uso de CPU y memoria en este momento:
+  memoria libre (available): 1364 MiB de 2852
+Diagnóstico (logs de catalog con marca de tiempo): StatReload detecta el cambio en menos de 1 s; el proceso nuevo
+tarda de 6,7 a 11,3 s en arrancar (importar FastAPI, SQLAlchemy y psycopg) con 2852 MiB en la VM de WSL. El
+límite de 10 s se cumple en 3 de 5 mediciones del backend (19,9; 7,3; 11,9; 7,0; 4,5 s) y en todas las del frontend.
+Hallazgo aparte: FastAPI avisa «Duplicate Operation ID health_health_get» en /health de catalog (GET y HEAD
+comparten la función).

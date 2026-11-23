@@ -14,7 +14,7 @@
 # wrong password. So each check asserts the answer of an existing client, and the wrong-password check needs the
 # right password to work first. The markers below come from the pages of Keycloak 26.8 and its login theme.
 #
-# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10 and 1.25 (design: Test Strategy,
+# Change e1-identity-access, tasks 1.4, 1.5, 1.8, 1.9, 1.10, 1.11 and 1.25 (design: Test Strategy,
 # platform/identity-provisioning, identity/access-token, platform/api-gateway), and the public catalog paths of
 # change e1-event-catalog, task 5.1 (EC-03).
 
@@ -49,6 +49,12 @@ readonly -a CATALOG_PROTECTED_REQUESTS=(
   "GET /api/catalog/events/not-a-uuid"
   "GET /api/sales/events"
 )
+# The identity service made unavailable by the last checks (task 1.11): the limit of the spec for the 502, and how
+# long the restore waits for the service to be healthy again and for the gateway to reach it.
+readonly IDENTITY_SERVICE="identity"
+readonly UNAVAILABLE_LIMIT_SECONDS=5
+readonly IDENTITY_HEALTHY_WAIT_SECONDS=180
+readonly GATEWAY_REACHES_IDENTITY_WAIT_SECONDS=30
 # Pairs of simultaneous requests of two users in the concurrency check.
 readonly CONCURRENT_ROUNDS=10
 # Paths that only look like a public health path, or reach a protected path through /auth/; curl sends them as
@@ -176,6 +182,11 @@ CLAIM_EXPIRY=""
 declare -A test_user_subs=()
 # Set by check_second_owner_token: the sub of the API test token of the second EVENT_OWNER test user.
 second_owner_sub=""
+# Set by timed_request: the status and the seconds the request took.
+ELAPSED=""
+# Set by restore_identity_service: what the restore had to do, or why it failed.
+RESTORE_REPORT=""
+RESTORE_PROBLEM=""
 # Set by prepare_identity_checks: the token of the expired-token check and its exp, or the reason it is missing.
 expiring_token=""
 expiring_token_expiry=""
@@ -1296,6 +1307,145 @@ check_expired_token() {
   expect_bearer_challenge "$check" "a token that has expired"
 }
 
+# Sends a request and sets STATUS (000 when no answer came within REQUEST_TIMEOUT_SECONDS) and ELAPSED, the seconds
+# it took as curl measures them. Extra arguments are passed to curl.
+# Usage: timed_request <url> [curl arguments...]
+timed_request() {
+  local url=$1 output
+  shift
+  output=$(curl --silent --noproxy '*' --max-time "$REQUEST_TIMEOUT_SECONDS" --output /dev/null \
+    --write-out '%{http_code} %{time_total}' "$@" "$url")
+  STATUS=${output%% *}
+  ELAPSED=${output#* }
+}
+
+# Checks that the last timed request got 502 in less than UNAVAILABLE_LIMIT_SECONDS, and reports the time measured.
+# Usage: expect_bad_gateway_in_time <check name> <description of the request>
+expect_bad_gateway_in_time() {
+  local check=$1 request=$2
+  if [[ $STATUS == 000 ]]; then
+    fail "$check" "$request got no answer in $ELAPSED s (curl gives up after $REQUEST_TIMEOUT_SECONDS s)"
+  elif [[ $STATUS != 502 ]]; then
+    fail "$check" "$request got $STATUS in $ELAPSED s, expected 502 in less than $UNAVAILABLE_LIMIT_SECONDS s"
+  elif ! awk -v elapsed="$ELAPSED" -v limit="$UNAVAILABLE_LIMIT_SECONDS" 'BEGIN { exit !(elapsed < limit) }'; then
+    fail "$check" "$request got 502 in $ELAPSED s, not in less than $UNAVAILABLE_LIMIT_SECONDS s"
+  else
+    pass "$check: 502 in $ELAPSED s"
+  fi
+}
+
+# Prints the health of the identity container (healthy, starting, unhealthy), or nothing when it is not running.
+identity_container_health() {
+  local container_id
+  container_id=$(docker compose ps --quiet "$IDENTITY_SERVICE" 2> /dev/null)
+  [[ -n $container_id ]] && docker inspect --format '{{.State.Health.Status}}' "$container_id" 2> /dev/null
+}
+
+# Waits until a command succeeds, checking every 2 s for at most the given seconds; fails when it never does.
+# Usage: wait_until <seconds> <command> [arguments...]
+wait_until() {
+  local seconds=$1 deadline
+  shift
+  deadline=$(($(date +%s) + seconds))
+  until "$@"; do
+    (($(date +%s) < deadline)) || return 1
+    sleep 2
+  done
+}
+
+identity_is_healthy() {
+  [[ $(identity_container_health) == healthy ]]
+}
+
+gateway_reaches_identity() {
+  http_get "http://localhost:${gateway_port}${REALM_PATH}/.well-known/openid-configuration"
+  [[ $STATUS == 200 ]]
+}
+
+gateway_is_healthy() {
+  local container_id health
+  container_id=$(docker compose ps --quiet gateway 2> /dev/null)
+  [[ -n $container_id ]] || return 1
+  health=$(docker inspect --format '{{.State.Health.Status}}' "$container_id" 2> /dev/null)
+  [[ $health == healthy ]]
+}
+
+# Makes the identity service available again whatever state it was left in: unpauses and starts it, waits until it
+# is healthy, then until the gateway reaches it. NGINX resolves identity only when it starts (DS-07), and a started
+# container may get a new address, so when the gateway cannot reach it the gateway is restarted. Sets
+# RESTORE_REPORT, and RESTORE_PROBLEM when the service could not be made available. Safe to run more than once; it
+# also runs from the EXIT trap while the identity service is unavailable.
+restore_identity_service() {
+  RESTORE_REPORT="identity healthy and reached through the gateway"
+  RESTORE_PROBLEM=""
+  docker compose unpause "$IDENTITY_SERVICE" > /dev/null 2>&1
+  docker compose start "$IDENTITY_SERVICE" > /dev/null 2>&1
+  if ! wait_until "$IDENTITY_HEALTHY_WAIT_SECONDS" identity_is_healthy; then
+    RESTORE_PROBLEM="the identity service is not healthy after $IDENTITY_HEALTHY_WAIT_SECONDS s"
+    return 1
+  fi
+  if wait_until "$GATEWAY_REACHES_IDENTITY_WAIT_SECONDS" gateway_reaches_identity; then
+    return 0
+  fi
+  RESTORE_REPORT="identity healthy; the gateway was restarted to reach its new address"
+  docker compose restart gateway > /dev/null 2>&1
+  if ! wait_until "$IDENTITY_HEALTHY_WAIT_SECONDS" gateway_is_healthy ||
+    ! wait_until "$GATEWAY_REACHES_IDENTITY_WAIT_SECONDS" gateway_reaches_identity; then
+    RESTORE_PROBLEM="the gateway does not reach the identity service, even after a restart"
+    return 1
+  fi
+}
+
+# The EXIT trap while the identity service is unavailable: restores it, then removes the temporary directory as
+# the trap of smoke-test.sh does, so an interrupted run never leaves the identity service stopped or paused.
+restore_identity_service_on_exit() {
+  restore_identity_service
+  remove_temp_dir
+}
+
+# Req api-gateway: An unavailable identity service is answered 502 - Scenarios: Protected request while the
+# identity service is stopped; Identity service path while it is stopped; Service health while the identity
+# service is stopped; Gateway health while the identity service is stopped
+# Req api-gateway: Requests forwarded on paths that are not public require a valid access token - Scenario:
+# Authorization header that is not a bearer token
+# The same checks run with the identity service paused too: the requirement covers an identity service that "does
+# not answer", and a paused container accepts the connection and never answers, the hung case that the read timeout
+# bounds (IA-05). sales answers /example with 404, so a 502 shows that the protected request was not forwarded;
+# 401 while the identity service is down shows that the gateway did not ask it.
+# Usage: check_while_identity_unavailable <stopped|paused> <check name>...
+check_while_identity_unavailable() {
+  local mode=$1 check_protected=$2 check_discovery=$3 check_basic=$4 check_none=$5 check_health=$6
+  local check_healthz=$7 check_restored=$8 token url="http://localhost:${gateway_port}${SALES_EXAMPLE_PATH}"
+  local -a mode_checks=("${@:2:7}")
+
+  if ! token=$(api_test_token CLIENT); then
+    fail_each "no access token before the identity service is made unavailable: $token" "${mode_checks[@]}"
+    return
+  fi
+  if [[ $mode == stopped ]]; then
+    docker compose stop "$IDENTITY_SERVICE" > /dev/null 2>&1
+  else
+    docker compose pause "$IDENTITY_SERVICE" > /dev/null 2>&1
+  fi
+
+  timed_request "$url" --header @- < <(printf 'Authorization: Bearer %s\n' "$token")
+  expect_bad_gateway_in_time "$check_protected" "GET $SALES_EXAMPLE_PATH with a token"
+  timed_request "http://localhost:${gateway_port}${REALM_PATH}/.well-known/openid-configuration"
+  expect_bad_gateway_in_time "$check_discovery" "the discovery document"
+  http_headers GET "$url" --header "Authorization: Basic dXNlcjpwYXNz"
+  expect_bearer_challenge "$check_basic" "a Basic Authorization header"
+  http_headers GET "$url"
+  expect_bearer_challenge "$check_none" "a request without a token"
+  expect_status "$check_health" 200 /api/sales/health
+  expect_status "$check_healthz" 200 /healthz
+
+  if restore_identity_service; then
+    pass "$check_restored: $RESTORE_REPORT"
+  else
+    fail "$check_restored" "$RESTORE_PROBLEM"
+  fi
+}
+
 # The checks of the realm's clients and settings (task 1.4).
 check_identity_clients() {
   local check_frontend_grant="identity: $FRONTEND_CLIENT_ID refuses the password grant"
@@ -1535,8 +1685,36 @@ check_public_catalog_paths() {
   done
 }
 
-# Runs every identity check; called by main of smoke-test.sh after the other checks. The expired-token check runs
-# last (see check_expired_token).
+# The checks with the identity service unavailable (task 1.11), first stopped and then paused. They run last: they
+# stop the identity service, and the EXIT trap restores it if the run ends while it is unavailable.
+check_identity_unavailable() {
+  local mode
+  local -a checks
+  if [[ -z $identity_problem ]]; then
+    trap restore_identity_service_on_exit EXIT
+  fi
+  for mode in stopped paused; do
+    checks=(
+      "identity: identity $mode: GET $SALES_EXAMPLE_PATH with a token gets 502 within $UNAVAILABLE_LIMIT_SECONDS s"
+      "identity: identity $mode: the discovery document gets 502 within $UNAVAILABLE_LIMIT_SECONDS s"
+      "identity: identity $mode: a Basic Authorization header still gets 401"
+      "identity: identity $mode: a request without a token still gets 401"
+      "identity: identity $mode: GET /api/sales/health still gets 200"
+      "identity: identity $mode: GET /healthz still gets 200"
+      "identity: the identity service is available again after being $mode"
+    )
+    if [[ -n $identity_problem ]]; then
+      fail_each "$identity_problem" "${checks[@]}"
+    else
+      check_while_identity_unavailable "$mode" "${checks[@]}"
+    fi
+  done
+  trap remove_temp_dir EXIT
+}
+
+# Runs every identity check; called by main of smoke-test.sh after the other checks. The expired-token check is the
+# last of the access checks (see check_expired_token), and the checks with the identity service unavailable run
+# after it, at the very end.
 run_identity_checks() {
   check_identity_clients
   check_identity_tokens
@@ -1545,4 +1723,5 @@ run_identity_checks() {
   check_public_paths
   check_public_catalog_paths
   check_expired_token "identity: an expired token gets 401 with a Bearer challenge"
+  check_identity_unavailable
 }

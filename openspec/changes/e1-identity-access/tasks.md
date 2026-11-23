@@ -104,13 +104,17 @@
   `401`; and a check in `identity-checks.sh` that a valid token with `PUT` (with a body) and `DELETE` through the
   echo route gets `200` (IA-01 to IA-04, IA-09). Verify: the checks of 1.8 (except the expired token, which needs
   1.6 too) and 1.9 pass; the bootstrap checks of `smoke-test.sh` still pass.
-- [ ] 1.11 [P1] Write the identity-unavailable tests at the end of `identity-checks.sh` (red): with the identity
+- [x] 1.11 [P1] Write the identity-unavailable tests at the end of `identity-checks.sh` (red): with the identity
   service stopped, a protected request with a token gets `502` in under 5 s and does not reach the service; the
   discovery document gets `502` in under 5 s; `Basic` and no-token requests still get `401`; `/api/sales/health`
-  and `/healthz` get `200`; then the identity service is started and waited healthy (Req api-gateway: An
-  unavailable identity service is answered 502 - all scenarios; Requests forwarded on paths that are not public
-  require a valid access token - Scenario: Authorization header that is not a bearer token). Verify: the `502`
-  checks fail (routes answer `500`, `/auth/` waits 60 s).
+  and `/healthz` get `200`; then the identity service is started and waited healthy. The same checks run with the
+  identity service paused, which accepts connections and never answers: the requirement covers an identity service
+  that does not answer, and IA-05 bounds this hung case with the read timeout. Each `502` check reports the time
+  measured, every request is capped at 10 s, and the identity service is always restored, from an EXIT trap too,
+  with a gateway restart if the gateway cannot reach it again (DS-07) (Req api-gateway: An unavailable identity
+  service is answered 502 - all scenarios; Requests forwarded on paths that are not public require a valid access
+  token - Scenario: Authorization header that is not a bearer token; IA-05). Verify: the `502` checks fail, with no
+  answer within the 10 s cap, and every other check passes.
 - [ ] 1.12 [P1] Set connect 1 s and read 3 s in `/_auth` and `/auth/`; move `proxy_connect_timeout 3s` and
   `error_page 500 502 504 =502 @upstream_unavailable` to server level, and remove them and the named locations from
   `catalog.conf`, `sales.conf` and `payments.conf` (IA-05, IA-06). Verify: the checks of 1.11 and the existing

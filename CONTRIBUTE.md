@@ -134,9 +134,8 @@ tests/api/run.sh catalog
 ```
 
 El runner comparte la red del gateway, así que las colecciones llaman a `http://localhost:8080/api/<servicio>`.
-Les pasa los tokens `ownerToken`, `otherOwnerToken`, `adminToken` y `clientToken`, con un `sub` nuevo por corrida.
-Por ahora son tokens de prueba sin firmar: sirven mientras el gateway no valide tokens. Cuando se integre el control
-de acceso de `e1-identity-access` (#30), el runner tiene que pedir tokens reales al cliente `ticketera-api-tests`.
+Les pasa los tokens `ownerToken`, `otherOwnerToken`, `adminToken` y `clientToken`: tokens reales del cliente
+`ticketera-api-tests` (ver «Usuarios de prueba y tokens»).
 
 ### Catálogo de eventos e inventario de `sales`
 
@@ -268,6 +267,85 @@ arranque, cuando todavía no existe el realm `master`. Cambiar esas variables en
 cambiá la contraseña en la consola o borrá el volumen con `docker compose down -v`. Es un administrador temporal
 de desarrollo; un entorno real no se crea así.
 
+### Usuarios de prueba y tokens
+
+Desde `e1-identity-access`, el gateway valida el token de cada solicitud a la API, salvo las rutas públicas (`GET`
+y `HEAD` de `/api/<servicio>/health` y del catálogo público, y todo `/auth/`): sin un token válido responde `401`
+(ADR-0010). Para probar a mano o con Bruno hacen falta usuarios y tokens de verdad.
+
+**Usuarios de prueba.** El realm `ticketera` trae cuatro, uno por rol de plataforma y un segundo `EVENT_OWNER`:
+
+| Usuario | Rol | Para qué sirve |
+|---|---|---|
+| `test-admin` | `ADMIN` | Operaciones de administración, como cargar el inventario de `sales` |
+| `test-event-owner` | `EVENT_OWNER` | Crear y publicar eventos: es el dueño en las pruebas |
+| `test-other-event-owner` | `EVENT_OWNER` | Pruebas de propiedad: otro dueño que no ve ni toca los eventos del primero, como el test 05 de la colección de Bruno de `catalog` (`404`) |
+| `test-client` | `CLIENT` | Comprar entradas y probar lo que un cliente no puede hacer |
+
+Sus contraseñas no están en el repositorio: el realm las toma de `.env` con marcadores `${TEST_USER_*_PASSWORD}`.
+Si tu `.env` es anterior a este cambio, puede faltarle alguna de las cuatro líneas `TEST_USER_*_PASSWORD` de
+`.env.example`. Mirá primero cuáles tiene, para no duplicar ninguna:
+
+```bash
+grep '^TEST_USER_' .env
+```
+
+Si no tiene ninguna, agregá las cuatro. La primera línea agrega el salto de línea final si falta, para que la
+primera variable no quede pegada a la última de tu `.env`:
+
+```bash
+[ -n "$(tail -c1 .env)" ] && echo >> .env
+grep '^TEST_USER_' .env.example >> .env
+```
+
+Si tiene algunas, copiá a mano solo las que faltan.
+
+Sin ellas, `docker compose up` se detiene antes de crear contenedores y nombra la que falta. Después recreá el
+realm, como se explica a continuación.
+
+**Un realm nuevo necesita `docker compose down -v`.** Keycloak importa el realm solo si no existe, así que los
+usuarios de prueba, las contraseñas nuevas de `.env` o cualquier cambio de `infra/keycloak/ticketera-realm.json`
+llegan a tu entorno solo con `docker compose down -v` y `docker compose up -d --wait`. `-v` borra los volúmenes
+`ticketera-db-data` (las bases de todos los servicios: eventos, inventario, órdenes, y el realm con sus sesiones),
+`ticketera-loki-data` y `ticketera-alloy-data` (la bitácora guardada en Loki). Lo que hayas cargado a mano se
+pierde. Si `up --wait` falla con `ticketera-alloy-1` en `unhealthy`, algo que pasa en un arranque en frío, corré
+`docker compose restart alloy` (ver «Bitácora de solicitudes y Grafana»).
+
+**Un token para una prueba manual.** El cliente `ticketera-api-tests` existe solo para las pruebas: acepta usuario y
+contraseña y sus tokens duran 60 s (los del frontend, 5 minutos). Para no dejar la contraseña ni el token en la línea
+de comandos, donde quedan en el historial y en la lista de procesos, la contraseña se lee sin eco y los dos llegan
+a `curl` por su entrada estándar:
+
+```bash
+gateway="http://$(docker compose port gateway 8080)"
+read -rsp 'Contraseña de test-event-owner: ' password; echo
+token=$(curl --silent --show-error --fail \
+    --data-urlencode grant_type=password --data-urlencode client_id=ticketera-api-tests \
+    --data-urlencode username=test-event-owner --data-urlencode scope=openid --data-urlencode password@- \
+    "$gateway/auth/realms/ticketera/protocol/openid-connect/token" < <(printf '%s' "$password") \
+  | sed -E 's/.*"access_token":"([^"]+)".*/\1/')
+unset password
+curl --silent --show-error --header @- "$gateway/api/catalog/manage/events" <<< "Authorization: Bearer $token"
+unset token
+```
+
+La contraseña es la de `.env`. `scope=openid` es obligatorio: el gateway valida el token contra `userinfo`, que
+rechaza uno sin ese scope. Pasados 60 s el gateway responde `401`: pedí otro token.
+
+**Archivos de rutas: sin `add_header` ni `error_page`.** El gateway define a nivel de servidor
+(`infra/gateway/templates/default.conf.template`) los encabezados de CORS, `X-Correlation-ID` y `WWW-Authenticate`,
+y `error_page 500 502 504 =502`, que convierte en `502` la falla de un servicio o del servicio de identidad. NGINX
+hereda esas directivas en un `location` solo si este no declara ninguna propia: un archivo de
+`infra/gateway/routes/` con un `add_header` pierde todos los encabezados del servidor, y uno con un `error_page`
+responde `500` en vez de `502` cuando el servicio de identidad no responde. Tampoco declara `auth_request`: la
+validación del token viene del servidor, así que una ruta nueva queda protegida sin escribir nada.
+
+**Bruno.** `tests/api/run.sh` pide tokens reales a `ticketera-api-tests` para los cuatro usuarios, justo antes de
+correr la colección, y se los pasa a Bruno como `adminToken`, `ownerToken`, `otherOwnerToken` y `clientToken`. Lee
+las contraseñas de `docker compose config`, así que necesita las cuatro líneas de `.env`; si no puede obtener un
+token, se detiene y nombra el usuario. Una colección nueva usa esas variables y no fabrica tokens propios: el
+gateway rechaza un token sin firma.
+
 ### Cómo agregar un servicio
 
 Cada servicio nuevo (grupos 3, 5 y 6) agrega su bloque a `docker-compose.yml` y su archivo de rutas, y la CI
@@ -318,9 +396,9 @@ location /api/catalog/ {
 
 Dos reglas para estos archivos:
 
-- Un `location` de `infra/gateway/routes/` no declara `add_header`. CORS se resuelve a nivel de servidor en
-  `infra/gateway/templates/default.conf.template`, y un `location` que declara su propio `add_header` deja de
-  heredar esos encabezados.
+- Un `location` de `infra/gateway/routes/` no declara `add_header` ni `error_page`. CORS, los otros encabezados y
+  el `502` se resuelven a nivel de servidor en `infra/gateway/templates/default.conf.template`, y un `location`
+  que declara los suyos deja de heredarlos (ver «Usuarios de prueba y tokens»).
 - Cada ruta es un solo `location` que incluye `snippets/forwarded-headers.conf`.
 
 **Bitácora de solicitudes.** Un servicio backend escribe su línea por solicitud (D-23):
@@ -377,7 +455,7 @@ levantá de nuevo; `FRONTEND_ORIGIN` no cambia con el puerto del gateway.
 (*Settings → Resources → WSL integration*) y comprobá `docker version`.
 
 **El reloj de WSL se atrasa después de suspender el PC.** Los tokens firmados con una hora desfasada se
-rechazan. Reiniciá WSL con `wsl --shutdown`; será relevante desde el primer change con autenticación.
+rechazan con `401`. Reiniciá WSL con `wsl --shutdown`.
 
 **Error `/bin/sh^M` o `bad interpreter` en un script.** Terminaciones de línea CRLF: `.gitattributes` fuerza LF
 en `*.sh`, `*.sql`, `*.conf`, `Dockerfile` y `*.json`. Cloná el repositorio dentro de WSL, no en `/mnt/c`, y

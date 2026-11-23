@@ -155,7 +155,7 @@
   `create-architectural-decision-record` skill, add it to the index in `docs/adr/README.md`, and fix the links in
   `design.md` and `proposal.md` if its slug differs from `adr-0010-validacion-de-tokens-en-el-gateway` (D-27;
   IA-01). Verify: the ADR is in the pull request and the link resolves.
-- [ ] 1.20 [P1] Write the `CONTRIBUTE.md` section (Spanish): the test users and their roles, the four new `.env`
+- [x] 1.20 [P1] Write the `CONTRIBUTE.md` section (Spanish): the test users and their roles, the four new `.env`
   variables, `docker compose down -v` after realm changes, and getting a token from `ticketera-api-tests`.
   Verify: a reviewer follows it from a fresh clone.
 - [ ] 1.21 [P1] Write the team log entry for this group with the red and green evidence, the closed pending item

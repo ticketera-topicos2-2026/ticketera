@@ -115,7 +115,7 @@
   service is answered 502 - all scenarios; Requests forwarded on paths that are not public require a valid access
   token - Scenario: Authorization header that is not a bearer token; IA-05). Verify: the `502` checks fail, with no
   answer within the 10 s cap, and every other check passes.
-- [ ] 1.12 [P1] Set connect 1 s and read 3 s in `/_auth` and `/auth/`; move `proxy_connect_timeout 3s` and
+- [x] 1.12 [P1] Set connect 1 s and read 3 s in `/_auth` and `/auth/`; move `proxy_connect_timeout 3s` and
   `error_page 500 502 504 =502 @upstream_unavailable` to server level, and remove them and the named locations from
   `catalog.conf`, `sales.conf` and `payments.conf` (IA-05, IA-06). Verify: the checks of 1.11 and the existing
   stopped-service checks pass.

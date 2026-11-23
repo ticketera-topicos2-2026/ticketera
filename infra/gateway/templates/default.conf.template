@@ -4,7 +4,7 @@
 # server; each ${NAME} that names an environment variable is replaced with its value.
 #
 # Change project-bootstrap, task group 2 (design: platform/api-gateway); the access check: change e1-identity-access,
-# task 1.10 (IA-01 to IA-04, IA-09).
+# task 1.10 (IA-01 to IA-04, IA-09); the identity timeouts and the failure mapping: task 1.12 (IA-05, IA-06).
 
 # Hides the NGINX version in the Server header and in error pages, those of the 421 default server included: the
 # version is an internal detail that helps an attacker look up known vulnerabilities (design, Security Threat
@@ -116,6 +116,19 @@ server {
     # turns it off (identity.conf).
     auth_request /_auth;
 
+    # Failure mapping (IA-06; Req api-gateway: An unavailable service does not affect other routes; An unavailable
+    # identity service is answered 502). NGINX resolves each service once, at startup (DS-07): a stopped container
+    # leaves nothing at that address, so the connection is never refused and waits for the connect timeout (60 s by
+    # default) before NGINX answers 504. Every location inherits the short timeout and the mapping, those of routes
+    # added later included: a 502 or a 504 that NGINX gives itself becomes 502, and so does the 500 that auth_request
+    # answers when the identity service cannot be asked. A location that declares its own error_page stops
+    # inheriting this one, so route files never declare error_page; only /_auth does, and it needs none of this: it
+    # is the subrequest, and auth_request turns its failures into the 500 mapped here. error_page applies to an
+    # answer of a service only with proxy_intercept_errors, which is on only in /_auth, so a 500 that a service
+    # answers itself reaches the client as 500.
+    proxy_connect_timeout 3s;
+    error_page 500 502 504 =502 @upstream_unavailable;
+
     # Answered before any location is chosen, so the preflight never reaches a service.
     if ($is_api_preflight) {
         return 204;
@@ -150,6 +163,12 @@ server {
         proxy_set_header Content-Type "";
         proxy_set_header Cookie "";
         include snippets/forwarded-headers.conf;
+        # Identity timeouts (IA-05; Req api-gateway: An unavailable identity service is answered 502): a stopped
+        # identity service is answered 502 after about 1 s, a hung one after about 3 s, inside the 5-second limit
+        # (DS-15). The connection is between containers on the same network, so 1 s is enough. location /auth/ sets
+        # the same (identity.conf).
+        proxy_connect_timeout 1s;
+        proxy_read_timeout 3s;
         # Every 4xx of userinfo, such as the 403 for a token without the openid scope, becomes 401, so that a
         # rejected token never looks like a role denial (IA-04; Req api-gateway: A token rejected by the identity
         # service is answered 401).
@@ -160,6 +179,11 @@ server {
 
     location @access_token_rejected {
         return 401;
+    }
+
+    # The answer of the failure mapping above; return ends the request before the access phase, so it needs no token.
+    location @upstream_unavailable {
+        return 502;
     }
 
     # One route file per service, infra/gateway/routes/<service>.conf, mounted at routes/platform; test-only routes

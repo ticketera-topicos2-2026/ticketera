@@ -191,7 +191,7 @@
   Afterwards `run.sh catalog` test 10 is expected to fail until the next `docker compose down -v`: the public
   catalog sorts by `starts_at`, so the latency events push the new event out of the first 100 (known issue,
   reported to Ariel, not changed here).
-- [ ] 1.28 [P1] Add tests to `tests/platform/test_check_realm_secrets.py`, with realm fixtures, for three cases of
+- [x] 1.28 [P1] Add tests to `tests/platform/test_check_realm_secrets.py`, with realm fixtures, for three cases of
   a credential object that no test covers yet: a `value` with text around the placeholder is rejected; a
   credential with no `value` is accepted; an empty or a null `value` is rejected (Req identity-provisioning: The
   realm definition contains no secrets - Scenario: Test user passwords in the realm definition; IA-12). They pin the

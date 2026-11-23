@@ -1,5 +1,5 @@
 """Tests of the realm secret check, scripts/check_realm_secrets.py (project-bootstrap, task 2.4; user credentials
-read field by field: e1-identity-access, task 1.1).
+read field by field: e1-identity-access, tasks 1.1 and 1.28).
 
 Requirement verified: continuous-integration, "The quality check rejects literal secrets in the realm
 definition"; for user credentials also identity-provisioning, "The realm definition contains no secrets"
@@ -157,6 +157,36 @@ class RealmSecretCheckTest(unittest.TestCase):
         value is a literal, and the output names that field (IA-12).
         """
         self.assert_rejected("placeholder-with-default-user-credentials.json", "users[0].credentials[0].value")
+
+    def test_user_credential_with_text_around_the_placeholder_is_rejected(self) -> None:
+        """Scenario: Test user passwords in the realm definition.
+        Req: The realm definition contains no secrets (identity-provisioning).
+
+        Case: the value of a user credential is pw-${TEST_USER_CLIENT_PASSWORD}-1; only a value that is exactly
+        ${NAME} is a placeholder, so the text around it is a literal, and the output names that field (IA-12;
+        e1-identity-access, task 1.28).
+        """
+        self.assert_rejected("text-around-placeholder-user-credentials.json", "users[0].credentials[0].value")
+
+    def test_user_credential_without_a_value_is_accepted(self) -> None:
+        """Scenario: Test user passwords in the realm definition.
+        Req: The realm definition contains no secrets (identity-provisioning).
+
+        Case: a user credential with type, temporary and userLabel and no value holds no secret, so the check
+        accepts it (IA-12; e1-identity-access, task 1.28).
+        """
+        self.assert_accepted("no-value-user-credentials.json")
+
+    def test_user_credential_with_an_empty_or_null_value_is_rejected(self) -> None:
+        """Scenario: Test user passwords in the realm definition.
+        Req: The realm definition contains no secrets (identity-provisioning).
+
+        Case: the value of a user credential is an empty string, or null; neither is a ${NAME} placeholder, so a
+        test user would have no password from .env, and the output names that field (IA-12; e1-identity-access,
+        task 1.28).
+        """
+        self.assert_rejected("empty-value-user-credentials.json", "users[0].credentials[0].value")
+        self.assert_rejected("null-value-user-credentials.json", "users[0].credentials[0].value")
 
     def test_literal_smtp_password_is_rejected(self) -> None:
         """Scenario: Realm definition with a literal client secret, applied to password, a field that holds a

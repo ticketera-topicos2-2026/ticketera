@@ -137,7 +137,7 @@
   stopped with a query-string token; identity stopped with `id_token_hint`) fail, because the error log at `notice`
   writes the request line, query string included, at level `error`; every other check passes, since
   `ticketera_json` keeps the query string out of the access log.
-- [ ] 1.16 [P1] Set `error_log /var/log/nginx/error.log crit;` in the http context of the template, so it covers
+- [x] 1.16 [P1] Set `error_log /var/log/nginx/error.log crit;` in the http context of the template, so it covers
   both servers, with a comment on why (IA-08). In the pinned image that file is a link to `/dev/stderr`, so the
   lines that remain still reach `docker compose logs`. The access log keeps `ticketera_json` of `e1-request-log`,
   which already leaves out the query string and the referrer, and the template already holds the rule of IA-08 in

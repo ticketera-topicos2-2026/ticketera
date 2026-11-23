@@ -5,7 +5,7 @@
 #
 # Change project-bootstrap, task group 2 (design: platform/api-gateway); the access check: change e1-identity-access,
 # task 1.10 (IA-01 to IA-04, IA-09); the identity timeouts and the failure mapping: task 1.12 (IA-05, IA-06); the
-# methods and headers of the preflight: task 1.14 (IA-07).
+# methods and headers of the preflight: task 1.14 (IA-07); the level of the error log: task 1.16 (IA-08).
 
 # Hides the NGINX version in the Server header and in error pages, those of the 421 default server included: the
 # version is an internal detail that helps an attacker look up known vulnerabilities (design, Security Threat
@@ -24,6 +24,15 @@ log_format ticketera_json escape=json
     '{"timestamp":"$time_iso8601","service":"gateway","correlation_id":"$request_id",'
     '"method":"$request_method","path":"$uri","status":$status,"duration_seconds":$request_time,'
     '"client_address":"$remote_addr"}';
+
+# Error log at level crit (IA-08; Req api-gateway: The gateway never writes a token to its logs). At level error,
+# NGINX writes the request line of the request that failed, query string included, and on an upstream failure the
+# upstream address with its query string, so a token in the query string or the ID token of id_token_hint would
+# reach the logs whenever a service or the identity service fails. The access log still records every 502. This
+# file is included in the http context, so the level covers both servers; the main context of nginx.conf keeps its
+# own error log, so errors in the configuration still show at startup. In the image, error.log is a link to
+# /dev/stderr. Lower the level only locally while debugging, never in a commit.
+error_log /var/log/nginx/error.log crit;
 
 # CORS for the API (DS-09; Req api-gateway: The frontend can call the API from the browser). The only allowed
 # origin is the frontend's, FRONTEND_ORIGIN in .env, substituted when the template is rendered. Any other origin

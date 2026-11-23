@@ -158,7 +158,7 @@
 - [x] 1.20 [P1] Write the `CONTRIBUTE.md` section (Spanish): the test users and their roles, the four new `.env`
   variables, `docker compose down -v` after realm changes, and getting a token from `ticketera-api-tests`.
   Verify: a reviewer follows it from a fresh clone.
-- [ ] 1.21 [P1] Write the team log entry for this group with the red and green evidence, the closed pending item
+- [x] 1.21 [P1] Write the team log entry for this group with the red and green evidence, the closed pending item
   of group 3 (502 handling at server level) and the AI usage. Verify: the entry is in the pull request.
 - [ ] 1.22 [P1] After the merge, send the team message: copy the four `TEST_USER_*_PASSWORD` lines to `.env` and
   run `docker compose down -v` before `up`. Verify: the message is linked in the team log.

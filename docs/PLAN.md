@@ -2,11 +2,11 @@
 
 | Campo | Valor |
 |---|---|
-| Versión | 0.5.0 |
-| Estado | Aprobado por el equipo (reuniones del 2026-10-27 y del 2026-11-17) |
-| Última actualización | 2026-11-17 |
+| Versión | 0.6.0 |
+| Estado | Aprobado por el equipo (reuniones del 2026-10-27 y del 2026-11-17, y acuerdo del 2026-11-08) |
+| Última actualización | 2026-11-23 |
 | Responsable del documento | Integrante A |
-| Fuentes | Consigna «Trabajo final de Tópicos II – 2026»; notas de la clase (lineamiento y profundización); actas de las reuniones del equipo del 2026-10-27 y del 2026-11-17 |
+| Fuentes | Consigna «Trabajo final de Tópicos II – 2026»; notas de la clase (lineamiento y profundización); actas de las reuniones del equipo del 2026-10-27 y del 2026-11-17; acuerdo del equipo del 2026-11-08 (grupo de WhatsApp) |
 
 > Este plan es un documento vivo. Solo se modifica mediante Pull Request, siguiendo el
 > procedimiento de la sección 10. Cada cambio se registra en la sección 11.
@@ -349,7 +349,8 @@ En la Etapa II, `payments` deja de ser un esqueleto e implementa la pasarela de 
 
 ## 5. Decisiones propuestas
 
-Estado según las actas de las reuniones del equipo del 2026-10-27 y del 2026-11-17 (videollamada):
+Estado según las actas de las reuniones del equipo del 2026-10-27 y del 2026-11-17 (videollamada), y el acuerdo
+del equipo del 2026-11-08 (grupo de WhatsApp):
 
 - **Aprobada**: se aprobó la propuesta.
 - **Aprobada con cambios**: se aprobó la propuesta con los cambios del acta; la columna Propuesta muestra lo aprobado.
@@ -402,12 +403,13 @@ de proceso quedan en este plan y en el acta. Al aprobarse una decisión se actua
 | D-20 | Seguimiento de tareas | GitHub Issues; cada PR las cierra con `Closes #n` | Solo `tasks.md` | Aprobada |
 | D-26 | Skills de terceros para los copilotos | `create-architectural-decision-record` y, de Matt Pocock, grilling, grill-me, grill-with-docs, domain-modeling, tdd y code-review, copiadas en `.claude/skills/` y `.agents/skills/` con sus licencias. Solo la skill de la cátedra escribe ADR; las que duplican OpenSpec quedan fuera; las herramientas personales no se votan. Se incorporan en un PR propio después de un piloto | — | Aprobada |
 | D-27 | ADR: carpeta, plantilla y granularidad | Un ADR por decisión de arquitectura importante, en `docs/adr/adr-NNNN-slug.md`, en español, con la plantilla de la skill `create-architectural-decision-record` más las secciones *Decision Drivers* y *Confirmation*. Solo lleva ADR una decisión difícil de revertir, que sorprende sin contexto y que salió de un trade-off real; las decisiones de proceso quedan en el plan y en el acta | Un único ADR-0001 con todas las decisiones aprobadas | Aprobada |
-| D-28 | Alcance y orden del MVP (Etapa I) | APIs funcionales, tests de API, mockups y pantallas de React obligatorias para cerrar la Etapa I, cada una hecha por el dueño de su feature (*vertical slice*). Primera feature: la compra idempotente, *contract-first*, con el Event Storming antes. Reparto y orden en 7.3, sin cambiar D-08 | — | Aprobada con cambios |
+| D-28 | Alcance y orden del MVP (Etapa I) | APIs funcionales, tests de API, mockups y pantallas de React obligatorias para cerrar la Etapa I, cada una hecha por el dueño de su feature (*vertical slice*). La compra idempotente va *contract-first*; las features arrancan en paralelo y el Event Storming no va antes (D-39). Reparto y orden en 7.3, sin cambiar D-08 | — | Aprobada con cambios |
 | D-31 | Nombres de los changes | Inglés con prefijo de etapa: `e1-idempotent-purchase`, `e1-request-log`, `e1-event-catalog` y `e1-identity-access`; el proposal cita el nombre de la clase. El contrato de compras va dentro de `e1-idempotent-purchase` | — | Aprobada |
 | D-32 | Frontend en el esqueleto (bootstrap) | El frontend está en la Etapa I: esqueleto y stack, contenedor en `docker-compose.yml`, página de estado (grupo 4) y CORS de DS-09 | — | Aprobada |
 | D-35 | Integración de los pull requests | Cada autor integra su propio pull request cuando está aprobado y con la CI en verde; quien revisa no hace el merge. GitHub borra solas las ramas integradas. Nadie hace push a la rama de otro integrante ni la borra, salvo el push de prueba acordado en la tarea 1.12 del bootstrap | — | Aprobada |
 | D-36 | Idioma de los documentos del repositorio | `AGENTS.md` en inglés; `CONTRIBUTE.md` y la plantilla de pull request en español; issues con título en inglés y cuerpo en español (complementa D-09) | — | Aprobada |
 | D-37 | Cuándo hace falta una issue | Para cada change de OpenSpec (`Refs #n` en el pull request de planificación y `Closes #n` en el de implementación), cada grupo de tareas del bootstrap, refactorizaciones en varios archivos, correcciones que cambian comportamiento y cambios en la CI, en Docker Compose o en configuración compartida. Sin issue: erratas, redacción, formato, correcciones pedidas en una revisión y subas de versión menores, con «Sin issue: cambio menor» y el motivo en el pull request | — | Aprobada |
+| D-39 | Arranque en paralelo | Cada integrante arranca en paralelo sus features de la Etapa I, sin esperar el design de `e1-idempotent-purchase`; el bootstrap se reparte por área (A: grupos 1, 2 y 7; B: grupos 3 y 4; C: grupos 5 y 6), y el Event Storming corre en paralelo, no antes. Acordado por el equipo el 2026-11-08 en el grupo de WhatsApp; ajusta el orden de D-28 | Esperar el design de `e1-idempotent-purchase` y hacer el Event Storming antes (D-28 original) | Aprobada |
 
 ### 5.3 Puntos abiertos de las decisiones aprobadas
 
@@ -423,8 +425,6 @@ de proceso quedan en este plan y en el acta. Al aprobarse una decisión se actua
   - (d) el usuario de prueba del realm, con su contraseña en `.env`.
 - **D-29**: si «sin versión» significa «nunca» o «hasta que aparezca una v2», y qué se hace si cambia un
   contrato (header, ruta nueva o *breaking change* coordinado).
-- **D-33**: la fecha de integración del design de `e1-idempotent-purchase`, para que A y B lo tengan antes
-  de arrancar.
 - **DF-02**: las entradas numeradas y no numeradas son un requisito de la Etapa I que todavía no tiene un
   change asignado; se asigna después del Event Storming.
 - **D-24, D-33**: la organización de los tests de la sección 4.3 (`tests/acceptance/` dentro de cada servicio
@@ -558,21 +558,23 @@ Incluso el esqueleto sigue TDD: el test de `/health` se escribe antes que el end
 | 4 | C | `docs/domain/context-map.md` (contextos y relaciones). |
 | 5 | A | `PLAN.md` v0.5.0 con el resultado del Event Storming (T-05). |
 
+El descubrimiento del dominio corre en paralelo con la Etapa I, no antes (D-39).
+
 ### 7.3 Etapa I
 
-Primero el problema difícil, después las features verticales (D-28). Cada change es un *vertical slice*:
+Cada integrante arranca en paralelo sus features de la Etapa I (D-39). Cada change es un *vertical slice*:
 API funcional, tests de API (D-24), mockups y la pantalla de React de su feature, que hace el dueño del
 change. **Las pantallas de React son obligatorias para cerrar la Etapa I** (D-28, D-32).
 
 | Orden | Change | Responsable | Alcance |
 |---|---|---|---|
-| 1 | `e1-idempotent-purchase` | C | Contrato de compras (*contract-first*, después del Event Storming) y compra idempotente: inventario propio de `sales` cargado por `ADMIN`; la compra pasa de reservada a confirmada y emite el ticket en una sola solicitud, sin paso de pago (D-25); PostgreSQL como árbitro de la doble venta (D-30); su design fija el esqueleto de referencia de los servicios (D-33) (DF-01, DT-01) |
-| 2 | `e1-identity-access` | A | API gateway con identidad: login, roles, validación de tokens en el gateway, rutas protegidas en el frontend |
-| 2 | `e1-request-log` | B | Bitácora HTTP con medición de tiempos (DT-03, D-23) |
-| 2 | `e1-event-catalog` | B | Catálogo mínimo de eventos |
+| 1 | `e1-idempotent-purchase` | C | Contrato de compras (*contract-first*) y compra idempotente: inventario propio de `sales` cargado por `ADMIN`; la compra pasa de reservada a confirmada y emite el ticket en una sola solicitud, sin paso de pago (D-25); PostgreSQL como árbitro de la doble venta (D-30); su design fija el esqueleto de referencia de los servicios (D-33) (DF-01, DT-01) |
+| 1 | `e1-identity-access` | A | API gateway con identidad: login, roles, validación de tokens en el gateway, rutas protegidas en el frontend |
+| 1 | `e1-request-log` | B | Bitácora HTTP con medición de tiempos (DT-03, D-23) |
+| 1 | `e1-event-catalog` | B | Catálogo mínimo de eventos |
 
-- Los changes con orden 2 arrancan cuando está integrado el design de `e1-idempotent-purchase` y siguen su
-  esqueleto de referencia (D-33).
+- Los cuatro changes arrancan en paralelo, sin esperar el design de `e1-idempotent-purchase` (D-39), y
+  siguen su esqueleto de referencia (D-33) desde que está integrado.
 - Las primeras pruebas de `sales` van sin autenticación; el JWT se agrega después (D-28, puntos abiertos en 5.3).
 
 ADR que se escriben dentro del change que implementa la decisión, como una tarea de su `tasks.md`; su
@@ -670,6 +672,7 @@ ticketera/
 | 0.3.0 | 2026-10-11 | El bootstrap incluye el esqueleto andante: todo el sistema se levanta con `docker compose up`; la CI levanta el stack y ejecuta una prueba de humo desde el bootstrap | Integrante A | — |
 | 0.4.0 | 2026-10-28 | Aprobación del plan según el acta de la reunión del 2026-10-27: D-01 a D-22 aprobadas; nuevas decisiones D-23 a D-34 con sus puntos abiertos; `payments` pasa a la Etapa II y la compra de la Etapa I no tiene paso de pago; Etapa I reordenada con los changes de D-31, primero la compra idempotente, y pantallas de React obligatorias; solo `gateway` y `frontend` publican puertos, en `127.0.0.1`; entorno virtual de Python en `/opt/venv`; PostgreSQL 18; ADR según D-27 en `docs/adr/`; tests de API en `tests/api/`. Propuesta adoptada de Integrante B: Tailwind CSS con shadcn/ui (D-16). Propuestas adoptadas de Integrante C: bitácora HTTP y observabilidad, tests de API y contrato, pasarela de pagos en la Etapa II e idempotencia sobre PostgreSQL (D-23, D-24, D-25 y D-30) | Integrante A | — |
 | 0.5.0 | 2026-11-17 | Aprobación según el acta de la reunión del equipo del 2026-11-17 (videollamada): D-35 (cada autor integra su pull request), D-36 (idioma de `AGENTS.md`, `CONTRIBUTE.md`, la plantilla de pull request y las issues) y D-37 (cuándo hace falta una issue), aplicadas desde el grupo 1 del bootstrap. Propuesta adoptada de Integrante B: identidad visual GoPass (D-38) | Integrante B | — |
+| 0.6.0 | 2026-11-23 | Acuerdo del equipo del 2026-11-08 (grupo de WhatsApp): cada integrante arranca en paralelo sus features de la Etapa I, sin esperar el design de `e1-idempotent-purchase`; el bootstrap se reparte por área y el Event Storming corre en paralelo, no antes (nueva decisión D-39). Se ajustan D-28, el descubrimiento del dominio (7.2) y la Etapa I (7.3), y se cierra el punto abierto de D-33 | Integrante A | — |
 
 ---
 

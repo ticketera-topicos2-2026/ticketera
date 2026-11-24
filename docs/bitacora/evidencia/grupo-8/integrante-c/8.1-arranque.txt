@@ -1,0 +1,96 @@
+# 8.1 · Integrante C · 2026-11-19T09:25:01-03:00
+host: Windows 11 · WSL2 Linux 6.6.87.2-microsoft-standard-WSL2 · Docker 29.2.1 · Compose 5.1.0
+memoria del host: 15.53 GiB · CPUs: 12
+
+$ git clone https://github.com/ticketera-topicos2-2026/ticketera.git C:\GUS-PC\TP\ticketera
+commit: ae38e02 fix(catalog): give each health method its own OpenAPI operation id (#26)
+$ cp .env.example .env (ajustados puertos FRONTEND_PORT=15173 y GATEWAY_PORT=18080 para Windows)
+
+$ docker compose build
+build: 3.34 s
+
+$ docker compose up -d --wait --wait-timeout 300
+ Network ticketera_edge Creating 
+ Network ticketera_edge Created 
+ Network ticketera_backend Creating 
+ Network ticketera_backend Created 
+ Volume ticketera_ticketera-db-data Creating 
+ Volume ticketera_ticketera-db-data Created 
+ Container ticketera-database-1 Creating 
+ Container ticketera-frontend-1 Creating 
+ Container ticketera-database-1 Created 
+ Container ticketera-payments-1 Creating 
+ Container ticketera-identity-1 Creating 
+ Container ticketera-catalog-1 Creating 
+ Container ticketera-sales-1 Creating 
+ Container ticketera-payments-1 Created 
+ Container ticketera-catalog-1 Created 
+ Container ticketera-sales-1 Created 
+ Container ticketera-identity-1 Created 
+ Container ticketera-gateway-1 Creating 
+ Container ticketera-gateway-1 Created 
+ Container ticketera-frontend-1 Created 
+ Container ticketera-frontend-1 Starting 
+ Container ticketera-database-1 Starting 
+ Container ticketera-database-1 Started 
+ Container ticketera-database-1 Waiting 
+ Container ticketera-database-1 Waiting 
+ Container ticketera-database-1 Waiting 
+ Container ticketera-database-1 Waiting 
+ Container ticketera-frontend-1 Started 
+ Container ticketera-database-1 Healthy 
+ Container ticketera-catalog-1 Starting 
+ Container ticketera-database-1 Healthy 
+ Container ticketera-payments-1 Starting 
+ Container ticketera-database-1 Healthy 
+ Container ticketera-sales-1 Starting 
+ Container ticketera-database-1 Healthy 
+ Container ticketera-identity-1 Starting 
+ Container ticketera-sales-1 Started 
+ Container ticketera-identity-1 Started 
+ Container ticketera-catalog-1 Started 
+ Container ticketera-payments-1 Started 
+ Container ticketera-sales-1 Waiting 
+ Container ticketera-payments-1 Waiting 
+ Container ticketera-identity-1 Waiting 
+ Container ticketera-catalog-1 Waiting 
+ Container ticketera-catalog-1 Healthy 
+ Container ticketera-sales-1 Healthy 
+ Container ticketera-payments-1 Healthy 
+ Container ticketera-identity-1 Healthy 
+ Container ticketera-gateway-1 Starting 
+ Container ticketera-gateway-1 Started 
+ Container ticketera-sales-1 Waiting 
+ Container ticketera-payments-1 Waiting 
+ Container ticketera-frontend-1 Waiting 
+ Container ticketera-gateway-1 Waiting 
+ Container ticketera-database-1 Waiting 
+ Container ticketera-identity-1 Waiting 
+ Container ticketera-catalog-1 Waiting 
+ Container ticketera-sales-1 Healthy 
+ Container ticketera-payments-1 Healthy 
+ Container ticketera-frontend-1 Healthy 
+ Container ticketera-catalog-1 Healthy 
+ Container ticketera-identity-1 Healthy 
+ Container ticketera-database-1 Healthy 
+ Container ticketera-gateway-1 Healthy 
+up --wait: exit 0 en 61.9 s (límite de la tarea: 300 s)
+
+$ docker compose ps
+NAME                   IMAGE                                                                                                             COMMAND                  SERVICE    CREATED              STATUS                        PORTS
+ticketera-catalog-1    ticketera-catalog                                                                                                 "uvicorn catalog.api…"   catalog    About a minute ago   Up About a minute (healthy)   8000/tcp
+ticketera-database-1   postgres:18-alpine@sha256:1018733457011bf88d81db98cf43aac6d5150afc18787dbe204771fedf80ff95                        "docker-entrypoint.s…"   database   About a minute ago   Up About a minute (healthy)   5432/tcp
+ticketera-frontend-1   ticketera-frontend                                                                                                "docker-entrypoint.s…"   frontend   About a minute ago   Up About a minute (healthy)   127.0.0.1:15173->5173/tcp
+ticketera-gateway-1    nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8   "/docker-entrypoint.…"   gateway    About a minute ago   Up 57 seconds (healthy)       127.0.0.1:18080->8080/tcp
+ticketera-identity-1   quay.io/keycloak/keycloak:26.8.2@sha256:c68e286cacd87b942ac1939a0a1481461109d6acd3a57dc496969a319a76bbf0          "/opt/keycloak/bin/k…"   identity   About a minute ago   Up About a minute (healthy)   8080/tcp, 8443/tcp, 9000/tcp
+ticketera-payments-1   ticketera-payments                                                                                                "uvicorn payments.ap…"   payments   About a minute ago   Up About a minute (healthy)   8000/tcp
+ticketera-sales-1      ticketera-sales                                                                                                   "uvicorn sales.api.m…"   sales      About a minute ago   Up About a minute (healthy)   8000/tcp
+
+$ curl verification:
+/healthz → 200
+/api/catalog/health → {"status":"ok","service":"catalog","database":"ok"} (200)
+/api/sales/health → {"status":"ok","service":"sales","database":"ok"} (200)
+/api/payments/health → {"status":"ok","service":"payments","database":"ok"} (200)
+realm ticketera → http://localhost:18080/auth/realms/ticketera (200)
+frontend UI → http://localhost:15173/ (200)
+
